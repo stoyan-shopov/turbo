@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/">
+        <file>resources/highlight.css</file>
+        <file>resources/init.txt</file>
+    </qresource>
+    <qresource prefix="/fonts">
+        <file>resources/Hack-Regular.ttf</file>
+    </qresource>
+</RCC>
