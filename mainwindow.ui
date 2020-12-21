@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>2544</width>
-    <height>1240</height>
+    <width>2199</width>
+    <height>1000</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -293,7 +293,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>2544</width>
+     <width>2199</width>
      <height>21</height>
     </rect>
    </property>
@@ -1075,12 +1075,6 @@
    </widget>
   </widget>
   <widget class="QDockWidget" name="dockWidgetTest">
-   <property name="sizePolicy">
-    <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
-     <horstretch>0</horstretch>
-     <verstretch>0</verstretch>
-    </sizepolicy>
-   </property>
    <property name="windowTitle">
     <string>Test</string>
    </property>
@@ -1088,12 +1082,6 @@
     <number>4</number>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_17">
-    <property name="sizePolicy">
-     <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
-      <horstretch>0</horstretch>
-      <verstretch>0</verstretch>
-     </sizepolicy>
-    </property>
     <layout class="QVBoxLayout" name="verticalLayout_22">
      <item>
       <widget class="QPushButton" name="pushButtonHidePlainTextEdit">
@@ -1103,14 +1091,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QPlainTextEdit" name="plainTextEdit">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-      </widget>
+      <widget class="QPlainTextEdit" name="plainTextEdit"/>
      </item>
      <item>
       <widget class="QPushButton" name="pushButtonHideTreeWidget">
@@ -1121,12 +1102,6 @@
      </item>
      <item>
       <widget class="QTreeWidget" name="treeWidget">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
        <column>
         <property name="text">
          <string notr="true">1</string>
