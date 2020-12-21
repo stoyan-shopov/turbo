@@ -212,12 +212,7 @@ MainWindow::MainWindow(QWidget *parent) :
 "}\n"
 			      ));
 
-	//gdbProcess->start("arm-none-eabi-gdb", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("arm-none-eabi-gdb-9.1-with-expat.exe", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("arm-none-eabi-gdb-9.2-with-expat-and-python.exe", QStringList() << "--interpreter=mi3");
-
-	gdbProcess->start("gdbxxx.exe", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("c:/msys64/usr/bin/gdb.exe", QStringList() << "--interpreter=mi3");
+	gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
 
 	ui->plainTextEditScratchpad->setPlainText(s.value("scratchpad-text-contents", QString("Lorem ipsum dolor sit amet")).toString());
 
