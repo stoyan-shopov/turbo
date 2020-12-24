@@ -58,6 +58,19 @@
 
 #include "svdfileparser.hxx"
 
+#include <functional>
+
+namespace std
+{
+template<> struct hash<QString>
+{
+	std::size_t operator()(const QString& s) const noexcept
+	{
+		return (size_t) qHash(s);
+	}
+};
+}
+
 namespace Ui {
 class MainWindow;
 }
@@ -1272,7 +1285,7 @@ private:
 		uint32_t address;
 		QDialog * dialog;
 		QGroupBox * fieldsGroupBox;
-		SvdRegisterViewData(QDialog * dialog, uint32_t address) : address(address), dialog(dialog) {}
+		SvdRegisterViewData(QDialog * dialog = 0, uint32_t address = -1) : address(address), dialog(dialog) {}
 		struct RegField { int bitoffset, bitwidth; QSpinBox * spinbox;
 				RegField(int bitoffset, int bitwidth, QSpinBox * spinbox) :
 					bitoffset(bitoffset), bitwidth(bitwidth), spinbox(spinbox) {}};
