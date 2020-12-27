@@ -34,6 +34,8 @@
 #include <set>
 
 #include "cscanner.hxx"
+#include "bmpdetect.hxx"
+
 
 MainWindow::MainWindow(QWidget *parent) :
 	QMainWindow(parent),
@@ -202,15 +204,12 @@ MainWindow::MainWindow(QWidget *parent) :
 	"background: cyan;\n"
 "}\n"
 
-/*
-"QPlainTextEdit {\n"
-	"font: 10pt 'Lucida Sans Typewriter';\n"
-"}\n"
-*/
 "QPlainTextEdit {\n"
 	"font: 10pt 'Hack';\n"
 "}\n"
 
+/* Horizontal scroll bars. */
+#if 1
 "QScrollBar:horizontal {\n"
     "border: 2px solid grey;\n"
     "background: #32CC99;\n"
@@ -236,6 +235,8 @@ MainWindow::MainWindow(QWidget *parent) :
     "subcontrol-position: left;\n"
     "subcontrol-origin: margin;\n"
 "}\n"
+#endif
+/* Vertical scroll bars. */
 
 "QScrollBar:vertical {\n"
     "border: 2px solid grey;\n"
@@ -262,6 +263,8 @@ MainWindow::MainWindow(QWidget *parent) :
     "subcontrol-position: top;\n"
     "subcontrol-origin: margin;\n"
 "}\n"
+
+#if 0
 "QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {\n"
     "border: 2px solid grey;\n"
     "width: 3px;\n"
@@ -272,6 +275,7 @@ MainWindow::MainWindow(QWidget *parent) :
 "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {\n"
     "background: none;\n"
 "}\n"
+#endif
 			      ));
 
 	gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");

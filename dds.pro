@@ -24,9 +24,12 @@ INCLUDEPATH += ./clex/ ./troll/
 # You can also select to disable deprecated APIs only up to a certain version of Qt.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
+LIBS += -lsetupapi
+
 CONFIG += c++11
 
 SOURCES += \
+	   bmpdetect.cxx \
 	   clex/cscanner.cxx \
 	   mainwindow.cxx \
 	   main.cxx \
@@ -35,6 +38,7 @@ SOURCES += \
 	   svdfileparser.cxx
 
 HEADERS += \
+	   bmpdetect.hxx \
 	   clex/cscanner.hxx \
 	   gdb-mi-parser.hxx \
 	   mainwindow.hxx \
