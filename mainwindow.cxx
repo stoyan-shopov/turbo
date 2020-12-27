@@ -2481,35 +2481,6 @@ void MainWindow::on_lineEditBlackmagicMonitorCommand_returnPressed()
 	ui->lineEditBlackmagicMonitorCommand->clear();
 }
 
-
-PassThroughGdbserver::PassThroughGdbserver(BlackMagicProbe * probe)
-{
-	blackmagicProbe = probe;
-	gdb_tcpserver.setMaxPendingConnections(1);
-	connect(& gdb_tcpserver, SIGNAL(newConnection()), this, SLOT(newConneciton()));
-	if (!gdb_tcpserver.listen(QHostAddress::Any, 1122))
-	{
-		QMessageBox::critical(0, "Cannot listen on gdbserver port", "Error opening a gdbserver port for listening for incoming gdb connections");
-		return;
-	}
-	connect(probe, SIGNAL(dataAvailable(QByteArray)), this, SLOT(portDataAvailable(QByteArray)));
-}
-
-void PassThroughGdbserver::newConneciton(void)
-{
-	qDebug() << "gdb client connected";
-	/*! \todo	I think there is a race with the 'gdb_client_socket' variable - if a signal arrives between the variable assignment,
-	 * 		and the slot connections - fix this. */
-	gdb_client_socket = gdb_tcpserver.nextPendingConnection();
-	connect(gdb_client_socket, &QTcpSocket::disconnected, [&] { gdb_client_socket->disconnect(); gdb_client_socket = 0; qDebug() << "gdb client disconnected"; });
-	connect(gdb_client_socket, SIGNAL(readyRead()), this, SLOT(gdbClientSocketReadyRead()));
-}
-
-void PassThroughGdbserver::gdbClientSocketReadyRead(void)
-{
-	blackmagicProbe->sendRawGdbPacket(gdb_client_socket->readAll());
-}
-
 void MainWindow::on_pushButtonDisconnectGdbServer_clicked()
 {
 	gdbserver->closeConnection();
