@@ -101,66 +101,158 @@ class BlackMagicProbeServer : public QObject
 {
 	Q_OBJECT
 private:
+	QSerialPort	bmport;
+	QTcpServer	gdb_tcpserver;
+	QTcpSocket	gdb_client_socket;
 
+	static const int DEFAULT_GDB_SERVER_PORT	= 1122;
+
+	void shutdown(void)
+	{
+		qDebug() << __func__ << "shutting down gdb server, and blackmagic probe connections";
+		bmport.blockSignals(true);
+		gdb_client_socket.blockSignals(true);
+
+		gdb_tcpserver.close();
+		emit GdbServerDestroyed();
+
+		if (bmport.isOpen())
+		{
+			qDebug() << "data available when closing the blackmagic port:" << bmport.readAll();
+			bmport.setDataTerminalReady(false);
+			bmport.close();
+			emit BlackMagicProbeDisconnected();
+		}
+
+		if (gdb_client_socket.isValid() && gdb_client_socket.isOpen())
+		{
+			qDebug() << "data available when closing the gdb server port:" << gdb_client_socket.readAll();
+			gdb_client_socket.close();
+		}
+
+		bmport.blockSignals(false);
+		gdb_client_socket.blockSignals(false);
+	}
+signals:
+	void BlackMagicProbeConnected(void);
+	void BlackMagicProbeDisconnected(void);
+	void GdbServerCreated(int portNumber);
+	void GdbServerDestroyed(void);
+private slots:
+	void probeErrorOccurred(QSerialPort::SerialPortError error)
+	{
+		if (error != QSerialPort::NoError)
+		{
+			qDebug() << "blackmagic probe error occurred, error code:" << error;
+			shutdown();
+		}
+	}
+	void gdbSocketErrorOccurred(QAbstractSocket::SocketError error)
+	{
+		qDebug() << "gdb server socket error occurred, error code:" << error;
+		shutdown();
+	}
+
+	void gdbSocketReadyRead(void)
+	{
+		if (!bmport.isOpen())
+			qDebug() << "WARNING: gdb data received, but no blackmagic probe connected; discarding gdb data:" << gdb_client_socket.readAll();
+		else
+			bmport.write(gdb_client_socket.readAll());
+	}
+
+	void bmportReadyRead(void)
+	{
+		if (!gdb_client_socket.isValid() || !gdb_client_socket.isOpen())
+			qDebug() << "WARNING: blackmagic probe data received, but no gdb client connected; discarding blackmagic data:" << bmport.readAll();
+		else
+			gdb_client_socket.write(bmport.readAll());
+	}
+
+	void newGdbConnection(void)
+	{
+		*(int*)0=0;
+	}
+public:
+	BlackMagicProbeServer(void)
+	{
+		connect(& bmport, SIGNAL(errorOccurred(QSerialPort::SerialPortError)), this, SLOT(probeErrorOccurred(QSerialPort::SerialPortError)));
+		connect(& bmport, SIGNAL(readyRead()), this, SLOT(bmportReadyRead()));
+		connect(& gdb_client_socket, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(gdbSocketErrorOccurred(QAbstractSocket::SocketError)));
+		connect(& gdb_client_socket, SIGNAL(readyRead()), this, SLOT(gdbSocketReadyRead()));
+		connect(& gdb_client_socket, &QTcpSocket::disconnected, [&] { shutdown(); });
+		connect(& gdb_tcpserver, SIGNAL(newConnection()), this, SLOT(newGdbConnection()));
+	}
+	void connectToProbe(void)
+	{
+		if (bmport.isOpen())
+		{
+			bmport.setDataTerminalReady(false);
+			bmport.close();
+			emit BlackMagicProbeDisconnected();
+		}
+
+		std::vector<BmpProbeData> probes;
+		findConnectedProbes(probes);
+		if (!probes.size())
+			return;
+		QString portName;
+		if (probes.size() > 1)
+		{
+			QStringList probeDescriptions;
+			for (const auto & p : probes)
+				probeDescriptions << p.description + " \\\\Serial# " + p.serialNumber + " \\\\Port# " + p.portName;
+			bool ok;
+			QString probe = QInputDialog::getItem(0, "Select probe to connect to",
+							      "Multiple blackmagic probes detected.\n"
+							      "Select the blackmagic probe to connect to",
+							      probeDescriptions, 0, false, &ok);
+			if (!ok)
+				return;
+			QRegularExpression rx("\\\\Port# (.*)");
+			QRegularExpressionMatch match = rx.match(probe);
+			if (match.hasMatch())
+				portName = match.captured(1);
+			else
+				return;
+		}
+		else
+			portName = probes.at(0).portName;
+
+		bmport.setPortName(portName);
+		if (bmport.open(QSerialPort::ReadWrite))
+		{
+			if (!gdb_tcpserver.listen(QHostAddress::Any, DEFAULT_GDB_SERVER_PORT))
+			{
+				QMessageBox::critical(0, "Cannot listen on gdbserver port", "Error opening a gdbserver port for listening for incoming gdb connections");
+				shutdown();
+				return;
+			}
+			emit GdbServerCreated(DEFAULT_GDB_SERVER_PORT);
+			bmport.setDataTerminalReady(false);
+			bmport.setDataTerminalReady(true);
+			emit BlackMagicProbeConnected();
+		}
+	}
+	void sendRawGdbPacket(const QByteArray & packet)
+	{
+		if (bmport.isOpen())
+			bmport.write(packet);
+		else
+			qDebug() << "WARNING: tried to send data to the blackmagic probe, and no probe is connected; data:" << packet;
+	}
 };
+
 
 class BlackMagicProbe : public QObject
 {
 	Q_OBJECT
 private:
 	QSerialPort port;
-	QByteArray incomingData;
-	enum
-	{
-		INVALID,
-		CONNECTED,
-		SYNC,
-		ASYNC,
-		PASSTHROUGH,
-	}
-	portState = INVALID;
-	bool blackmMagicTargetConnected = false;
-	void dumpIncomingPackets(void)
-	{
-		QByteArray packet;
-		qDebug() << "dumping packets";
-		while ((packet = GdbRemote::extractPacket(incomingData)).length())
-		{
-			port.write("+");
-			qDebug() << "confirmed";
-			auto packetContents = GdbRemote::packetData(packet);
-			if (packetContents.length() && packetContents.at(0) == 'O' && !GdbRemote::isOkResponse(packetContents))
-				qDebug() << QByteArray::fromHex(packetContents.right(packetContents.length() - 1));
-			qDebug() << packet;
-		}
-	}
-	bool receivePacketConfirmation(void)
-	{
-		int len = incomingData.length();
-		qDebug() << "expecting confirmation...";
-		if (!port.waitForReadyRead(3000))
-		{
-			if (len != incomingData.length())
-				*(int*)0=0;
-			/*! \todo	This is an error - handle it better at this place. */
-			*(int *)0=0;
-		}
-		incomingData += port.readAll();
-		if (!incomingData.length())
-			/*! \todo	This is an error - handle it better at this place. */
-			*(int *)0=0;
-		if (incomingData.at(0) != '+')
-			*(int *)0=0;
-		incomingData.remove(0, 1);
-		qDebug() << "confirmation received";
-		return true;
-	}
 signals:
 	void dataAvailable(const QByteArray & data);
 	void BlackMagicProbeConnected(void);
 	void BlackMagicProbeDisconnected(void);
-	void BlackMagicTargetConnected(void);
-	void BlackMagicTargetDisconnected(void);
 private slots:
 	void errorOccurred(QSerialPort::SerialPortError error)
 	{
@@ -170,7 +262,6 @@ private slots:
 			if (port.isOpen())
 			{
 				port.blockSignals(true);
-				qDebug() << "cached data available when closing the port:" << incomingData;
 				qDebug() << "data available when closing the port:" << port.readAll();
 				port.setDataTerminalReady(false);
 				port.close();
@@ -182,14 +273,7 @@ private slots:
 	}
 	void portReadyRead(void)
 	{
-		qDebug() << "blackmagic data available; state is:" << portState;
-		if (portState == ASYNC)
-		{
-			incomingData += port.readAll();
-			dumpIncomingPackets();
-		}
-		else if (portState == PASSTHROUGH)
-			emit dataAvailable(port.readAll());
+		emit dataAvailable(port.readAll());
 	}
 public:
 	BlackMagicProbe(void)
@@ -236,8 +320,6 @@ public:
 		port.setPortName(portName);
 		if (port.open(QSerialPort::ReadWrite))
 		{
-			portState = PASSTHROUGH;
-			incomingData.clear();
 			port.setDataTerminalReady(false);
 			port.setDataTerminalReady(true);
 			emit BlackMagicProbeConnected();
@@ -248,7 +330,7 @@ public:
 		if (port.isOpen())
 			port.write(packet);
 		else
-			*(int*)0=0;
+			qDebug() << "WARNING: tried to send data to the blackmagic probe, and no probe is connected; data:" << packet;
 	}
 };
 
@@ -261,7 +343,7 @@ public:
 	{
 		blackmagicProbe = probe;
 		gdb_tcpserver.setMaxPendingConnections(1);
-		connect(& gdb_tcpserver, SIGNAL(newConnection()), this, SLOT(newConneciton()));
+		connect(& gdb_tcpserver, SIGNAL(newConnection()), this, SLOT(newConnection()));
 		if (!gdb_tcpserver.listen(QHostAddress::Any, 1122))
 		{
 			QMessageBox::critical(0, "Cannot listen on gdbserver port", "Error opening a gdbserver port for listening for incoming gdb connections");
@@ -276,7 +358,7 @@ private:
 	/*! \todo	I think there is a race with the 'gdb_client_socket' variable. */
 	QTcpSocket	* gdb_client_socket = 0;
 private slots:
-	void newConneciton(void)
+	void newConnection(void)
 	{
 		qDebug() << "gdb client connected";
 		/*! \todo	I think there is a race with the 'gdb_client_socket' variable - if a signal arrives between the variable assignment,
@@ -290,14 +372,6 @@ private slots:
 		blackmagicProbe->sendRawGdbPacket(gdb_client_socket->readAll());
 	}
 	void portDataAvailable(const QByteArray & data) { if (gdb_client_socket) gdb_client_socket->write(data); else qDebug() << "discarding BMP data:" << data; }
-public slots:
-	void stopServer(void)
-	{
-		gdb_tcpserver.close();
-		if (gdb_client_socket)
-			gdb_client_socket->disconnect();
-		gdb_client_socket = 0;
-	}
 };
 
 class StringFinder : public QObject
