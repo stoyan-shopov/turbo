@@ -358,7 +358,6 @@ reopen_last_file:
 					    targetFilesBaseDirectory + "ram.bin", 0x20000000,
 					    targetFilesBaseDirectory + "registers.bin");
 	////gdbserver = new GdbServer(targetCorefile);
-	gdbserver = new PassThroughGdbserver(& blackMagicProbe);
 
 	/* Load bookmarks. */
 	QStringList bookmarkStrings = s.value("bookmarks", QStringList()).toStringList();
@@ -399,14 +398,14 @@ reopen_last_file:
 	connect(ui->treeWidgetTraceLog, & QTreeWidget::itemClicked, [=] (QTreeWidgetItem * item, int column)
 		{ showSourceCode(item); } );
 
-	connect(& blackMagicProbe, & BlackMagicProbe::BlackMagicProbeConnected,
+	connect(& blackMagicProbe, & BlackMagicProbeServer::BlackMagicProbeConnected,
 		[&] {
 			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: lawngreen");
 			ui->pushButtonConnectToBlackmagic->setText(tr("Blackmagic connected"));
 			ui->groupBoxBlackMagicDisconnectedWidgets->setEnabled(false);
 			ui->groupBoxBlackMagicConnectedWidgets->setEnabled(true);
 			});
-	connect(& blackMagicProbe, & BlackMagicProbe::BlackMagicProbeDisconnected,
+	connect(& blackMagicProbe, & BlackMagicProbeServer::BlackMagicProbeDisconnected,
 		[&] {
 			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: yellow");
 			ui->pushButtonConnectToBlackmagic->setText(tr("Connect to blackmagic"));
@@ -2452,7 +2451,8 @@ void MainWindow::on_pushButtonConnectToBlackmagic_clicked()
 
 void MainWindow::on_pushButtonDisconnectGdbServer_clicked()
 {
-	gdbserver->closeConnection();
+	*(int*)0=0;
+	//gdbserver->closeConnection();
 }
 
 void MainWindow::on_lineEditFindText_returnPressed()
