@@ -34,8 +34,6 @@
 #include <set>
 
 #include "cscanner.hxx"
-#include "bmpdetect.hxx"
-
 
 MainWindow::MainWindow(QWidget *parent) :
 	QMainWindow(parent),
@@ -417,8 +415,6 @@ reopen_last_file:
 			});
 	ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: yellow");
 
-	//connect(ui->pushButtonConnectToFirstTarget, & QPushButton::clicked, [&] { blackMagicProbe.connectToFirstTarget(); });
-	connect(ui->pushButtonConnectToFirstTarget, & QPushButton::clicked, [&] { emit attachToFirstTarget(); });
 	connect(ui->pushButtonDisplayHelp, SIGNAL(clicked(bool)), this, SLOT(displayHelp()));
 	displayHelp();
 
@@ -455,8 +451,6 @@ reopen_last_file:
 	});
 
 	targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED);
-
-	connect(ui->pushButtonConnectGdbToGdbServer, SIGNAL(clicked(bool)), this, SLOT(connectGdbToGdbServer()));
 
 	connect(ui->pushButtonResetAndRunTarget, & QPushButton::clicked, [&] { sendDataToGdbProcess("-exec-run\n"); });
 	connect(ui->pushButtonContinue, & QPushButton::clicked, [&] { sendDataToGdbProcess("-exec-continue\n"); });
@@ -777,9 +771,6 @@ MainWindow::~MainWindow()
 	fileSearchThread.quit();
 	fileSearchThread.wait();
 
-	targetAttachThread.quit();
-	targetAttachThread.wait();
-
 	delete ui;
 }
 
@@ -1050,13 +1041,6 @@ bool MainWindow::handleFilesResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 	qRegisterMetaType<QSharedPointer<QVector<StringFinder::SearchResult>>>();
 	connect(stringFinder, SIGNAL(searchReady(QString,QSharedPointer<QVector<StringFinder::SearchResult> >,bool)), this, SLOT(stringSearchReady(QString,QSharedPointer<QVector<StringFinder::SearchResult> >,bool)));
 	fileSearchThread.start();
-
-	blackmagicTargetAttacher = new BlackmagicTargetAttacher();
-	blackmagicTargetAttacher->moveToThread(&targetAttachThread);
-	connect(this, SIGNAL(attachToFirstTarget()), blackmagicTargetAttacher, SLOT(attachToFirstTarget()));
-	connect(blackmagicTargetAttacher, SIGNAL(targetCommunicationError(QString)), this, SLOT(targetAttacherErrorReceived(QString)));
-	connect(blackmagicTargetAttacher, SIGNAL(targetAttached()), this, SLOT(targetAttacherSuccess()));
-	targetAttachThread.start();
 
 	return true;
 }
@@ -2313,14 +2297,6 @@ int currentBlockNumber = ui->plainTextEditSourceView->textCursor().blockNumber()
 	sourceFileWatcher.addPath(fi.absoluteFilePath());
 }
 
-void MainWindow::connectGdbToGdbServer(void)
-{
-	if (!isGdbServerConnectedToGdb)
-		/*! \todo	Make it possible here that connection errors are handled. */
-		sendDataToGdbProcess("-target-select extended-remote localhost:1122\n");
-}
-
-
 class xbtn : public QPushButton
 {
 public:
@@ -2472,13 +2448,6 @@ void MainWindow::on_pushButtonDeleteAllBookmarks_clicked()
 void MainWindow::on_pushButtonConnectToBlackmagic_clicked()
 {
 	blackMagicProbe.connectToProbe();
-}
-
-void MainWindow::on_lineEditBlackmagicMonitorCommand_returnPressed()
-{
-	qDebug() << "sending user monitor packet:" << GdbRemote::monitorRequest(ui->lineEditBlackmagicMonitorCommand->text().toLocal8Bit());
-	blackMagicProbe.sendRawGdbPacket(GdbRemote::monitorRequest(ui->lineEditBlackmagicMonitorCommand->text().toLocal8Bit()), true, true);
-	ui->lineEditBlackmagicMonitorCommand->clear();
 }
 
 void MainWindow::on_pushButtonDisconnectGdbServer_clicked()

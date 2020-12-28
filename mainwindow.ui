@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>2199</width>
-    <height>1000</height>
+    <width>2298</width>
+    <height>1001</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -131,17 +131,17 @@
               </property>
              </widget>
             </item>
-            <item>
-             <widget class="QPushButton" name="pushButtonDisconnectGdbServer">
-              <property name="text">
-               <string>Disconnect gdb server</string>
-              </property>
-             </widget>
-            </item>
            </layout>
           </widget>
          </item>
         </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButtonDisconnectGdbServer">
+        <property name="text">
+         <string>Disconnect gdb server</string>
+        </property>
        </widget>
       </item>
       <item>
@@ -175,13 +175,6 @@
          <property name="bottomMargin">
           <number>0</number>
          </property>
-         <item>
-          <widget class="QPushButton" name="pushButtonConnectGdbToGdbServer">
-           <property name="text">
-            <string>Connect gdb to gdb server</string>
-           </property>
-          </widget>
-         </item>
         </layout>
        </widget>
       </item>
@@ -293,7 +286,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>2199</width>
+     <width>2298</width>
      <height>21</height>
     </rect>
    </property>
@@ -767,16 +760,6 @@
              <widget class="QLabel" name="label_11">
               <property name="text">
                <string>TextLabel</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="lineEditBlackmagicMonitorCommand"/>
-            </item>
-            <item>
-             <widget class="QPushButton" name="pushButtonConnectToFirstTarget">
-              <property name="text">
-               <string>Connect to first target</string>
               </property>
              </widget>
             </item>

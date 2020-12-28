@@ -35,6 +35,7 @@
 #include <QTextEdit>
 #include <QSerialPort>
 #include <QSerialPortInfo>
+#include <QInputDialog>
 
 #include <QMessageBox>
 #include <QFileSystemWatcher>
@@ -59,6 +60,8 @@
 #include "svdfileparser.hxx"
 
 #include <functional>
+
+#include "bmpdetect.hxx"
 
 namespace std
 {
@@ -94,6 +97,13 @@ QRegularExpression rx("^/(\\w)/");
 };
 
 
+class BlackMagicProbeServer : public QObject
+{
+	Q_OBJECT
+private:
+
+};
+
 class BlackMagicProbe : public QObject
 {
 	Q_OBJECT
@@ -103,7 +113,6 @@ private:
 	enum
 	{
 		INVALID,
-		DETECTING_PORT,
 		CONNECTED,
 		SYNC,
 		ASYNC,
@@ -181,7 +190,6 @@ private slots:
 		}
 		else if (portState == PASSTHROUGH)
 			emit dataAvailable(port.readAll());
-		//incomingData += port.readAll();
 	}
 public:
 	BlackMagicProbe(void)
@@ -191,205 +199,59 @@ public:
 	}
 	void connectToProbe(void)
 	{
-		auto serialPorts = QSerialPortInfo::availablePorts();
 		if (port.isOpen())
 		{
 			port.setDataTerminalReady(false);
 			port.close();
 			emit BlackMagicProbeDisconnected();
 		}
-		portState = DETECTING_PORT;
-		for (const auto & p : serialPorts)
-		{
-			qDebug() << p.portName() << p.description() << p.manufacturer() << p.vendorIdentifier() << p.productIdentifier() << p.systemLocation();
-			port.setPort(p);
-			if (port.open(QSerialPort::ReadWrite))
-			{
-				incomingData.clear();
-				port.setDataTerminalReady(false);
-				port.setDataTerminalReady(true);
-				while (true)
-				{
-					int len = incomingData.length();
-					if (!port.waitForReadyRead(500))
-					{
-						if (len != incomingData.length())
-							*(int*)0=0;
-						break;
-					}
-					incomingData += port.readAll();
-					QByteArray packet = GdbRemote::extractPacket(incomingData);
-					if (GdbRemote::packetData(packet) == "OK")
-					{
-						port.write("+");
-						qDebug() << "confirmed";
-						qDebug() << "probe detected, returning";
-						//////!!!!!!!!!!!!portState = ASYNC;
-						portState = PASSTHROUGH;
-						emit BlackMagicProbeConnected();
-						return;
-					}
 
-				}
-				port.setDataTerminalReady(false);
-				port.close();
-			}
-		}
-		return;
-	}
-	void connectToFirstTarget(void)
-	{
-		if (!port.isOpen())
+		std::vector<BmpProbeData> probes;
+		findConnectedProbes(probes);
+		if (!probes.size())
 			return;
-		qDebug() << "START";
-		QString response;
-		portState = SYNC;
-		//incomingData.clear();
-		sendRawGdbPacket(GdbRemote::monitorRequest("swdp_scan"), true);
-		while (true)
+		QString portName;
+		if (probes.size() > 1)
 		{
-			incomingData += port.readAll();
-			while (1)
-			{
-				auto packet = GdbRemote::extractPacket(incomingData);
-				if (!packet.length())
-					break;
-				port.write("+");
-				if (GdbRemote::isOkResponse(packet))
-				{
-					qDebug() << "target detection complete, response:" << response;
-					goto out;
-				}
-				if (GdbRemote::isErrorResponse(packet))
-				{
-					qDebug() << "target detection complete with errors, response:" << response;
-					goto out;
-				}
-				auto packetContents = GdbRemote::packetData(packet);
-				if (packetContents.length() && packetContents.at(0) == 'O')
-					response += QByteArray::fromHex(packetContents.right(packetContents.length() - 1));
-				else
-				{
-					qDebug() << "unexpected packet received, ignoring:" << packetContents;
-				}
-			}
-			if (!port.waitForReadyRead(1000))
-			{
-				qDebug() << "error receiving packet from the blackmagic probe";
-				response.clear();
-				break;
-			}
+			QStringList probeDescriptions;
+			for (const auto & p : probes)
+				probeDescriptions << p.description + " \\\\Serial# " + p.serialNumber + " \\\\Port# " + p.portName;
+			bool ok;
+			QString probe = QInputDialog::getItem(0, "Select probe to connect to",
+							      "Multiple blackmagic probes detected.\n"
+							      "Select the blackmagic probe to connect to",
+							      probeDescriptions, 0, false, &ok);
+			if (!ok)
+				return;
+			QRegularExpression rx("\\\\Port# (.*)");
+			QRegularExpressionMatch match = rx.match(probe);
+			if (match.hasMatch())
+				portName = match.captured(1);
+			else
+				return;
 		}
-out:
-		//dumpIncomingPackets();
-		portState = ASYNC;
-		qDebug() << "END";
+		else
+			portName = probes.at(0).portName;
+
+		port.setPortName(portName);
+		if (port.open(QSerialPort::ReadWrite))
+		{
+			portState = PASSTHROUGH;
+			incomingData.clear();
+			port.setDataTerminalReady(false);
+			port.setDataTerminalReady(true);
+			emit BlackMagicProbeConnected();
+		}
 	}
-	/*! \todo This is broken when sending packets from the user interface, and I have no idea why (yet). */
-	void sendRawGdbPacket(const QByteArray & packet, bool waitForConfirmation = false, bool confirmPacketsAlreadyReceived = false)
+	void sendRawGdbPacket(const QByteArray & packet)
 	{
 		if (port.isOpen())
-		{
-			auto savedState = portState;
-			portState = SYNC;
 			port.write(packet);
-			if (waitForConfirmation)
-				if (!receivePacketConfirmation())
-					*(int*)0=0;
-			/*! \todo This is for handling any received monitor packets when issuing monitor requests from
-			 * the user interface. This is really messy, and buggy at this time, fix this... */
-			if (confirmPacketsAlreadyReceived)
-			{
-				qDebug() << "xxx";
-				dumpIncomingPackets();
-				qDebug() << "yyy";
-			}
-			portState = savedState;
-		}
 		else
 			*(int*)0=0;
 	}
 };
 
-class BlackmagicTargetAttacher : public QObject
-{
-	Q_OBJECT
-private:
-	bool sendPacketAndGetResponse(const QByteArray packet, QList<QByteArray> & responsePackets)
-	{
-		responsePackets.clear();
-		QTcpSocket s;
-		auto returnError = [&] (const QString& errorMessage) -> bool
-		{
-			if (s.isOpen())
-				s.close();
-			qDebug() << errorMessage;
-			emit targetCommunicationError(errorMessage);
-			return false;
-		};
-		s.connectToHost("localhost", 1122);
-		if (!s.waitForConnected(3000))
-			return returnError("Failed to connect to gdbserver socket");
-		QByteArray incomingData;
-		s.write(packet);
-
-		if (!s.waitForBytesWritten())
-			return returnError("Error writing to the gdbserver socket");
-		if (!s.waitForReadyRead())
-			return returnError("Error reading from the gdbserver socket");
-		incomingData += s.readAll();
-		if (incomingData.at(0) != '+')
-			return returnError("Error receiving packet confirmation from the gdbserver");
-		incomingData.remove(0 ,1);
-		while (1)
-		{
-			QByteArray packet;
-			while (!(packet = GdbRemote::extractPacket(incomingData)).isEmpty())
-			{
-				s.write("+");
-				responsePackets << packet;
-				if (!s.waitForBytesWritten())
-					return returnError("Error writing to the gdbserver socket");
-
-				qDebug() << __func__ << ": received packet: " << GdbRemote::packetData(packet);
-				if (GdbRemote::isOkResponse(packet) || GdbRemote::isErrorResponse(packet)
-						|| GdbRemote::isTargetStopReplyPacket(packet))
-					return true;
-			}
-
-			if (!s.waitForReadyRead())
-				return returnError("Error reading from the gdbserver socket");
-			incomingData += s.readAll();
-		}
-
-	}
-public slots:
-
-	void attachToFirstTarget(void)
-	{
-		QList<QByteArray> packets;
-		if (!sendPacketAndGetResponse(GdbRemote::monitorRequest("swdp_scan"), packets))
-			return;
-		if (packets.size() && GdbRemote::isErrorResponse(packets.last()))
-		{
-			emit targetCommunicationError("Failed to scan targets with 'swdp_scan'");
-			return;
-		}
-
-		if (!sendPacketAndGetResponse(GdbRemote::attachRequest(), packets))
-		{
-			emit targetCommunicationError("Error attaching to first target");
-			return;
-		}
-		if (packets.size() == 1 && GdbRemote::isTargetStopReplyPacket(packets.at(0)))
-			emit targetAttached();
-		else
-			emit targetCommunicationError("Failed to attach to target");
-	}
-signals:
-	void targetAttached(void);
-	void targetCommunicationError(const QString errorMessage);
-};
 
 class PassThroughGdbserver : public QObject
 {
@@ -427,7 +289,15 @@ private slots:
 	{
 		blackmagicProbe->sendRawGdbPacket(gdb_client_socket->readAll());
 	}
-	void portDataAvailable(const QByteArray & data) { gdb_client_socket->write(data); }
+	void portDataAvailable(const QByteArray & data) { if (gdb_client_socket) gdb_client_socket->write(data); else qDebug() << "discarding BMP data:" << data; }
+public slots:
+	void stopServer(void)
+	{
+		gdb_tcpserver.close();
+		if (gdb_client_socket)
+			gdb_client_socket->disconnect();
+		gdb_client_socket = 0;
+	}
 };
 
 class StringFinder : public QObject
@@ -814,12 +684,6 @@ private slots:
 	void bookmarksContextMenuRequested(QPoint p);
 	void breakpointViewItemChanged(QTreeWidgetItem * item, int column);
 	void stringSearchReady(const QString pattern, QSharedPointer<QVector<StringFinder::SearchResult>> results, bool resultsTruncated);
-	void targetAttacherErrorReceived(const QString errorMessage) { QMessageBox::critical(0, "Error communicating with target", errorMessage); }
-	void targetAttacherSuccess(void) {
-		connectGdbToGdbServer();
-		QMessageBox::information(0, "Successfully attached to target", "Successfully attached to target");
-	}
-	void connectGdbToGdbServer(void);
 	void createSvdRegisterView(QTreeWidgetItem * item, int column);
 
 	void updateSourceListView(void);
@@ -839,8 +703,6 @@ private slots:
 	void on_pushButtonDeleteAllBookmarks_clicked();
 
 	void on_pushButtonConnectToBlackmagic_clicked();
-
-	void on_lineEditBlackmagicMonitorCommand_returnPressed();
 
 	void on_pushButtonDisconnectGdbServer_clicked();
 
@@ -1276,7 +1138,6 @@ private:
 	QThread fileSearchThread;
 	QThread targetAttachThread;
 	StringFinder * stringFinder;
-	BlackmagicTargetAttacher * blackmagicTargetAttacher;
 	GdbMiReceiver			* gdbMiReceiver;
 	QStringList targetRegisterNames;
 
@@ -1366,7 +1227,6 @@ protected:
 	bool event(QEvent *event);
 	bool eventFilter(QObject *watched, QEvent *event) override;
 signals:
-	void attachToFirstTarget(void);
 	void readyReadGdbProcess(const QByteArray data);
 	void findString(const QString & str, unsigned flags);
 	void targetRunning(void);
