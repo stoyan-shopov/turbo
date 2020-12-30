@@ -117,7 +117,6 @@ private:
 			qDebug() << "data available when closing the blackmagic port:" << bmport.readAll();
 			bmport.setDataTerminalReady(false);
 			bmport.close();
-			emit BlackMagicProbeDisconnected();
 		}
 
 		if (gdb_client_socket)
@@ -138,6 +137,7 @@ private:
 		gdb_tcpserver.close();
 
 		bmport.blockSignals(false);
+		emit BlackMagicProbeDisconnected();
 	}
 signals:
 	void BlackMagicProbeConnected(void);
@@ -196,11 +196,7 @@ public:
 	void connectToProbe(void)
 	{
 		if (bmport.isOpen())
-		{
-			bmport.setDataTerminalReady(false);
-			bmport.close();
-			emit BlackMagicProbeDisconnected();
-		}
+			shutdown();
 
 		std::vector<BmpProbeData> probes;
 		findConnectedProbes(probes);
