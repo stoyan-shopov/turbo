@@ -188,6 +188,11 @@ public:
 		connect(& bmport, SIGNAL(readyRead()), this, SLOT(bmportReadyRead()));
 		connect(& gdb_tcpserver, SIGNAL(newConnection()), this, SLOT(newGdbConnection()));
 	}
+	~BlackMagicProbeServer(void)
+	{
+		disconnect();
+		shutdown();
+	}
 	void connectToProbe(void)
 	{
 		if (bmport.isOpen())
@@ -1074,18 +1079,16 @@ private:
 		SVD_REGISTER_ADDRESS,
 	};
 	SvdFileParser svdParser;
-	BlackMagicProbeServer blackMagicProbe;
+	BlackMagicProbeServer blackMagicProbeServer;
 	const QString vimEditorLocation = "C:\\Program Files (x86)\\Vim\\vim80\\gvim.exe";
 	Ui::MainWindow *ui;
 	std::shared_ptr<QProcess> gdbProcess;
 	////GdbServer	* gdbserver;
-	BlackMagicProbeServer	gdbserver;
 	TargetCorefile	* targetCorefile;
 	QString normalizeGdbString(const QString & miString);
 	/*! \todo This is no longer needed. */
 	QThread gdbMiReceiverThread;
 	QThread fileSearchThread;
-	QThread targetAttachThread;
 	StringFinder * stringFinder;
 	GdbMiReceiver			* gdbMiReceiver;
 	QStringList targetRegisterNames;

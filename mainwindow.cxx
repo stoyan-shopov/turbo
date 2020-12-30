@@ -398,14 +398,14 @@ reopen_last_file:
 	connect(ui->treeWidgetTraceLog, & QTreeWidget::itemClicked, [=] (QTreeWidgetItem * item, int column)
 		{ showSourceCode(item); } );
 
-	connect(& blackMagicProbe, & BlackMagicProbeServer::BlackMagicProbeConnected,
+	connect(& blackMagicProbeServer, & BlackMagicProbeServer::BlackMagicProbeConnected,
 		[&] {
 			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: lawngreen");
 			ui->pushButtonConnectToBlackmagic->setText(tr("Blackmagic connected"));
 			ui->groupBoxBlackMagicDisconnectedWidgets->setEnabled(false);
 			ui->groupBoxBlackMagicConnectedWidgets->setEnabled(true);
 			});
-	connect(& blackMagicProbe, & BlackMagicProbeServer::BlackMagicProbeDisconnected,
+	connect(& blackMagicProbeServer, & BlackMagicProbeServer::BlackMagicProbeDisconnected,
 		[&] {
 			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: yellow");
 			ui->pushButtonConnectToBlackmagic->setText(tr("Connect to blackmagic"));
@@ -704,7 +704,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 			if (target_state == TARGET_STOPPED)
 				sendDataToGdbProcess("c\n");
 			else if (e->modifiers() == Qt::ControlModifier)
-				blackMagicProbe.sendRawGdbPacket("\x3");
+				blackMagicProbeServer.sendRawGdbPacket("\x3");
 			result = true;
 			break;
 		case Qt::Key_Space:
@@ -761,6 +761,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 
 MainWindow::~MainWindow()
 {
+	blackMagicProbeServer.disconnect();
 	gdbMiReceiverThread.quit();
 	gdbProcess->disconnect();
 	gdbProcess->kill();
@@ -2446,7 +2447,7 @@ void MainWindow::on_pushButtonDeleteAllBookmarks_clicked()
 
 void MainWindow::on_pushButtonConnectToBlackmagic_clicked()
 {
-	blackMagicProbe.connectToProbe();
+	blackMagicProbeServer.connectToProbe();
 }
 
 void MainWindow::on_pushButtonDisconnectGdbServer_clicked()
@@ -2465,7 +2466,7 @@ void MainWindow::on_lineEditFindText_returnPressed()
 void MainWindow::on_pushButtonRequestGdbHalt_clicked()
 {
 	//gdbProcess->write("\x3");
-	blackMagicProbe.sendRawGdbPacket("\x3");
+	blackMagicProbeServer.sendRawGdbPacket("\x3");
 }
 
 void MainWindow::on_pushButtonDumpVarObjects_clicked()
