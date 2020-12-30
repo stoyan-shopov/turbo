@@ -128,7 +128,7 @@ private:
 				qDebug() << "data available when closing the gdb server port:" << gdb_client_socket->readAll();
 				gdb_client_socket->close();
 			}
-			/* Do not explicitly delete the socket. It is not explicitly stated in the t documentation,
+			/* Do not explicitly delete the socket. It is not explicitly stated in the Qt documentation,
 			 * and I have not checked the Qt sources, but it seems that calling 'QTcpServer::close()'
 			 * also deletes the connected sockets. Trying to delete the socket here is crashing the program. */
 			//delete gdb_client_socket;
@@ -136,15 +136,12 @@ private:
 		}
 
 		gdb_tcpserver.close();
-		emit GdbServerDestroyed();
 
 		bmport.blockSignals(false);
 	}
 signals:
 	void BlackMagicProbeConnected(void);
 	void BlackMagicProbeDisconnected(void);
-	void GdbServerCreated(int portNumber);
-	void GdbServerDestroyed(void);
 private slots:
 	void probeErrorOccurred(QSerialPort::SerialPortError error)
 	{
@@ -241,7 +238,6 @@ public:
 				shutdown();
 				return;
 			}
-			emit GdbServerCreated(DEFAULT_GDB_SERVER_PORT);
 			bmport.setDataTerminalReady(false);
 			bmport.setDataTerminalReady(true);
 			emit BlackMagicProbeConnected();
