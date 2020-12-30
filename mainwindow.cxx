@@ -405,6 +405,7 @@ reopen_last_file:
 			ui->pushButtonConnectToBlackmagic->setText(tr("Blackmagic connected"));
 			ui->groupBoxBlackMagicDisconnectedWidgets->setEnabled(false);
 			ui->groupBoxBlackMagicConnectedWidgets->setEnabled(true);
+			ui->pushButtonConnectGdbToGdbServer->click();
 			});
 	connect(& blackMagicProbeServer, & BlackMagicProbeServer::BlackMagicProbeDisconnected,
 		[&] {
@@ -424,7 +425,8 @@ reopen_last_file:
 		if (isGdbServerConnectedToGdb)
 			*(int*)0=0;
 		isGdbServerConnectedToGdb = true;
-		QMessageBox::information(0, "Gdb connection established", "Gdb successfully connected to remote gdb server");
+		////QMessageBox::information(0, "Gdb connection established", "Gdb successfully connected to remote gdb server");
+		ui->pushButtonScanForTargets->click();
 	});
 	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->groupBoxTargetHalted << ui->groupBoxTargetConnected;
 	targetStateDependentWidgets.disabledWidgetsWhenTargetStopped << ui->groupBoxTargetRunning;
