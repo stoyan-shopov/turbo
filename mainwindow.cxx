@@ -413,6 +413,8 @@ reopen_last_file:
 			ui->pushButtonConnectToBlackmagic->setText(tr("Connect to blackmagic"));
 			ui->groupBoxBlackMagicDisconnectedWidgets->setEnabled(true);
 			ui->groupBoxBlackMagicConnectedWidgets->setEnabled(false);
+			sendDataToGdbProcess("-target-disconnect\n");
+			isGdbServerConnectedToGdb = false;
 			});
 	ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: yellow");
 
