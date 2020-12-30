@@ -175,6 +175,13 @@
          <property name="bottomMargin">
           <number>0</number>
          </property>
+         <item>
+          <widget class="QPushButton" name="pushButtonConnectGdbToGdbServer">
+           <property name="text">
+            <string>Connect gdb</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </widget>
       </item>
@@ -760,6 +767,13 @@
              <widget class="QLabel" name="label_11">
               <property name="text">
                <string>TextLabel</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButtonScanForTargets">
+              <property name="text">
+               <string>Scan</string>
               </property>
              </widget>
             </item>

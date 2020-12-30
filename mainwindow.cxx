@@ -309,6 +309,7 @@ reopen_last_file:
 									   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_EXECUTABLE_SYMBOL_FILE_LOADED,
 									   f.canonicalFilePath())
 								   );
+			sendDataToGdbProcess("-gdb-set tcp auto-retry off\n");
 			sendDataToGdbProcess("-gdb-set mem inaccessible-by-default off\n");
 			sendDataToGdbProcess("-gdb-set print elements unlimited\n");
 			sendDataToGdbProcess(QString("%1-file-exec-and-symbols \"%2\"\n").arg(t).arg(f.canonicalFilePath()));
@@ -790,13 +791,17 @@ void MainWindow::gdbMiLineAvailable(QString line)
 	switch(line.at(0).toLatin1())
 	{
 		case '~':
+		/* Console stream output. */
 			ui->plainTextEditConsoleStreamOutput->appendPlainText(normalizeGdbString(line.right(line.length() - 1)));
 			break;
 		case '&':
+		/* Log stream output. */
 			ui->plainTextEditLogStreamOutput->appendPlainText(normalizeGdbString(line.right(line.length() - 1)));
 			break;
 		case '*':
+		/* Exec-async output. */
 		case '^':
+		/* Result record. */
 			ui->plainTextEditConsoleStreamOutput->appendPlainText((tokenNumber ? QString("%1").arg(tokenNumber) : QString()) + line);
 			{
 				std::vector<GdbMiParser::MIResult> results;
@@ -815,6 +820,8 @@ void MainWindow::gdbMiLineAvailable(QString line)
 				if (handleSequencePoints(result, results, tokenNumber))
 					break;
 				if (handleBreakpointUpdateResponses(result, results, tokenNumber))
+					break;
+				if (handleTargetScanResponse(result, results, tokenNumber))
 					break;
 				if (handleSymbolsResponse(result, results, tokenNumber))
 					break;
@@ -841,15 +848,7 @@ void MainWindow::gdbMiLineAvailable(QString line)
 					case GdbMiParser::ERROR:
 				{
 					/* \todo	Remove the 'gdbTokenContext' for the current token number, if not already removed above. */
-					QString errorMessage;
-					for (const auto & r : results)
-					{
-						if (r.variable == "msg")
-							errorMessage += QString("Gdb message: %1\n").arg(QString::fromStdString(r.value->asConstant()->constant()));
-						if (r.variable == "code")
-							errorMessage += QString("Gdb error code: %1\n").arg(QString::fromStdString(r.value->asConstant()->constant()));
-					}
-					QMessageBox::critical(0, "Gdb error", QString("Gdb error:\n%1").arg(errorMessage));
+					QMessageBox::critical(0, "Gdb error", QString("Gdb error:\n%1").arg(gdbErrorString(result, results)));
 				}
 					break;
 				case GdbMiParser::CONNECTED:
@@ -866,6 +865,11 @@ void MainWindow::gdbMiLineAvailable(QString line)
 				}
 			}
 			break;
+		case '@':
+		/* Target stream output - put it along with the console output, capturing it for later
+		 * processing, if necessary. */
+			targetDataCapture.captureLine(line.right(line.length() - 1));
+			/* Fall out. */
 		default:
 			ui->plainTextEditConsoleStreamOutput->appendPlainText(line);
 		break;
@@ -1583,6 +1587,55 @@ update_breakpoint_data:
 	{
 		gdbTokenContext.readAndRemoveContext(tokenNumber);
 		goto update_breakpoint_data;
+	}
+	return false;
+}
+
+bool MainWindow::handleTargetScanResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
+{
+	if (gdbTokenContext.hasContextForToken(tokenNumber)
+		&& gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TARGET_SCAN_COMPLETE)
+	{
+		targetDataCapture.stopCapture();
+		gdbTokenContext.readAndRemoveContext(tokenNumber);
+		if (parseResult == GdbMiParser::ERROR)
+		{
+			QMessageBox::critical(0, "Target scan failed", QString("Target scan command failed, error:\n%1").arg(gdbErrorString(parseResult, results)));
+			return true;
+		}
+		/* Try to parse any stream output from the target. */
+		const QStringList & output(targetDataCapture.capturedLines());
+		QStringList detectedTargets;
+		QRegularExpression rx("^\"\\s*(\\d+)\\s+");
+		for (const auto & l : output)
+		{
+			qDebug() << "processing line:" << l;
+			if (l.contains("scan failed"))
+			{
+				QMessageBox::critical(0, "Target scan failed", QString("Target scan command failed, error:\n%1").arg(l));
+				return true;
+			}
+			QRegularExpressionMatch match = rx.match(l);
+			if (match.hasMatch())
+				detectedTargets << l;
+		}
+		assert(detectedTargets.length() != 0);
+		bool ok;
+		/*! \todo: handle the case for one connected target only, and do not show the dialog
+		 * in that case. I am deliberately not doing this now, because I have no
+		 * hardware for testing right now. */
+		QString targetNumber = QInputDialog::getItem(0, "Select target to connect to",
+							     ""
+							     "Select the target to connect to:",
+							     detectedTargets, 0, false, &ok);
+		if (!ok)
+		{
+			QMessageBox::information(0, "No target selected", "No target selected, abborting target connection.");
+			return true;
+		}
+		QRegularExpressionMatch match = rx.match(targetNumber);
+		sendDataToGdbProcess(QString("-target-attach %1\n").arg(match.captured(1)));
+		return true;
 	}
 	return false;
 }
@@ -2630,4 +2683,17 @@ void MainWindow::displayHelp()
 void MainWindow::on_pushButtonSendScratchpadToGdb_clicked()
 {
 	sendDataToGdbProcess(ui->plainTextEditScratchpad->toPlainText());
+}
+
+void MainWindow::on_pushButtonScanForTargets_clicked()
+{
+	unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TARGET_SCAN_COMPLETE));
+	targetDataCapture.startCapture();
+	sendDataToGdbProcess(QString("%1monitor swdp_scan\n").arg(t));
+}
+
+void MainWindow::on_pushButtonConnectGdbToGdbServer_clicked()
+{
+	/*! \todo	do not hardcode the gdb server listening port */
+	sendDataToGdbProcess("-target-select extended-remote :1122\n");
 }

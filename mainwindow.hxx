@@ -109,11 +109,8 @@ private:
 
 	void shutdown(void)
 	{
-		qDebug() << __func__ << "shutting down gdb server, and blackmagic probe connections";
+		qDebug() << "shutting down gdb server, and blackmagic probe connections";
 		bmport.blockSignals(true);
-
-		gdb_tcpserver.close();
-		emit GdbServerDestroyed();
 
 		if (bmport.isOpen())
 		{
@@ -131,9 +128,15 @@ private:
 				qDebug() << "data available when closing the gdb server port:" << gdb_client_socket->readAll();
 				gdb_client_socket->close();
 			}
-			delete gdb_client_socket;
+			/* Do not explicitly delete the socket. It is not explicitly stated in the t documentation,
+			 * and I have not checked the Qt sources, but it seems that calling 'QTcpServer::close()'
+			 * also deletes the connected sockets. Trying to delete the socket here is crashing the program. */
+			//delete gdb_client_socket;
 			gdb_client_socket = 0;
 		}
+
+		gdb_tcpserver.close();
+		emit GdbServerDestroyed();
 
 		bmport.blockSignals(false);
 	}
@@ -728,14 +731,10 @@ private:
 				GDB_RESPONSE_VARIABLE_SYMBOLS,
 				/* Annotated response to the "-symbol-info-types" machine interface gdb command. */
 				GDB_RESPONSE_TYPE_SYMBOLS,
-
-				/* When receiving this response code, update the breakpoint information by
-				 * issuing a "-break-list" gdb machine interface command.
-				 * This may be needed when issuing breakpoint commands, such as
-				 * "-break-delete", "-break-enable", "-break-disable", etc., because
-				 * gdb answers to such commands with a "^done" response packet,
-				 * with no other details available. */
-				GDB_REQUEST_BREAKPOINT_LIST_UPDATE,
+				/* Response for target monitor scan commands, i.e. 'monitor swdp_scan' and
+				 * 'monitor jtag_scan' commands. This is a somewhat special case, because there is
+				 * no machine interface command corresponding to the 'monitor' command. */
+				GDB_RESPONSE_TARGET_SCAN_COMPLETE,
 
 				/*******************************************************
 				 * The codes below are not really responses from gdb.
@@ -765,6 +764,14 @@ private:
 				 * (of only those source files that actually contain any
 				 * machine code) can be built. */
 				GDB_SEQUENCE_POINT_SOURCE_CODE_ADDRESSES_RETRIEVED,
+				/* When receiving this response code, update the breakpoint information by
+				 * issuing a "-break-list" gdb machine interface command.
+				 * This may be needed when issuing breakpoint commands, such as
+				 * "-break-delete", "-break-enable", "-break-disable", etc., because
+				 * gdb answers to such commands with a "^done" response packet,
+				 * with no other details available. */
+				GDB_REQUEST_BREAKPOINT_LIST_UPDATE,
+
 			};
 			enum GDB_RESPONSE_ENUM gdbResponseCode = GDB_RESPONSE_INVALID;
 			QString		s;
@@ -902,6 +909,22 @@ private:
 		TARGET_STOPPED,
 	}
 	target_state = GDBSERVER_DISCONNECTED;
+
+	/* This structure captures target output data, e.g., the target responses
+	 * for 'monitor swdp_scan' and 'monitor jtag_scan' commands. */
+	struct
+	{
+	private:
+		QStringList capturedDataLines;
+		bool isCapturing = false;
+	public:
+		const QStringList & capturedLines(void) { return capturedDataLines; }
+		void startCapture(void) { isCapturing = true; capturedDataLines.clear(); }
+		void stopCapture(void) { isCapturing = false; }
+		void captureLine(const QString & dataLine) { if (isCapturing) capturedDataLines << dataLine; }
+	}
+	targetDataCapture;
+
 	struct
 	{
 		QWidgetList enabledWidgetsWhenGdbServerDisconnected;
@@ -1063,6 +1086,10 @@ private slots:
 	void updateHighlightedWidget(void);
 	void on_pushButtonSendScratchpadToGdb_clicked();
 
+	void on_pushButtonScanForTargets_clicked();
+
+	void on_pushButtonConnectGdbToGdbServer_clicked();
+
 private:
 	QTimer controlKeyPressTimer;
 	const int controlKeyPressLockTimeMs = 400;
@@ -1094,6 +1121,23 @@ private:
 	QStringList targetRegisterNames;
 
 	QModelIndex locateVarObject(const QString & miName, const QModelIndex & root, const QModelIndex &parent);
+
+	/* Attempts to build an error strings out of a gdb result response. */
+	QString gdbErrorString(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results)
+	{
+		QString errorMessage;
+		if (parseResult == GdbMiParser::ERROR)
+			for (const auto & r : results)
+			{
+				if (r.variable == "msg")
+					errorMessage += QString("Gdb message: %1\n").arg(QString::fromStdString(r.value->asConstant()->constant()));
+				if (r.variable == "code")
+					errorMessage += QString("Gdb error code: %1\n").arg(QString::fromStdString(r.value->asConstant()->constant()));
+			}
+		else
+			errorMessage = "No error";
+		return errorMessage;
+	}
 
 	/* This map holds information about where children of gdb varobjects should be displayed in the user interface.
 	 *
@@ -1173,6 +1217,8 @@ private:
 	bool handleSequencePoints(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 	/* Handle various responses from gdb that may lead to updating the breakpoint information. */
 	bool handleBreakpointUpdateResponses(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
+	/* Handle target scan ('monitor swdp_scan' and 'monitor jtag_scan') response. */
+	bool handleTargetScanResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 
 protected:
 	void closeEvent(QCloseEvent *event) override;
