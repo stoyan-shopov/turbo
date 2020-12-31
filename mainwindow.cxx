@@ -2504,27 +2504,26 @@ QString searchPattern = ui->lineEditObjectLocator->text();
 	}
 	/* Search for symbols (subprograms, data objects, data types), and file names matching the search pattern.
 	 * Keep the sets of items found sorted, for each type of object (subrogram, data object, filename). */
-	std::map<QString /* filename */, const SourceFileData *> sourceFileNames;
-	std::map<QString /* subprogram name */, QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>> subprograms;
-	std::map<QString /* subprogram name */, QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>> dataObjects;
-	std::map<QString /* subprogram name */, QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>> dataTypes;
-	QList<QTreeWidgetItem *> fileNameItems, dataObjectItems, subprogramItems;
+	std::multimap<QString /* filename */, const SourceFileData *> sourceFileNames;
+	std::multimap<QString /* subprogram name */, QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>> subprograms;
+	std::multimap<QString /* data object name */, QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>> dataObjects;
+	std::multimap<QString /* data type name */, QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>> dataTypes;
 	for (const auto & file : sourceFiles)
 	{
 		if (file.fileName.contains(searchPattern, Qt::CaseInsensitive))
-			sourceFileNames.operator [](file.fileName) = & file;
+			sourceFileNames.insert({file.fileName, & file});
 		for (const auto & subprogram : file.subprograms)
 			if (subprogram.name.contains(searchPattern, Qt::CaseInsensitive))
-				subprograms.operator [](subprogram.name) =
-					QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>(& file.fullFileName, & subprogram);
+				subprograms.insert({subprogram.name,
+					QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>(& file.fullFileName, & subprogram)});
 		for (const auto & dataObject : file.variables)
 			if (dataObject.name.contains(searchPattern, Qt::CaseInsensitive))
-				dataObjects.operator [](dataObject.name) =
-					QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>(& file.fullFileName, & dataObject);
+				dataObjects.insert({dataObject.name,
+					QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>(& file.fullFileName, & dataObject)});
 		for (const auto & dataType : file.dataTypes)
 			if (dataType.name.contains(searchPattern, Qt::CaseInsensitive))
-				dataTypes.operator [](dataType.name) =
-					QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>(& file.fullFileName, & dataType);
+				dataTypes.insert({dataType.name,
+					QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>(& file.fullFileName, & dataType)});
 	}
 	/* Populate the object locator view with the items matching the search pattern. */
 	for (const auto & file : sourceFileNames)
