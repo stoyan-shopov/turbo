@@ -966,6 +966,7 @@ private:
 	void navigateToSymbolAtCursor(void);
 	void navigateBack(void);
 	QString escapeString(const QString & s) { QString t = s; return t.replace('\\', "\\\\").replace('\"', "\\\""); }
+	void sourceItemContextMenuRequested(QTreeWidget * treeWidget, QPoint p);
 
 	/* Returns true, if the source view was refreshed, false otherwise. */
 	bool searchCurrentSourceText(const QString pattern);
@@ -979,12 +980,24 @@ private:
 		{
 			FILE_NAME = Qt::UserRole,
 			LINE_NUMBER,
+
+			/* Item type values in the object locator view. Used for creating
+			 * custom context menus depending on the item type. */
+			/*! \todo	It may be simpler to add here all 'source location'-related objects,
+			 * i.e., bookmarks, breakpoints, etc., and handle their context menus depending on
+			 * the item types. */
+			ITEM_TYPE,
+			FILE_NAME_ITEM,
+			DATA_OBJECT_ITEM,
+			DATA_TYPE_ITEM,
+			SUBPROGRAM_ITEM,
 			/* The data contents are a 'void' pointer that can be cast to a 'GdbBreakpointData' data structure. */
 			BREAKPOINT_DATA_POINTER,
 			/* Generic, 'void' pointer, used for referencing some data structures from a tree widget
 			 * item. The interpretation of this pointer depends on context. It is expected that,
 			 * depending on context, this pointer will be cast to the actual type that it points
 			 * to, before use. */
+			/*! \todo	This was once usedm but is currently unused. Maybe remove it altogether. */
 			GENERIC_DATA_POINTER,
 		};
 		QString fileName, gdbReportedFileName, fullFileName;

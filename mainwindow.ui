@@ -14,7 +14,7 @@
    <string>dds</string>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <layout class="QVBoxLayout" name="verticalLayout_3">
+   <layout class="QVBoxLayout" name="verticalLayout_23">
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
@@ -250,7 +250,30 @@
          <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
         </property>
        </widget>
-       <widget class="QPlainTextEdit" name="plainTextEditDisassembly"/>
+       <widget class="QWidget" name="">
+        <layout class="QVBoxLayout" name="verticalLayout_3">
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_3">
+           <item>
+            <widget class="QPushButton" name="pushButton_2">
+             <property name="text">
+              <string>PushButton</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="lineEdit"/>
+           </item>
+           <item>
+            <widget class="QComboBox" name="comboBox"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QPlainTextEdit" name="plainTextEditDisassembly"/>
+         </item>
+        </layout>
+       </widget>
       </widget>
       <widget class="QSplitter" name="splitterHorizontalGdbConsoles">
        <property name="orientation">

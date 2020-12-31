@@ -325,6 +325,18 @@ reopen_last_file:
 	ui->treeWidgetSvd->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(ui->treeWidgetSvd, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(svdContextMenuRequested(QPoint)));
 
+	/* Unified custom menu processing for source items. */
+	ui->treeWidgetObjectLocator->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(ui->treeWidgetObjectLocator, &QTreeWidget::customContextMenuRequested, [=] (QPoint p) -> void { sourceItemContextMenuRequested(ui->treeWidgetObjectLocator, p); });
+	ui->treeWidgetDataTypes->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(ui->treeWidgetDataTypes, &QTreeWidget::customContextMenuRequested, [=] (QPoint p) -> void { sourceItemContextMenuRequested(ui->treeWidgetDataTypes, p); });
+	ui->treeWidgetStaticDataObjects->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(ui->treeWidgetStaticDataObjects, &QTreeWidget::customContextMenuRequested, [=] (QPoint p) -> void { sourceItemContextMenuRequested(ui->treeWidgetStaticDataObjects, p); });
+	ui->treeWidgetSubprograms->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(ui->treeWidgetSubprograms, &QTreeWidget::customContextMenuRequested, [=] (QPoint p) -> void { sourceItemContextMenuRequested(ui->treeWidgetSubprograms, p); });
+	ui->treeWidgetSourceFiles->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(ui->treeWidgetSourceFiles, &QTreeWidget::customContextMenuRequested, [=] (QPoint p) -> void { sourceItemContextMenuRequested(ui->treeWidgetSourceFiles, p); });
+
 	/* Use this for handling changes to the breakpoint enable/disable checkbox modifications. */
 	connect(ui->treeWidgetBreakpoints, SIGNAL(itemChanged(QTreeWidgetItem*,int)), this, SLOT(breakpointViewItemChanged(QTreeWidgetItem*,int)));
 
@@ -1815,6 +1827,51 @@ void MainWindow::svdContextMenuRequested(QPoint p)
 	}
 }
 
+void MainWindow::sourceItemContextMenuRequested(QTreeWidget *treeWidget, QPoint p)
+{
+	QTreeWidgetItem * w = treeWidget->itemAt(p);
+
+	if (w)
+	{
+		if (w->data(0, SourceFileData::ITEM_TYPE).isNull())
+		{
+			qDebug() << "warning: unset source item type, aborting context menu request";
+			return;
+		}
+		unsigned itemType = w->data(0, SourceFileData::ITEM_TYPE).toUInt();
+		QMenu menu(this);
+		QAction * disassembleFile = 0, * disassembleSuprogram = 0;
+		/* Because of the header of the tree widget, it looks more natural to set the
+		 * menu position on the screen at point translated from the tree widget viewport,
+		 * not from the tree widget itself. */
+		switch (itemType)
+		{
+			case SourceFileData::FILE_NAME_ITEM:
+				disassembleFile = menu.addAction("Disassemble");
+				break;
+			case SourceFileData::SUBPROGRAM_ITEM:
+				disassembleSuprogram = menu.addAction("Disassemble");
+				break;
+			case SourceFileData::DATA_OBJECT_ITEM:
+			case SourceFileData::DATA_TYPE_ITEM:
+				return;
+			default:
+				qDebug() << QString("warning: unknown source item type: %1, aborting context menu request").arg(itemType);
+				return;
+		}
+
+		menu.addAction("Cancel");
+		QAction * selection = menu.exec(treeWidget->viewport()->mapToGlobal(p));
+		if (selection)
+		{
+			if (selection == disassembleFile)
+				sendDataToGdbProcess(QString("-data-disassemble -f \"%1\" -l 1 -n -1 -- 5\n").arg(w->text(0)));
+			else if (selection == disassembleSuprogram)
+				sendDataToGdbProcess(QString("-data-disassemble -a \"%1\" -- 5\n").arg(w->text(0)));
+		}
+	}
+}
+
 void MainWindow::bookmarksContextMenuRequested(QPoint p)
 {
 	QTreeWidgetItem * w = ui->treeWidgetBookmarks->itemAt(p);
@@ -1887,12 +1944,14 @@ bool showOnlySourcesWithMachineCode = ui->checkBoxShowOnlySourcesWithMachineCode
 			ui->treeWidgetSourceFiles->addTopLevelItem(t = new QTreeWidgetItem(QStringList() << f.fileName << f.fullFileName));
 			t->setData(0, SourceFileData::FILE_NAME, f.fullFileName);
 			t->setData(0, SourceFileData::LINE_NUMBER, 0);
+			t->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::FILE_NAME_ITEM);
 			for (const auto & s : f.subprograms)
 			{
 				QTreeWidgetItem * x;
 				t->addChild(x = new QTreeWidgetItem(QStringList() << s.description));
 				x->setData(0, SourceFileData::FILE_NAME, f.fullFileName);
 				x->setData(0, SourceFileData::LINE_NUMBER, s.line);
+				x->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::SUBPROGRAM_ITEM);
 			}
 		}
 	ui->treeWidgetSourceFiles->sortByColumn(0, Qt::AscendingOrder);
@@ -1912,6 +1971,7 @@ void MainWindow::updateSymbolViews()
 
 			subprogram->setData(0, SourceFileData::FILE_NAME, f.fullFileName);
 			subprogram->setData(0, SourceFileData::LINE_NUMBER, s.line);
+			subprogram->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::SUBPROGRAM_ITEM);
 		}
 		for (const auto & s : f.variables)
 		{
@@ -1921,6 +1981,7 @@ void MainWindow::updateSymbolViews()
 
 			variable->setData(0, SourceFileData::FILE_NAME, f.fullFileName);
 			variable->setData(0, SourceFileData::LINE_NUMBER, s.line);
+			variable->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::DATA_OBJECT_ITEM);
 		}
 		for (const auto & s : f.dataTypes)
 		{
@@ -1930,6 +1991,7 @@ void MainWindow::updateSymbolViews()
 
 			type->setData(0, SourceFileData::FILE_NAME, f.fullFileName);
 			type->setData(0, SourceFileData::LINE_NUMBER, s.line);
+			type->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::DATA_TYPE_ITEM);
 		}
 	}
 	ui->treeWidgetSubprograms->sortByColumn(0, Qt::AscendingOrder);
@@ -2470,6 +2532,7 @@ QString searchPattern = ui->lineEditObjectLocator->text();
 		QTreeWidgetItem * w = new QTreeWidgetItem(QStringList() << file.first);
 		w->setData(0, SourceFileData::FILE_NAME, file.second->fullFileName);
 		w->setData(0, SourceFileData::LINE_NUMBER, 0);
+		w->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::FILE_NAME_ITEM);
 		ui->treeWidgetObjectLocator->addTopLevelItem(w);
 	}
 	for (const auto & dataObject : dataObjects)
@@ -2477,6 +2540,7 @@ QString searchPattern = ui->lineEditObjectLocator->text();
 		QTreeWidgetItem * w = new QTreeWidgetItem(QStringList() << dataObject.first);
 		w->setData(0, SourceFileData::FILE_NAME, * dataObject.second.first);
 		w->setData(0, SourceFileData::LINE_NUMBER, dataObject.second.second->line);
+		w->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::DATA_OBJECT_ITEM);
 		ui->treeWidgetObjectLocator->addTopLevelItem(w);
 	}
 	for (const auto & subprogram : subprograms)
@@ -2484,6 +2548,7 @@ QString searchPattern = ui->lineEditObjectLocator->text();
 		QTreeWidgetItem * w = new QTreeWidgetItem(QStringList() << subprogram.first);
 		w->setData(0, SourceFileData::FILE_NAME, * subprogram.second.first);
 		w->setData(0, SourceFileData::LINE_NUMBER, subprogram.second.second->line);
+		w->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::SUBPROGRAM_ITEM);
 		ui->treeWidgetObjectLocator->addTopLevelItem(w);
 	}
 	for (const auto & dataType : dataTypes)
@@ -2491,6 +2556,7 @@ QString searchPattern = ui->lineEditObjectLocator->text();
 		QTreeWidgetItem * w = new QTreeWidgetItem(QStringList() << dataType.first);
 		w->setData(0, SourceFileData::FILE_NAME, * dataType.second.first);
 		w->setData(0, SourceFileData::LINE_NUMBER, dataType.second.second->line);
+		w->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::DATA_TYPE_ITEM);
 		ui->treeWidgetObjectLocator->addTopLevelItem(w);
 	}
 }
