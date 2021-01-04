@@ -986,11 +986,8 @@ private:
 			/*! \todo	It may be simpler to add here all 'source location'-related objects,
 			 * i.e., bookmarks, breakpoints, etc., and handle their context menus depending on
 			 * the item types. */
+			/* The values for this role are from the SymbolData:SymbolKind enumeration. */
 			ITEM_TYPE,
-			FILE_NAME_ITEM,
-			DATA_OBJECT_ITEM,
-			DATA_TYPE_ITEM,
-			SUBPROGRAM_ITEM,
 			/* The data contents are a 'void' pointer that can be cast to a 'GdbBreakpointData' data structure. */
 			BREAKPOINT_DATA_POINTER,
 			/* Generic, 'void' pointer, used for referencing some data structures from a tree widget
@@ -1010,8 +1007,21 @@ private:
 		{ return other.fileName == fileName && other.gdbReportedFileName == gdbReportedFileName && other.fullFileName == fullFileName; }
 		struct SymbolData
 		{
+			/* This enumeration specifies a symbol 'kind', useful in some cases when handling symbols. */
+			enum SymbolKind
+			{
+				/* For data type symbols, only the 'name' field is appropriate. For data object and subprogram symbols,
+				 * the description is normally a string specifying the declaration of the symbol.
+				 *
+				 * 'Source file name' is not really a symbol, it is here to make some parts of the user-interface code
+				 *  more uniform. */
+				INVALID = 0,
+				DATA_OBJECT,
+				DATA_TYPE,
+				SUBPROGRAM,
+				SOURCE_FILE_NAME,
+			};
 			int line = -1;
-			/* For data type symbols, only the 'name' field is appropriate. */
 			QString	name, type, description;
 			const bool operator ==(const SymbolData & other) const
 			{
