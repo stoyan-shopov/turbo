@@ -387,6 +387,8 @@ public:
 
 class GdbVarObjectTreeItemModel : public QAbstractItemModel
 {
+/* The 'Editable Tree Model' Qt example was very useful when making this customized
+ * item model class. */
 	Q_OBJECT
 private:
 	/* Dummy root node. */
@@ -761,7 +763,13 @@ private:
 				 * This may be needed when issuing breakpoint commands, such as
 				 * "-break-delete", "-break-enable", "-break-disable", etc., because
 				 * gdb answers to such commands with a "^done" response packet,
-				 * with no other details available. */
+				 * with no other details available. This is also used for
+				 * updating the breakpoint list after receiving 'notify-async-output'
+				 * records for breakpoint changes from gdb - these are sent to the
+				 * frontend when breakpoints are modified directly by the user, through
+				 * breakpoint commands. The 'notify-async-output' records in such cases
+				 * are '=breakpoint-created,bkpt={...}', '=breakpoint-modified,bkpt={...}',
+				 * '=breakpoint-deleted,id=number'. */
 				GDB_REQUEST_BREAKPOINT_LIST_UPDATE,
 
 			};
@@ -984,10 +992,10 @@ private:
 			/* Item type values in the object locator view. Used for creating
 			 * custom context menus depending on the item type. */
 			/*! \todo	It may be simpler to add here all 'source location'-related objects,
-			 * i.e., bookmarks, breakpoints, etc., and handle their context menus depending on
+			 * i.e., bookmarks, breakpoints, stack frames, etc., and handle their context menus depending on
 			 * the item types. */
 			/* The values for this role are from the SymbolData:SymbolKind enumeration. */
-			ITEM_TYPE,
+			ITEM_KIND,
 			/* The data contents are a 'void' pointer that can be cast to a 'GdbBreakpointData' data structure. */
 			BREAKPOINT_DATA_POINTER,
 			/* Generic, 'void' pointer, used for referencing some data structures from a tree widget
@@ -1041,6 +1049,9 @@ private:
 		std::unordered_set<struct SymbolData, SymbolHash> variables;
 		std::unordered_set<struct SymbolData, SymbolHash> dataTypes;
 	};
+
+	QTreeWidgetItem * createNavigationWidgetItem(const QStringList & columnTexts, const QString fullFileName = QString(), int lineNumber = -1,
+						     enum SourceFileData::SymbolData::SymbolKind itemKind = SourceFileData::SymbolData::INVALID);
 	struct StackFrameData
 	{
 		QString fileName, gdbReportedFileName, fullFileName, subprogramName;

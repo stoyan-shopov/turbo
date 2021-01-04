@@ -338,7 +338,7 @@ reopen_last_file:
 	connect(ui->treeWidgetSourceFiles, &QTreeWidget::customContextMenuRequested, [=] (QPoint p) -> void { sourceItemContextMenuRequested(ui->treeWidgetSourceFiles, p); });
 
 	/* Use this for handling changes to the breakpoint enable/disable checkbox modifications. */
-	connect(ui->treeWidgetBreakpoints, SIGNAL(itemChanged(QTreeWidgetItem*,int)), this, SLOT(breakpointViewItemChanged(QTreeWidgetItem*,int)));
+	connect(ui->treeWidgetBreakpoints, SIGNAL(itemChanged(QTreeWidgetItem*,int)), this, SLOT(breakpointViewItemChanged(const QTreeWidgetItem*,int)));
 
 	sourceCodeViewHighlightFormats.navigatedLine.setProperty(QTextFormat::FullWidthSelection, true);
 	sourceCodeViewHighlightFormats.navigatedLine.setBackground(QBrush(Qt::gray));
@@ -395,10 +395,7 @@ reopen_last_file:
 		lineNumber = t.at(1).toUInt(& ok);
 		if (!ok)
 			lineNumber = -1;
-		QTreeWidgetItem * w = new QTreeWidgetItem(t);
-		w->setData(0, SourceFileData::FILE_NAME, t.at(2));
-		w->setData(0, SourceFileData::LINE_NUMBER, lineNumber);
-		ui->treeWidgetTraceLog->addTopLevelItem(w);
+		ui->treeWidgetTraceLog->addTopLevelItem(createNavigationWidgetItem(t, t.at(2), lineNumber));
 	}
 
 	connect(ui->checkBoxShowFullFileNamesInTraceLog, & QCheckBox::stateChanged, [&](int newState) { ui->treeWidgetTraceLog->setColumnHidden(2, newState == 0); });
@@ -531,7 +528,7 @@ reopen_last_file:
 	}
 	);
 
-	connect(ui->treeWidgetSvd, SIGNAL(itemDoubleClicked(QTreeWidgetItem*,int)), this, SLOT(createSvdRegisterView(QTreeWidgetItem*,int)));
+	connect(ui->treeWidgetSvd, SIGNAL(itemDoubleClicked(QTreeWidgetItem*,int)), this, SLOT(createSvdRegisterView(const QTreeWidgetItem*,int)));
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -1342,30 +1339,24 @@ bool MainWindow::handleStackResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 	}
 	ui->treeWidgetBacktrace->clear();
 	for (const auto & frame : backtrace)
-	{
-		QTreeWidgetItem * w;
-		ui->treeWidgetBacktrace->addTopLevelItem(w = new QTreeWidgetItem(QStringList()
-										 << QString("%1").arg(frame.level)
-										 << frame.subprogramName
-										 << frame.fileName
-										 << QString("%1").arg(frame.lineNumber)
-										 << QString("$%1").arg(frame.pcAddress, 8, 16, QChar('0'))));
-		w->setData(0, SourceFileData::FILE_NAME, frame.fullFileName);
-		w->setData(0, SourceFileData::LINE_NUMBER, frame.lineNumber);
-	}
+		ui->treeWidgetBacktrace->addTopLevelItem(createNavigationWidgetItem(
+			 QStringList()
+				 << QString("%1").arg(frame.level)
+				 << frame.subprogramName
+				 << frame.fileName
+				 << QString("%1").arg(frame.lineNumber)
+				 << QString("$%1").arg(frame.pcAddress, 8, 16, QChar('0')),
+			 frame.fullFileName,
+			 frame.lineNumber));
+
 	if (ui->checkBoxEnableTraceLogging->isChecked() && backtrace.size())
 	{
 		StackFrameData frame = backtrace.at(0);
-		QTreeWidgetItem * w = new QTreeWidgetItem(QStringList() << frame.fileName << QString("%1").arg(frame.lineNumber) << frame.fullFileName);
-		w->setData(0, SourceFileData::FILE_NAME, frame.fullFileName);
-		w->setData(0, SourceFileData::LINE_NUMBER, frame.lineNumber);
-		ui->treeWidgetTraceLog->addTopLevelItem(w);
+		ui->treeWidgetTraceLog->addTopLevelItem(createNavigationWidgetItem(
+				QStringList() << frame.fileName << QString("%1").arg(frame.lineNumber) << frame.fullFileName,
+				frame.fullFileName,
+				frame.lineNumber));
 	}
-#if 0
-	QTreeWidgetItem * frame = ui->treeWidgetBacktrace->topLevelItem(0);
-	if (frame)
-		ui->treeWidgetBacktrace->setItemSelected(frame, true);
-#endif
 	return true;
 }
 
@@ -1740,15 +1731,21 @@ void MainWindow::readGdbVarObjectChildren(const QModelIndex parent)
 
 void MainWindow::showSourceCode(const QTreeWidgetItem *item)
 {
+	/* If the source code location details seem to be not set for this tree widget item
+	 * do not attempt to navigate to a source code location */
+
 	QVariant v = item->data(0, SourceFileData::FILE_NAME);
+	bool ok;
 	if (v.type() != QMetaType::QString)
-		/* If the source code location details seem to be not set for this tree widget item
-		 * do not attempt to navigate to a source code location */
 		return;
 	QString sourceFileName = item->data(0, SourceFileData::FILE_NAME).toString();
-	int lineNumber = item->data(0, SourceFileData::LINE_NUMBER).toInt();
+	int lineNumber = item->data(0, SourceFileData::LINE_NUMBER).toInt(& ok);
+	if (!ok)
+		return;
 	if (lineNumber == 0)
 		lineNumber = 1;
+	if (lineNumber == -1 || sourceFileName.isEmpty())
+		return;
 	displaySourceCodeFile(SourceCodeLocation(sourceFileName, lineNumber));
 }
 
@@ -1831,12 +1828,14 @@ void MainWindow::sourceItemContextMenuRequested(const QTreeWidget *treeWidget, Q
 
 	if (w)
 	{
-		if (w->data(0, SourceFileData::ITEM_TYPE).isNull())
+		auto items = treeWidget->findItems(w->text(0), Qt::MatchExactly);
+		qDebug() << items.count() << "items found";
+		if (w->data(0, SourceFileData::ITEM_KIND).isNull())
 		{
 			qDebug() << "warning: unset source item type, aborting context menu request";
 			return;
 		}
-		SourceFileData::SymbolData::SymbolKind itemType = (SourceFileData::SymbolData::SymbolKind) w->data(0, SourceFileData::ITEM_TYPE).toUInt();
+		SourceFileData::SymbolData::SymbolKind itemType = (SourceFileData::SymbolData::SymbolKind) w->data(0, SourceFileData::ITEM_KIND).toUInt();
 		QMenu menu(this);
 		QAction * disassembleFile = 0, * disassembleSuprogram = 0;
 		/* Because of the header of the tree widget, it looks more natural to set the
@@ -1919,13 +1918,11 @@ void MainWindow::stringSearchReady(const QString pattern, QSharedPointer<QVector
 	ui->treeWidgetSearchResults->clear();
 	ui->lineEditSearchFilesForText->setText(pattern);
 	for (const auto & result : * results)
-	{
-		QTreeWidgetItem * w = new QTreeWidgetItem(QStringList() << QFileInfo(result.fullFileName).fileName()
-							  << QString("%1").arg(result.lineNumber) << result.sourceCodeLineText);
-		w->setData(0, SourceFileData::FILE_NAME, result.fullFileName);
-		w->setData(0, SourceFileData::LINE_NUMBER, result.lineNumber);
-		ui->treeWidgetSearchResults->addTopLevelItem(w);
-	}
+		ui->treeWidgetSearchResults->addTopLevelItem(createNavigationWidgetItem(
+			     QStringList() << QFileInfo(result.fullFileName).fileName() << QString("%1").arg(result.lineNumber) << result.sourceCodeLineText,
+			     result.fullFileName,
+			     result.lineNumber
+			     ));
 	ui->treeWidgetSearchResults->sortByColumn(0, Qt::AscendingOrder);
 	if (resultsTruncated)
 		ui->treeWidgetSearchResults->addTopLevelItem(new QTreeWidgetItem(QStringList() << "" << "xxx" << "Too many results - search results truncated"));
@@ -1938,19 +1935,10 @@ bool showOnlySourcesWithMachineCode = ui->checkBoxShowOnlySourcesWithMachineCode
 	for (const auto & f : sourceFiles)
 		if (!showOnlySourcesWithMachineCode || !f.isSourceLinesFetched || f.machineCodeLineNumbers.size())
 		{
-			QTreeWidgetItem * t;
-			ui->treeWidgetSourceFiles->addTopLevelItem(t = new QTreeWidgetItem(QStringList() << f.fileName << f.fullFileName));
-			t->setData(0, SourceFileData::FILE_NAME, f.fullFileName);
-			t->setData(0, SourceFileData::LINE_NUMBER, 0);
-			t->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::SymbolData::SOURCE_FILE_NAME);
+			QTreeWidgetItem * t = createNavigationWidgetItem(QStringList() << f.fileName << f.fullFileName, f.fullFileName, 0, SourceFileData::SymbolData::SOURCE_FILE_NAME);
+			ui->treeWidgetSourceFiles->addTopLevelItem(t);
 			for (const auto & s : f.subprograms)
-			{
-				QTreeWidgetItem * x;
-				t->addChild(x = new QTreeWidgetItem(QStringList() << s.description));
-				x->setData(0, SourceFileData::FILE_NAME, f.fullFileName);
-				x->setData(0, SourceFileData::LINE_NUMBER, s.line);
-				x->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::SymbolData::SUBPROGRAM);
-			}
+				t->addChild(createNavigationWidgetItem(QStringList() << s.description, f.fullFileName, s.line, SourceFileData::SymbolData::SUBPROGRAM));
 		}
 	ui->treeWidgetSourceFiles->sortByColumn(0, Qt::AscendingOrder);
 }
@@ -1962,35 +1950,24 @@ void MainWindow::updateSymbolViews()
 	for (const auto & f : sourceFiles)
 	{
 		for (const auto & s : f.subprograms)
-		{
-			QTreeWidgetItem * subprogram;
-			ui->treeWidgetSubprograms->addTopLevelItem(subprogram = new QTreeWidgetItem(
-				   QStringList() << s.name << f.fileName << QString("%1").arg(s.line) << s.description));
+			ui->treeWidgetSubprograms->addTopLevelItem(createNavigationWidgetItem(
+				   QStringList() << s.name << f.fileName << QString("%1").arg(s.line) << s.description,
+				   f.fullFileName,
+				   s.line,
+				   SourceFileData::SymbolData::SUBPROGRAM));
 
-			subprogram->setData(0, SourceFileData::FILE_NAME, f.fullFileName);
-			subprogram->setData(0, SourceFileData::LINE_NUMBER, s.line);
-			subprogram->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::SymbolData::SUBPROGRAM);
-		}
 		for (const auto & s : f.variables)
-		{
-			QTreeWidgetItem * variable;
-			ui->treeWidgetStaticDataObjects->addTopLevelItem(variable = new QTreeWidgetItem(
-				   QStringList() << s.name << f.fileName << QString("%1").arg(s.line) << s.description));
-
-			variable->setData(0, SourceFileData::FILE_NAME, f.fullFileName);
-			variable->setData(0, SourceFileData::LINE_NUMBER, s.line);
-			variable->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::SymbolData::DATA_OBJECT);
-		}
+			ui->treeWidgetStaticDataObjects->addTopLevelItem(createNavigationWidgetItem(
+				   QStringList() << s.name << f.fileName << QString("%1").arg(s.line) << s.description,
+				   f.fullFileName,
+				   s.line,
+				   SourceFileData::SymbolData::DATA_OBJECT));
 		for (const auto & s : f.dataTypes)
-		{
-			QTreeWidgetItem * type;
-			ui->treeWidgetDataTypes->addTopLevelItem(type = new QTreeWidgetItem(
-				   QStringList() << s.name << f.fileName << QString("%1").arg(s.line)));
-
-			type->setData(0, SourceFileData::FILE_NAME, f.fullFileName);
-			type->setData(0, SourceFileData::LINE_NUMBER, s.line);
-			type->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::SymbolData::DATA_TYPE);
-		}
+			ui->treeWidgetDataTypes->addTopLevelItem(createNavigationWidgetItem(
+				   QStringList() << s.name << f.fileName << QString("%1").arg(s.line),
+				   f.fullFileName,
+				   s.line,
+				   SourceFileData::SymbolData::DATA_TYPE));
 	}
 	ui->treeWidgetSubprograms->sortByColumn(0, Qt::AscendingOrder);
 	ui->treeWidgetStaticDataObjects->sortByColumn(0, Qt::AscendingOrder);
@@ -2003,38 +1980,35 @@ void MainWindow::updateBreakpointsView()
 	ui->treeWidgetBreakpoints->clear();
 	for (const auto & b : breakpoints)
 	{
-		QTreeWidgetItem * w = new QTreeWidgetItem(QStringList()
-							  << b.gdbReportedNumberString
-							  << b.type
-							  << b.disposition
-							  << (b.enabled ? "yes" : "no")
-							  << QString("0x%1").arg(b.address, 8, 16, QChar('0'))
-							  << b.locationSpecifierString
-							  );
+		QTreeWidgetItem * w = createNavigationWidgetItem(
+					QStringList()
+						<< b.gdbReportedNumberString
+						<< b.type
+						<< b.disposition
+						<< (b.enabled ? "yes" : "no")
+						<< QString("0x%1").arg(b.address, 8, 16, QChar('0'))
+						<< b.locationSpecifierString,
+					b.sourceCodeLocation.fullFileName,
+					b.sourceCodeLocation.lineNumber
+					);
 		w->setCheckState(GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER, b.enabled ? Qt::Checked : Qt::Unchecked);
 		w->setData(0, SourceFileData::BREAKPOINT_DATA_POINTER, QVariant::fromValue((void *) & b));
-		if (b.sourceCodeLocation.lineNumber != -1)
-		{
-			w->setData(0, SourceFileData::FILE_NAME, b.sourceCodeLocation.fullFileName);
-			w->setData(0, SourceFileData::LINE_NUMBER, b.sourceCodeLocation.lineNumber);
-		}
 		for (const auto & m : b.multipleLocationBreakpoints)
 		{
-			QTreeWidgetItem * t = new QTreeWidgetItem(w, QStringList()
-								  << m.gdbReportedNumberString
-								  << m.type
-								  << m.disposition
-								  << (m.enabled ? "yes" : "no")
-								  << QString("0x%1").arg(m.address, 8, 16, QChar('0'))
-								  << m.locationSpecifierString
-								  );
+			QTreeWidgetItem * t = createNavigationWidgetItem(
+					QStringList()
+						<< m.gdbReportedNumberString
+						<< m.type
+						<< m.disposition
+						<< (m.enabled ? "yes" : "no")
+						<< QString("0x%1").arg(m.address, 8, 16, QChar('0'))
+						<< m.locationSpecifierString,
+					m.sourceCodeLocation.fullFileName,
+					m.sourceCodeLocation.lineNumber
+					);
 			t->setCheckState(GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER, b.enabled ? Qt::Checked : Qt::Unchecked);
 			t->setData(0, SourceFileData::BREAKPOINT_DATA_POINTER, QVariant::fromValue((void *) & m));
-			if (m.sourceCodeLocation.lineNumber != -1)
-			{
-				t->setData(0, SourceFileData::FILE_NAME, m.sourceCodeLocation.fullFileName);
-				t->setData(0, SourceFileData::LINE_NUMBER, m.sourceCodeLocation.lineNumber);
-			}
+			w->addChild(t);
 		}
 		ui->treeWidgetBreakpoints->addTopLevelItem(w);
 	}
@@ -2044,12 +2018,11 @@ void MainWindow::updateBookmarksView()
 {
 	ui->treeWidgetBookmarks->clear();
 	for (const auto & bookmark : bookmarks)
-	{
-		QTreeWidgetItem * w = new QTreeWidgetItem(QStringList() << QFileInfo(bookmark.fullFileName).fileName() << QString("%1").arg(bookmark.lineNumber));
-		w->setData(0, SourceFileData::FILE_NAME, bookmark.fullFileName);
-		w->setData(0, SourceFileData::LINE_NUMBER, bookmark.lineNumber);
-		ui->treeWidgetBookmarks->addTopLevelItem(w);
-	}
+		ui->treeWidgetBookmarks->addTopLevelItem(createNavigationWidgetItem(
+			 QStringList() << QFileInfo(bookmark.fullFileName).fileName() << QString("%1").arg(bookmark.lineNumber),
+			 bookmark.fullFileName,
+			 bookmark.lineNumber
+			 ));
 }
 
 void MainWindow::on_lineEditGdbMiCommand_returnPressed()
@@ -2255,6 +2228,15 @@ void MainWindow::moveCursorToPreviousMatch()
 
 	ui->plainTextEditSourceView->setTextCursor(c);
 	ui->plainTextEditSourceView->ensureCursorVisible();
+}
+
+QTreeWidgetItem * MainWindow::createNavigationWidgetItem(const QStringList &columnTexts, const QString fullFileName, int lineNumber, MainWindow::SourceFileData::SymbolData::SymbolKind itemKind)
+{
+	QTreeWidgetItem * item = new QTreeWidgetItem(columnTexts);
+	item->setData(0, SourceFileData::FILE_NAME, fullFileName);
+	item->setData(0, SourceFileData::LINE_NUMBER, lineNumber);
+	item->setData(0, SourceFileData::ITEM_KIND, itemKind);
+	return item;
 }
 
 void MainWindow::updateHighlightedWidget()
@@ -2525,37 +2507,29 @@ QString searchPattern = ui->lineEditObjectLocator->text();
 	}
 	/* Populate the object locator view with the items matching the search pattern. */
 	for (const auto & file : sourceFileNames)
-	{
-		QTreeWidgetItem * w = new QTreeWidgetItem(QStringList() << file.first);
-		w->setData(0, SourceFileData::FILE_NAME, file.second->fullFileName);
-		w->setData(0, SourceFileData::LINE_NUMBER, 0);
-		w->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::SymbolData::SOURCE_FILE_NAME);
-		ui->treeWidgetObjectLocator->addTopLevelItem(w);
-	}
+		ui->treeWidgetObjectLocator->addTopLevelItem(createNavigationWidgetItem(
+								     QStringList() << file.first,
+								     file.second->fullFileName,
+								     0,
+								     SourceFileData::SymbolData::SOURCE_FILE_NAME));
 	for (const auto & dataObject : dataObjects)
-	{
-		QTreeWidgetItem * w = new QTreeWidgetItem(QStringList() << dataObject.first);
-		w->setData(0, SourceFileData::FILE_NAME, * dataObject.second.first);
-		w->setData(0, SourceFileData::LINE_NUMBER, dataObject.second.second->line);
-		w->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::SymbolData::DATA_OBJECT);
-		ui->treeWidgetObjectLocator->addTopLevelItem(w);
-	}
+		ui->treeWidgetObjectLocator->addTopLevelItem(createNavigationWidgetItem(
+								     QStringList() << dataObject.first,
+								     * dataObject.second.first,
+								     dataObject.second.second->line,
+								     SourceFileData::SymbolData::DATA_OBJECT));
 	for (const auto & subprogram : subprograms)
-	{
-		QTreeWidgetItem * w = new QTreeWidgetItem(QStringList() << subprogram.first);
-		w->setData(0, SourceFileData::FILE_NAME, * subprogram.second.first);
-		w->setData(0, SourceFileData::LINE_NUMBER, subprogram.second.second->line);
-		w->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::SymbolData::SUBPROGRAM);
-		ui->treeWidgetObjectLocator->addTopLevelItem(w);
-	}
+		ui->treeWidgetObjectLocator->addTopLevelItem(createNavigationWidgetItem(
+								     QStringList() << subprogram.first,
+								     * subprogram.second.first,
+								     subprogram.second.second->line,
+								     SourceFileData::SymbolData::SUBPROGRAM));
 	for (const auto & dataType : dataTypes)
-	{
-		QTreeWidgetItem * w = new QTreeWidgetItem(QStringList() << dataType.first);
-		w->setData(0, SourceFileData::FILE_NAME, * dataType.second.first);
-		w->setData(0, SourceFileData::LINE_NUMBER, dataType.second.second->line);
-		w->setData(0, SourceFileData::ITEM_TYPE, SourceFileData::SymbolData::SUBPROGRAM);
-		ui->treeWidgetObjectLocator->addTopLevelItem(w);
-	}
+		ui->treeWidgetObjectLocator->addTopLevelItem(createNavigationWidgetItem(
+								     QStringList() << dataType.first,
+								     * dataType.second.first,
+								     dataType.second.second->line,
+								     SourceFileData::SymbolData::DATA_TYPE));
 }
 
 void MainWindow::on_pushButtonDeleteAllBookmarks_clicked()
