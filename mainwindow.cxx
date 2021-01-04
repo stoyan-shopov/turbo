@@ -1838,20 +1838,34 @@ void MainWindow::sourceItemContextMenuRequested(const QTreeWidget *treeWidget, Q
 
 	if (w)
 	{
-		auto items = treeWidget->findItems(w->text(0), Qt::MatchExactly);
-		qDebug() << items.count() << "items found";
 		if (w->data(0, SourceFileData::ITEM_KIND).isNull())
 		{
 			qDebug() << "warning: unset source item type, aborting context menu request";
 			return;
 		}
-		SourceFileData::SymbolData::SymbolKind itemType = (SourceFileData::SymbolData::SymbolKind) w->data(0, SourceFileData::ITEM_KIND).toUInt();
+		QList<QTreeWidgetItem *> items = treeWidget->findItems(w->text(0), Qt::MatchExactly);
+		SourceFileData::SymbolData::SymbolKind itemKind = (SourceFileData::SymbolData::SymbolKind) w->data(0, SourceFileData::ITEM_KIND).toUInt();
+		/*! \todo	At this time, the case for multiple symbols of the same kind is not handled well.
+		 *		As a minimum, warn the user about this. */
+		int t = 0;
+		for (const auto & s : items)
+		{
+			if (s->data(0, SourceFileData::ITEM_KIND).isNull())
+				continue;
+			if ((SourceFileData::SymbolData::SymbolKind) s->data(0, SourceFileData::ITEM_KIND).toUInt() == itemKind)
+				t ++;
+		}
+		if (t > 1)
+			QMessageBox::warning(0, "Multiple symbols of the same kind",
+					     QString("Multiple symbols found for id:\n\n%1\n\n"
+						     "Be warned that this case is not handled properly at this time.\n"
+						     "You may experience incorrect behavior from the frontend!").arg(w->text(0)));
 		QMenu menu(this);
 		QAction * disassembleFile = 0, * disassembleSuprogram = 0;
 		/* Because of the header of the tree widget, it looks more natural to set the
 		 * menu position on the screen at point translated from the tree widget viewport,
 		 * not from the tree widget itself. */
-		switch (itemType)
+		switch (itemKind)
 		{
 			case SourceFileData::SymbolData::SOURCE_FILE_NAME:
 				disassembleFile = menu.addAction("Disassemble");
@@ -1863,7 +1877,7 @@ void MainWindow::sourceItemContextMenuRequested(const QTreeWidget *treeWidget, Q
 			case SourceFileData::SymbolData::DATA_TYPE:
 				return;
 			default:
-				qDebug() << QString("warning: unknown source item type: %1, aborting context menu request").arg(itemType);
+				qDebug() << QString("warning: unknown source item type: %1, aborting context menu request").arg(itemKind);
 				return;
 		}
 
