@@ -883,6 +883,16 @@ void MainWindow::gdbMiLineAvailable(QString line)
 		 * processing, if necessary. */
 			targetDataCapture.captureLine(line.right(line.length() - 1));
 			/* Fall out. */
+			if (0)
+		case '=':
+			{
+				/* Handle gdb 'notify-async-output' records. */
+				/*! \todo	If the number of cases here grows too much,
+				 *		extract this into a separate function. */
+				if (line.startsWith("=breakpoint-created") || line.startsWith("=breakpoint-modified")
+						|| line.startsWith("=breakpoint-deleted"))
+					sendDataToGdbProcess("-break-list\n");
+			}
 		default:
 			ui->plainTextEditConsoleStreamOutput->appendPlainText(line);
 		break;
