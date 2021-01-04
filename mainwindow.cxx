@@ -2492,6 +2492,50 @@ QString searchPattern = ui->lineEditObjectLocator->text();
 		ui->treeWidgetObjectLocator->addTopLevelItem(new QTreeWidgetItem(QStringList() << "< enter more text to search for... >"));
 		return;
 	}
+	QList<QTreeWidgetItem *> sourceFileNames, subprograms, dataObjects, dataTypes;
+	sourceFileNames = ui->treeWidgetSourceFiles->findItems(searchPattern, Qt::MatchContains);
+	subprograms = ui->treeWidgetSubprograms->findItems(searchPattern, Qt::MatchContains);
+	dataObjects = ui->treeWidgetStaticDataObjects->findItems(searchPattern, Qt::MatchContains);
+	dataTypes = ui->treeWidgetDataTypes->findItems(searchPattern, Qt::MatchContains);
+	/* Make sure that the items are sorted alphabetically. */
+	static auto compare = [](const QTreeWidgetItem * a, const QTreeWidgetItem * b) -> bool { return a->text(0) < b->text(0); };
+	/* Make sure to *copy* the tree widget items, as the locator tree widget will take
+	 * ownership of the items added. */
+	QTreeWidgetItem * headerItem;
+	if (sourceFileNames.size())
+	{
+		std::sort(sourceFileNames.begin(), sourceFileNames.end(), compare);
+		ui->treeWidgetObjectLocator->addTopLevelItem(headerItem = new QTreeWidgetItem(QStringList() << "--- File Names ---"));
+		headerItem->setBackground(0, Qt::lightGray);
+		for (const auto & s : sourceFileNames)
+			ui->treeWidgetObjectLocator->addTopLevelItem(new QTreeWidgetItem(* s));
+	}
+	if (subprograms.size())
+	{
+		std::sort(subprograms.begin(), subprograms.end(), compare);
+		ui->treeWidgetObjectLocator->addTopLevelItem(headerItem = new QTreeWidgetItem(QStringList() << "--- Subprograms ---"));
+		headerItem->setBackground(0, Qt::lightGray);
+		for (const auto & s : subprograms)
+			ui->treeWidgetObjectLocator->addTopLevelItem(new QTreeWidgetItem(* s));
+	}
+	if (dataObjects.size())
+	{
+		std::sort(dataObjects.begin(), dataObjects.end());
+		ui->treeWidgetObjectLocator->addTopLevelItem(headerItem = new QTreeWidgetItem(QStringList() << "--- Data Objects ---"));
+		headerItem->setBackground(0, Qt::lightGray);
+		for (const auto & s : dataObjects)
+			ui->treeWidgetObjectLocator->addTopLevelItem(new QTreeWidgetItem(* s));
+	}
+	if (dataTypes.size())
+	{
+		std::sort(dataTypes.begin(), dataTypes.end());
+		ui->treeWidgetObjectLocator->addTopLevelItem(headerItem = new QTreeWidgetItem(QStringList() << "--- Data Types ---"));
+		headerItem->setBackground(0, Qt::lightGray);
+		for (const auto & s : dataTypes)
+			ui->treeWidgetObjectLocator->addTopLevelItem(new QTreeWidgetItem(* s));
+	}
+	/*! \todo	Remove this once it is clear the new code works fine. */
+#if 0
 	/* Search for symbols (subprograms, data objects, data types), and file names matching the search pattern.
 	 * Keep the sets of items found sorted, for each type of object (subrogram, data object, filename). */
 	std::multimap<QString /* filename */, const SourceFileData *> sourceFileNames;
@@ -2540,6 +2584,7 @@ QString searchPattern = ui->lineEditObjectLocator->text();
 								     * dataType.second.first,
 								     dataType.second.second->line,
 								     SourceFileData::SymbolData::DATA_TYPE));
+#endif
 }
 
 void MainWindow::on_pushButtonDeleteAllBookmarks_clicked()
