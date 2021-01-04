@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Stoyan Shopov <stoyan.shopov@gmail.com>
+ * Copyright (C) 2020-2021 Stoyan Shopov <stoyan.shopov@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -633,9 +633,9 @@ private slots:
 	void breakpointsContextMenuRequested(QPoint p);
 	void svdContextMenuRequested(QPoint p);
 	void bookmarksContextMenuRequested(QPoint p);
-	void breakpointViewItemChanged(const QTreeWidgetItem * item, int column);
+	void breakpointViewItemChanged(QTreeWidgetItem * item, int column);
 	void stringSearchReady(const QString pattern, QSharedPointer<QVector<StringFinder::SearchResult>> results, bool resultsTruncated);
-	void createSvdRegisterView(const QTreeWidgetItem * item, int column);
+	void createSvdRegisterView(QTreeWidgetItem *item, int column);
 
 	void updateSourceListView(void);
 	void updateSymbolViews(void);

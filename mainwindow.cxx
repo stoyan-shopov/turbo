@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Stoyan Shopov <stoyan.shopov@gmail.com>
+ * Copyright (C) 2020-2021 Stoyan Shopov <stoyan.shopov@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -338,7 +338,7 @@ reopen_last_file:
 	connect(ui->treeWidgetSourceFiles, &QTreeWidget::customContextMenuRequested, [=] (QPoint p) -> void { sourceItemContextMenuRequested(ui->treeWidgetSourceFiles, p); });
 
 	/* Use this for handling changes to the breakpoint enable/disable checkbox modifications. */
-	connect(ui->treeWidgetBreakpoints, SIGNAL(itemChanged(QTreeWidgetItem*,int)), this, SLOT(breakpointViewItemChanged(const QTreeWidgetItem*,int)));
+	connect(ui->treeWidgetBreakpoints, SIGNAL(itemChanged(QTreeWidgetItem*,int)), this, SLOT(breakpointViewItemChanged(QTreeWidgetItem*,int)));
 
 	sourceCodeViewHighlightFormats.navigatedLine.setProperty(QTextFormat::FullWidthSelection, true);
 	sourceCodeViewHighlightFormats.navigatedLine.setBackground(QBrush(Qt::gray));
@@ -528,7 +528,7 @@ reopen_last_file:
 	}
 	);
 
-	connect(ui->treeWidgetSvd, SIGNAL(itemDoubleClicked(QTreeWidgetItem*,int)), this, SLOT(createSvdRegisterView(const QTreeWidgetItem*,int)));
+	connect(ui->treeWidgetSvd, SIGNAL(itemDoubleClicked(QTreeWidgetItem*,int)), this, SLOT(createSvdRegisterView(QTreeWidgetItem*,int)));
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -1907,7 +1907,7 @@ void MainWindow::bookmarksContextMenuRequested(QPoint p)
 	}
 }
 
-void MainWindow::breakpointViewItemChanged(const QTreeWidgetItem *item, int column)
+void MainWindow::breakpointViewItemChanged(QTreeWidgetItem *item, int column)
 {
 	if (column != GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER)
 		return;
@@ -2413,7 +2413,7 @@ public:
 	~xbtn(){qDebug() << "xbtn deleted";}
 };
 
-void MainWindow::createSvdRegisterView(const QTreeWidgetItem *item, int column)
+void MainWindow::createSvdRegisterView(QTreeWidgetItem *item, int column)
 {
 	if (item->data(0, SVD_REGISTER_POINTER).isNull())
 		return;
