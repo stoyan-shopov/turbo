@@ -626,14 +626,14 @@ private slots:
 	void gdbStandardErrorDataAvailable(void);
 	void sendDataToGdbProcess(const QString &data);
 	void readGdbVarObjectChildren(const QModelIndex parent);
-	void showSourceCode(QTreeWidgetItem * item);
+	void showSourceCode(const QTreeWidgetItem * item);
 	QString getExecutableFilename(void);
 	void breakpointsContextMenuRequested(QPoint p);
 	void svdContextMenuRequested(QPoint p);
 	void bookmarksContextMenuRequested(QPoint p);
-	void breakpointViewItemChanged(QTreeWidgetItem * item, int column);
+	void breakpointViewItemChanged(const QTreeWidgetItem * item, int column);
 	void stringSearchReady(const QString pattern, QSharedPointer<QVector<StringFinder::SearchResult>> results, bool resultsTruncated);
-	void createSvdRegisterView(QTreeWidgetItem * item, int column);
+	void createSvdRegisterView(const QTreeWidgetItem * item, int column);
 
 	void updateSourceListView(void);
 	void updateSymbolViews(void);
@@ -966,7 +966,7 @@ private:
 	void navigateToSymbolAtCursor(void);
 	void navigateBack(void);
 	QString escapeString(const QString & s) { QString t = s; return t.replace('\\', "\\\\").replace('\"', "\\\""); }
-	void sourceItemContextMenuRequested(QTreeWidget * treeWidget, QPoint p);
+	void sourceItemContextMenuRequested(const QTreeWidget * treeWidget, QPoint p);
 
 	/* Returns true, if the source view was refreshed, false otherwise. */
 	bool searchCurrentSourceText(const QString pattern);
@@ -1023,7 +1023,7 @@ private:
 			};
 			int line = -1;
 			QString	name, type, description;
-			const bool operator ==(const SymbolData & other) const
+			bool operator ==(const SymbolData & other) const
 			{
 				return name == other.name && type == other.type && description == other.description && line == other.line;
 			}
@@ -1037,8 +1037,8 @@ private:
 		};
 
 		/*! \todo	Make the 'subprograms' and 'variables' fields below unordered_set-s as well. */
-		std::vector<struct SymbolData> subprograms;
-		std::vector<struct SymbolData> variables;
+		std::unordered_set<struct SymbolData, SymbolHash> subprograms;
+		std::unordered_set<struct SymbolData, SymbolHash> variables;
 		std::unordered_set<struct SymbolData, SymbolHash> dataTypes;
 	};
 	struct StackFrameData

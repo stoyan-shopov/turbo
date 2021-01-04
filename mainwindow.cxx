@@ -1172,13 +1172,11 @@ bool MainWindow::handleSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM parseResul
 					sourceFiles.operator[](fullFileName) = s;
 				}
 				if (context.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_FUNCTION_SYMBOLS)
-					sourceFiles.operator [](fullFileName).subprograms.insert(sourceFiles.operator [](fullFileName).subprograms.end(), symbols.begin(), symbols.end());
+					sourceFiles.operator [](fullFileName).subprograms.insert(symbols.cbegin(), symbols.cend());
 				else if (context.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_VARIABLE_SYMBOLS)
-					sourceFiles.operator [](fullFileName).variables.insert(sourceFiles.operator [](fullFileName).variables.end(), symbols.begin(), symbols.end());
+					sourceFiles.operator [](fullFileName).variables.insert(symbols.cbegin(), symbols.cend());
 				else
-					//sourceFiles.operator [](fullFileName).dataTypes.insert(sourceFiles.operator [](fullFileName).dataTypes.end(), symbols.begin(), symbols.end());
-					for (const auto & symbol : symbols)
-						sourceFiles.operator [](fullFileName).dataTypes.insert(symbol);
+					sourceFiles.operator [](fullFileName).dataTypes.insert(symbols.cbegin(), symbols.cend());
 			}
 		}
 	}
@@ -1740,7 +1738,7 @@ void MainWindow::readGdbVarObjectChildren(const QModelIndex parent)
 	sendDataToGdbProcess((QString("%1-var-list-children --all-values ").arg(n) + t->miName + "\n"));
 }
 
-void MainWindow::showSourceCode(QTreeWidgetItem *item)
+void MainWindow::showSourceCode(const QTreeWidgetItem *item)
 {
 	QVariant v = item->data(0, SourceFileData::FILE_NAME);
 	if (v.type() != QMetaType::QString)
@@ -1827,7 +1825,7 @@ void MainWindow::svdContextMenuRequested(QPoint p)
 	}
 }
 
-void MainWindow::sourceItemContextMenuRequested(QTreeWidget *treeWidget, QPoint p)
+void MainWindow::sourceItemContextMenuRequested(const QTreeWidget *treeWidget, QPoint p)
 {
 	QTreeWidgetItem * w = treeWidget->itemAt(p);
 
@@ -1900,7 +1898,7 @@ void MainWindow::bookmarksContextMenuRequested(QPoint p)
 	}
 }
 
-void MainWindow::breakpointViewItemChanged(QTreeWidgetItem * item, int column)
+void MainWindow::breakpointViewItemChanged(const QTreeWidgetItem *item, int column)
 {
 	if (column != GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER)
 		return;
@@ -2423,7 +2421,7 @@ public:
 	~xbtn(){qDebug() << "xbtn deleted";}
 };
 
-void MainWindow::createSvdRegisterView(QTreeWidgetItem *item, int column)
+void MainWindow::createSvdRegisterView(const QTreeWidgetItem *item, int column)
 {
 	if (item->data(0, SVD_REGISTER_POINTER).isNull())
 		return;
