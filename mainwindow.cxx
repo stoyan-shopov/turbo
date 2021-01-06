@@ -187,7 +187,7 @@ MainWindow::MainWindow(QWidget *parent) :
 "QSplitterHandle:hover {}\n"
 
 "QSplitter::handle:horizontal {\n"
-	"width: 6px;\n"
+	"width: 5px;\n"
 	"background: grey;\n"
 "}\n"
 
@@ -196,7 +196,7 @@ MainWindow::MainWindow(QWidget *parent) :
 "}\n"
 
 "QSplitter::handle:vertical {\n"
-	"height: 6px;\n"
+	"height: 5px;\n"
 	"background: orange;\n"
 "}\n"
 
@@ -264,6 +264,18 @@ MainWindow::MainWindow(QWidget *parent) :
     "subcontrol-origin: margin;\n"
 "}\n"
 
+
+
+"QMainWindow::separator {\n"
+    "background: white;\n"
+    "width: 5px; /* when vertical */\n"
+    "height: 5px; /* when horizontal */\n"
+"}\n"
+"\n"
+"QMainWindow::separator:hover {\n"
+    "background: grey;\n"
+"}\n"
+
 #if 0
 "QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {\n"
     "border: 2px solid grey;\n"
@@ -279,6 +291,7 @@ MainWindow::MainWindow(QWidget *parent) :
 			      ));
 
 	gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
+	//gdbProcess->start("gdb.exe", QStringList() << "--interpreter=mi3");
 
 	ui->plainTextEditScratchpad->setPlainText(s.value("scratchpad-text-contents", QString("Lorem ipsum dolor sit amet")).toString());
 
