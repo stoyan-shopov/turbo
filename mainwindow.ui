@@ -250,7 +250,7 @@
          <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
         </property>
        </widget>
-       <widget class="QWidget" name="">
+       <widget class="QWidget" name="layoutWidget">
         <layout class="QVBoxLayout" name="verticalLayout_3">
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout_3">
@@ -797,6 +797,13 @@
              <widget class="QPushButton" name="pushButtonScanForTargets">
               <property name="text">
                <string>Scan</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButtonVerifyTargetMemory">
+              <property name="text">
+               <string>Verify flash</string>
               </property>
              </widget>
             </item>

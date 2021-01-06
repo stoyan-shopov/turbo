@@ -51,6 +51,8 @@
 #include <unordered_set>
 #include <set>
 
+#include <elfio/elfio.hpp>
+
 #include "gdbmireceiver.hxx"
 #include "gdb-mi-parser.hxx"
 #include "target-corefile.hxx"
@@ -771,7 +773,10 @@ private:
 				 * are '=breakpoint-created,bkpt={...}', '=breakpoint-modified,bkpt={...}',
 				 * '=breakpoint-deleted,id=number'. */
 				GDB_REQUEST_BREAKPOINT_LIST_UPDATE,
-
+				/* This response code is expected after the target non-volatile memory
+				 * contents have been retrieved, and a verification of the target memory
+				 * contents against the ELF file should be performed. */
+				GDB_SEQUENCE_POINT_CHECK_MEMORY_CONTENTS,
 			};
 			enum GDB_RESPONSE_ENUM gdbResponseCode = GDB_RESPONSE_INVALID;
 			QString		s;
@@ -964,6 +969,16 @@ private:
 	bool isGdbServerConnectedToGdb = false;
 	QString loadedExecutableFileName;
 
+	std::shared_ptr<ELFIO::elfio> elfReader;
+	/* This list contains the set of temporary file names used when verifying target memory area
+	 * contents.
+	 *
+	 * The file names are constructed, one for each program segment in the ELF file that is being
+	 * used for debugging. These file names are used in requests to gdb, to read the target memory
+	 * areas corresponding to the program segments. When the target memory areas are read, the files
+	 * are checked against the contents of the program segments from the ELF file. */
+	QStringList targetMemorySectionsTempFileNames;
+
 	QFileSystemWatcher sourceFileWatcher;
 	QString displayedSourceCodeFile;
 	void highlightBreakpointedLines(void);
@@ -1116,6 +1131,8 @@ private slots:
 
 	void on_pushButtonConnectGdbToGdbServer_clicked();
 
+	void on_pushButtonVerifyTargetMemory_clicked();
+
 private:
 	QTimer controlKeyPressTimer;
 	const int controlKeyPressLockTimeMs = 400;
@@ -1240,7 +1257,10 @@ private:
 	bool handleDisassemblyResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 
 	/* Sequence point handling. Also see comments about 'sequence points' for 'enum GDB_RESPONSE_ENUM' */
+	/*! \todo	Handle sequence points in separate functions. Rework and rename this function. */
 	bool handleSequencePoints(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
+	/* Handle sequence point response for vrtifying target memory area contents. */
+	bool handleVerifyTargetMemoryContentsSeqPoint(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 	/* Handle various responses from gdb that may lead to updating the breakpoint information. */
 	bool handleBreakpointUpdateResponses(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 	/* Handle target scan ('monitor swdp_scan' and 'monitor jtag_scan') response. */

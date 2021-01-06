@@ -35,6 +35,8 @@
 
 #include "cscanner.hxx"
 
+using namespace ELFIO;
+
 MainWindow::MainWindow(QWidget *parent) :
 	QMainWindow(parent),
 	ui(new Ui::MainWindow)
@@ -854,6 +856,8 @@ void MainWindow::gdbMiLineAvailable(QString line)
 					break;
 				if (handleDisassemblyResponse(result, results, tokenNumber))
 					break;
+				if (handleVerifyTargetMemoryContentsSeqPoint(result, results, tokenNumber))
+					break;
 				switch (result)
 				{
 					case GdbMiParser::DONE:
@@ -1216,6 +1220,9 @@ bool MainWindow::handleFileExecAndSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM
 	loadedExecutableFileName = context.s;
 	QSettings s("qgbd.rc", QSettings::IniFormat);
 	s.setValue("last-loaded-executable-file", loadedExecutableFileName);
+	elfReader = std::make_shared<elfio>();
+	if (!elfReader->load(loadedExecutableFileName.toStdString()))
+		elfReader.reset();
 	sendDataToGdbProcess("-file-list-exec-source-files\n");
 	return true;
 }
@@ -1585,6 +1592,53 @@ bool MainWindow::handleSequencePoints(GdbMiParser::RESULT_CLASS_ENUM parseResult
 	if (response_handled)
 		gdbTokenContext.readAndRemoveContext(tokenNumber);
 	return response_handled;
+}
+
+bool MainWindow::handleVerifyTargetMemoryContentsSeqPoint(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
+{
+	if (parseResult != GdbMiParser::DONE)
+		return false;
+	if (!gdbTokenContext.hasContextForToken(tokenNumber))
+		return false;
+	if (gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_CHECK_MEMORY_CONTENTS)
+		return false;
+	gdbTokenContext.readAndRemoveContext(tokenNumber);
+	bool match = true;
+	int i = 0;
+	for (const auto & f : targetMemorySectionsTempFileNames)
+	{
+		if (!QFileInfo(f).exists())
+		{
+			match = false;
+			QMessageBox::critical(0, "Error reading target memory", "Failed to read target memory, for verifying the target memory contents");
+			break;
+		}
+		QFile tf(f);
+		if (!tf.open(QFile::ReadOnly))
+		{
+			match = false;
+			QMessageBox::critical(0, "Error verifying target memory",
+					      QString("Failed to open temporary file\n\n"
+						      "%1\n\nwhen verifying target memory contents").arg(f));
+			break;
+		}
+		if (tf.readAll() != QByteArray(elfReader->segments[i]->get_data(), elfReader->segments[i]->get_file_size()));
+		{
+			match = false;
+			QMessageBox::critical(0, "Target memory contents mismatch",
+					      QString("The target memory contents are different from the memory contents of file\n\n"
+						      "%1").arg("xxx"));
+			break;
+		}
+	}
+	for (const auto & f : targetMemorySectionsTempFileNames)
+	{
+		QFile tf(f);
+		tf.remove();
+	}
+	if (match)
+		QMessageBox::information(0, "Target memory contents match", "Target memory contents match");
+	return true;
 }
 
 bool MainWindow::handleBreakpointUpdateResponses(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
@@ -2806,4 +2860,33 @@ void MainWindow::on_pushButtonConnectGdbToGdbServer_clicked()
 {
 	/*! \todo	do not hardcode the gdb server listening port */
 	sendDataToGdbProcess("-target-select extended-remote :1122\n");
+}
+
+void MainWindow::on_pushButtonVerifyTargetMemory_clicked()
+{
+	targetMemorySectionsTempFileNames.clear();
+	if (!elfReader)
+	{
+		QMessageBox::critical(0, "ELF file unavailable", "ELF file unavailable, cannot perform target memory verification");
+		return;
+	}
+	/*! \todo	Create proper temporary files, this is just a quick hack. */
+	auto x = QDateTime::currentMSecsSinceEpoch();
+	QString gdbRequest;
+	int i = 0;
+	for (const auto & segment : elfReader->segments)
+	{
+		targetMemorySectionsTempFileNames << QString("section-%1-%2.bin").arg(i).arg(x);
+		/* There is no machine interface command for dumping target memory to files, so use the regular gdb commands. */
+		gdbRequest += QString("dump binary memory %1 0x%2 0x%3\n")
+				.arg(targetMemorySectionsTempFileNames.back())
+				.arg(segment->get_physical_address(), 8, 16, QChar('0'))
+				.arg(segment->get_physical_address() + segment->get_file_size(), 8, 16, QChar('0'));
+		i ++;
+	}
+	/* As regular gdb commands are being used, insert a sequence point to know when to check the retrieved target memory areas. */
+	unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
+			   GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_CHECK_MEMORY_CONTENTS));
+	gdbRequest += QString("%1\n").arg(t);
+	sendDataToGdbProcess(gdbRequest);
 }
