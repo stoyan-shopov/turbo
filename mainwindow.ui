@@ -14,7 +14,28 @@
    <string>dds</string>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <layout class="QVBoxLayout" name="verticalLayout_23">
+   <layout class="QVBoxLayout" name="verticalLayout_24">
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_4">
+      <item>
+       <widget class="QLabel" name="label_4">
+        <property name="text">
+         <string>Search for text:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="lineEditFindText"/>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButtonNavigateBack">
+        <property name="text">
+         <string>Navigate back</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
@@ -216,39 +237,48 @@
      </layout>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="horizontalLayout_4">
-      <item>
-       <widget class="QLabel" name="label_4">
-        <property name="text">
-         <string>Search for text:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLineEdit" name="lineEditFindText"/>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButtonNavigateBack">
-        <property name="text">
-         <string>Navigate back</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </item>
-    <item>
      <widget class="QSplitter" name="splitterVerticalSourceView">
       <property name="orientation">
        <enum>Qt::Vertical</enum>
       </property>
-      <widget class="QSplitter" name="splitterHorizontalSourceDisassemblyView">
+      <widget class="QSplitter" name="splitterHorizontalStderrSrcDisassembly">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
        </property>
-       <widget class="QPlainTextEdit" name="plainTextEditSourceView">
-        <property name="textInteractionFlags">
-         <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+       <widget class="QSplitter" name="splitterHorizontalSourceViewStderr">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
         </property>
+        <widget class="QWidget" name="layoutWidget">
+         <layout class="QVBoxLayout" name="verticalLayout_23">
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_23">
+            <item>
+             <widget class="QLabel" name="label_15">
+              <property name="text">
+               <string>Lorem ipsum</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButton_4">
+              <property name="text">
+               <string>PushButton</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QPlainTextEdit" name="plainTextEditStderr"/>
+          </item>
+         </layout>
+        </widget>
+        <widget class="QPlainTextEdit" name="plainTextEditSourceView">
+         <property name="textInteractionFlags">
+          <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+         </property>
+        </widget>
        </widget>
        <widget class="QWidget" name="layoutWidget">
         <layout class="QVBoxLayout" name="verticalLayout_3">

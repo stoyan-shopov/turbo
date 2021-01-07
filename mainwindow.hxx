@@ -627,7 +627,6 @@ private slots:
 	void on_lineEditGdbCommand_returnPressed();
 	void gdbProcessError(QProcess::ProcessError error);
 	void gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
-	void gdbStandardErrorDataAvailable(void);
 	void sendDataToGdbProcess(const QString &data);
 	void readGdbVarObjectChildren(const QModelIndex parent);
 	void showSourceCode(const QTreeWidgetItem * item);

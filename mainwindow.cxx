@@ -48,7 +48,8 @@ MainWindow::MainWindow(QWidget *parent) :
 	restoreState(s.value("mainwindow-state", QByteArray()).toByteArray());
 	restoreGeometry(s.value("mainwindow-geometry", QByteArray()).toByteArray());
 	ui->splitterVerticalSourceView->restoreState(s.value("splitter-vertical-source-view-state", QByteArray()).toByteArray());
-	ui->splitterHorizontalSourceDisassemblyView->restoreState(s.value("splitter-horizontal-source-disassembly-view-state", QByteArray()).toByteArray());
+	ui->splitterHorizontalSourceViewStderr->restoreState(s.value("splitter-horizontal-source-stderr-view-state", QByteArray()).toByteArray());
+	ui->splitterHorizontalStderrSrcDisassembly->restoreState(s.value("splitter-horizontal-source-disassembly-view-state", QByteArray()).toByteArray());
 	ui->splitterHorizontalGdbConsoles->restoreState(s.value("splitter-horizontal-gdb-consoles-state", QByteArray()).toByteArray());
 
 	gdbProcess = std::make_shared<QProcess>();
@@ -62,7 +63,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
 	connect(ui->pushButtonNavigateBack, &QPushButton::clicked, [&] { navigateBack(); });
 
-	connect(gdbProcess.get(), SIGNAL(readyReadStandardError()), this, SLOT(gdbStandardErrorDataAvailable()));
+	connect(gdbProcess.get(), & QProcess::readyReadStandardError,
+		[=] { QTextCursor c = ui->plainTextEditStderr->textCursor(); c.movePosition(QTextCursor::End); c.insertText(gdbProcess.get()->readAllStandardError()); });
+
 	connect(gdbProcess.get(), SIGNAL(finished(int, QProcess::ExitStatus)), this, SLOT(gdbProcessFinished(int,QProcess::ExitStatus)));
 	connect(gdbMiReceiver, SIGNAL(gdbMiOutputLineAvailable(QString)), this, SLOT(gdbMiLineAvailable(QString)));
 	connect(gdbProcess.get(), SIGNAL(errorOccurred(QProcess::ProcessError)), this, SLOT(gdbProcessError(QProcess::ProcessError)));
@@ -570,7 +573,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	s.setValue("bookmarks", bookmarkStrings);
 
 	s.setValue("splitter-vertical-source-view-state", ui->splitterVerticalSourceView->saveState());
-	s.setValue("splitter-horizontal-source-disassembly-view-state", ui->splitterHorizontalSourceDisassemblyView->saveState());
+	s.setValue("splitter-horizontal-source-stderr-view-state", ui->splitterHorizontalSourceViewStderr->saveState());
+	s.setValue("splitter-horizontal-source-disassembly-view-state", ui->splitterHorizontalStderrSrcDisassembly->saveState());
 	s.setValue("splitter-horizontal-gdb-consoles-state", ui->splitterHorizontalGdbConsoles->saveState());
 
 	QStringList traceLog;
@@ -1793,11 +1797,6 @@ void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
 				== 0)
 			gdbProcess->start();
 	}
-}
-
-void MainWindow::gdbStandardErrorDataAvailable()
-{
-	qDebug() << gdbProcess->readAllStandardError();
 }
 
 void MainWindow::sendDataToGdbProcess(const QString & data)
