@@ -42,6 +42,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui(new Ui::MainWindow)
 {
 	ui->setupUi(this);
+	setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North);
 
 	QSettings s("qgbd.rc", QSettings::IniFormat);
 	restoreState(s.value("mainwindow-state", QByteArray()).toByteArray());
@@ -290,8 +291,8 @@ MainWindow::MainWindow(QWidget *parent) :
 #endif
 			      ));
 
-	gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("gdb.exe", QStringList() << "--interpreter=mi3");
+	//gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
+	gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 
 	ui->plainTextEditScratchpad->setPlainText(s.value("scratchpad-text-contents", QString("Lorem ipsum dolor sit amet")).toString());
 
@@ -909,6 +910,17 @@ void MainWindow::gdbMiLineAvailable(QString line)
 				if (line.startsWith("=breakpoint-created") || line.startsWith("=breakpoint-modified")
 						|| line.startsWith("=breakpoint-deleted"))
 					sendDataToGdbProcess("-break-list\n");
+				else if (line.startsWith("=thread-group-started"))
+				{
+					QRegularExpression rx("=thread-group-started,id=\"(.+)\",pid=\"(.+)\"");
+					QRegularExpressionMatch match = rx.match(line);
+					if (!match.hasMatch())
+						QMessageBox::critical(0, "Error parsing gdb notify async response",
+								      "Failed to parse gdb '=thread-group-started' response");
+					else
+						debugProcessId = match.captured(2).toULong(0, 0);
+
+				}
 			}
 		default:
 			ui->plainTextEditConsoleStreamOutput->appendPlainText(line);
@@ -2693,10 +2705,26 @@ void MainWindow::on_lineEditFindText_returnPressed()
 	moveCursorToNextMatch();
 }
 
+
+#ifdef Q_OS_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <wincon.h>
+#include <debugapi.h>
+#endif
 void MainWindow::on_pushButtonRequestGdbHalt_clicked()
 {
-	//gdbProcess->write("\x3");
 	blackMagicProbeServer.sendRawGdbPacket("\x3");
+#ifdef Q_OS_WINDOWS
+	if (debugProcessId != -1)
+	{
+		HANDLE process = OpenProcess(PROCESS_ALL_ACCESS, FALSE, debugProcessId);
+		if (!DebugBreakProcess(process))
+			QMessageBox::critical(0, "Error interrupting the debugged process",
+					      "Failed to interrupt the process that is debugged");
+		CloseHandle(process);
+	}
+#endif
 }
 
 void MainWindow::on_pushButtonDumpVarObjects_clicked()

@@ -1153,6 +1153,10 @@ private:
 	const QString vimEditorLocation = "C:\\Program Files (x86)\\Vim\\vim80\\gvim.exe";
 	Ui::MainWindow *ui;
 	std::shared_ptr<QProcess> gdbProcess;
+	/* This is the process identifier of the debugged process, needed for sending signals
+	 * for interrupting the process. This is appropriate only when debugging local processes,
+	 * it is invalid for remote debugging. */
+	unsigned debugProcessId = -1;
 	////GdbServer	* gdbserver;
 	TargetCorefile	* targetCorefile;
 	QString normalizeGdbString(const QString & miString);
