@@ -74,6 +74,13 @@
        </layout>
       </item>
       <item>
+       <widget class="QPushButton" name="pushButtonHide">
+        <property name="text">
+         <string>hide</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QGroupBox" name="groupBoxTargetConnected">
         <property name="title">
          <string>GroupBox - target connected</string>
@@ -241,44 +248,42 @@
       <property name="orientation">
        <enum>Qt::Vertical</enum>
       </property>
-      <widget class="QSplitter" name="splitterHorizontalStderrSrcDisassembly">
+      <widget class="QSplitter" name="splitterHorizontalSourceView">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
        </property>
-       <widget class="QSplitter" name="splitterHorizontalSourceViewStderr">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
+       <property name="childrenCollapsible">
+        <bool>false</bool>
+       </property>
+       <widget class="QWidget" name="layoutWidget">
+        <layout class="QVBoxLayout" name="verticalLayout_23">
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_23">
+           <item>
+            <widget class="QLabel" name="label_15">
+             <property name="text">
+              <string>Lorem ipsum</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="pushButton_4">
+             <property name="text">
+              <string>PushButton</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QPlainTextEdit" name="plainTextEditStderr"/>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QPlainTextEdit" name="plainTextEditSourceView">
+        <property name="textInteractionFlags">
+         <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
         </property>
-        <widget class="QWidget" name="layoutWidget">
-         <layout class="QVBoxLayout" name="verticalLayout_23">
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_23">
-            <item>
-             <widget class="QLabel" name="label_15">
-              <property name="text">
-               <string>Lorem ipsum</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="pushButton_4">
-              <property name="text">
-               <string>PushButton</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <widget class="QPlainTextEdit" name="plainTextEditStderr"/>
-          </item>
-         </layout>
-        </widget>
-        <widget class="QPlainTextEdit" name="plainTextEditSourceView">
-         <property name="textInteractionFlags">
-          <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-         </property>
-        </widget>
        </widget>
        <widget class="QWidget" name="layoutWidget">
         <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -308,6 +313,9 @@
       <widget class="QSplitter" name="splitterHorizontalGdbConsoles">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="childrenCollapsible">
+        <bool>false</bool>
        </property>
        <widget class="QGroupBox" name="groupBox">
         <property name="title">

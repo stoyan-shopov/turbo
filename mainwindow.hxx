@@ -1132,6 +1132,8 @@ private slots:
 
 	void on_pushButtonVerifyTargetMemory_clicked();
 
+	void on_pushButtonHide_clicked();
+
 private:
 	QTimer controlKeyPressTimer;
 	const int controlKeyPressLockTimeMs = 400;

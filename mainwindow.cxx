@@ -47,10 +47,10 @@ MainWindow::MainWindow(QWidget *parent) :
 	QSettings s("qgbd.rc", QSettings::IniFormat);
 	restoreState(s.value("mainwindow-state", QByteArray()).toByteArray());
 	restoreGeometry(s.value("mainwindow-geometry", QByteArray()).toByteArray());
+
 	ui->splitterVerticalSourceView->restoreState(s.value("splitter-vertical-source-view-state", QByteArray()).toByteArray());
-	ui->splitterHorizontalSourceViewStderr->restoreState(s.value("splitter-horizontal-source-stderr-view-state", QByteArray()).toByteArray());
-	ui->splitterHorizontalStderrSrcDisassembly->restoreState(s.value("splitter-horizontal-source-disassembly-view-state", QByteArray()).toByteArray());
 	ui->splitterHorizontalGdbConsoles->restoreState(s.value("splitter-horizontal-gdb-consoles-state", QByteArray()).toByteArray());
+	ui->splitterHorizontalSourceView->restoreState(s.value("splitter-horizontal-source-view-state", QByteArray()).toByteArray());
 
 	gdbProcess = std::make_shared<QProcess>();
 	/*! \todo This doesn't need to live in a separate thread. */
@@ -573,9 +573,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	s.setValue("bookmarks", bookmarkStrings);
 
 	s.setValue("splitter-vertical-source-view-state", ui->splitterVerticalSourceView->saveState());
-	s.setValue("splitter-horizontal-source-stderr-view-state", ui->splitterHorizontalSourceViewStderr->saveState());
-	s.setValue("splitter-horizontal-source-disassembly-view-state", ui->splitterHorizontalStderrSrcDisassembly->saveState());
 	s.setValue("splitter-horizontal-gdb-consoles-state", ui->splitterHorizontalGdbConsoles->saveState());
+	s.setValue("splitter-horizontal-source-view-state", ui->splitterHorizontalSourceView->saveState());
 
 	QStringList traceLog;
 	for (int i = 0; i < ui->treeWidgetTraceLog->topLevelItemCount(); i ++)
@@ -2929,4 +2928,12 @@ void MainWindow::on_pushButtonVerifyTargetMemory_clicked()
 			   GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_CHECK_MEMORY_CONTENTS));
 	gdbRequest += QString("%1\n").arg(t);
 	sendDataToGdbProcess(gdbRequest);
+}
+
+void MainWindow::on_pushButtonHide_clicked()
+{
+	static int xxx;
+	ui->splitterHorizontalSourceView->widget(0)->setHidden(xxx ^= 1);
+	ui->mainToolBar;
+	this->menuBar();
 }
