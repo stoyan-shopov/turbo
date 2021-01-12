@@ -52,6 +52,10 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->splitterHorizontalGdbConsoles->restoreState(s.value("splitter-horizontal-gdb-consoles-state", QByteArray()).toByteArray());
 	ui->splitterHorizontalSourceView->restoreState(s.value("splitter-horizontal-source-view-state", QByteArray()).toByteArray());
 
+	ui->splitterHorizontalGdbConsoles->setVisible(s.value("is-splitter-horizontal-gdb-consoles-visible", true).toBool());
+	ui->groupBoxDisassembly->setVisible(s.value("is-disassembly-view-visible", true).toBool());
+	ui->groupBoxTargetOutput->setVisible(s.value("is-target-output-view-visible", true).toBool());
+
 	gdbProcess = std::make_shared<QProcess>();
 	/*! \todo This doesn't need to live in a separate thread. */
 	gdbMiReceiver = new GdbMiReceiver();
@@ -548,6 +552,14 @@ reopen_last_file:
 	);
 
 	connect(ui->treeWidgetSvd, SIGNAL(itemDoubleClicked(QTreeWidgetItem*,int)), this, SLOT(createSvdRegisterView(QTreeWidgetItem*,int)));
+
+	connect(ui->pushButtonToggleTargetOuputView, & QPushButton::clicked, [&] { ui->groupBoxTargetOutput->setVisible(!ui->groupBoxTargetOutput->isVisible()); });
+	connect(ui->pushButtonToggleDisassemblyView, & QPushButton::clicked, [&] { ui->groupBoxDisassembly->setVisible(!ui->groupBoxDisassembly->isVisible()); });
+	connect(ui->pushButtonToggleGdbConsoles, & QPushButton::clicked, [&] { ui->splitterHorizontalGdbConsoles->setVisible(!ui->splitterHorizontalGdbConsoles->isVisible()); });
+
+	connect(ui->lineEditGdbCommand1, & QLineEdit::returnPressed, [&] { sendCommandsToGdb(ui->lineEditGdbCommand1); });
+	connect(ui->pushButtonSendCommandToGdb1, & QPushButton::clicked, [&] { sendCommandsToGdb(ui->lineEditGdbCommand1); });
+	connect(ui->lineEditGdbCommand2, & QLineEdit::returnPressed, [&] { sendCommandsToGdb(ui->lineEditGdbCommand2); });
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -575,6 +587,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	s.setValue("splitter-vertical-source-view-state", ui->splitterVerticalSourceView->saveState());
 	s.setValue("splitter-horizontal-gdb-consoles-state", ui->splitterHorizontalGdbConsoles->saveState());
 	s.setValue("splitter-horizontal-source-view-state", ui->splitterHorizontalSourceView->saveState());
+
+	s.setValue("is-splitter-horizontal-gdb-consoles-visible", ui->splitterHorizontalGdbConsoles->isVisible());
+	s.setValue("is-disassembly-view-visible", ui->groupBoxDisassembly->isVisible());
+	s.setValue("is-target-output-view-visible", ui->groupBoxTargetOutput->isVisible());
 
 	QStringList traceLog;
 	for (int i = 0; i < ui->treeWidgetTraceLog->topLevelItemCount(); i ++)
@@ -1737,16 +1753,6 @@ bool MainWindow::handleTargetScanResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 	return false;
 }
 
-void MainWindow::on_lineEditGdbCommand_returnPressed()
-{
-QString s =  ui->lineEditGdbCommand->text();
-	/* Remove any newlines. This is possible if pasting text from the clipboard. */
-	s.replace('\n', ' ');
-	qDebug() << "console command:" << escapeString(s);
-	QString data = "-interpreter-exec console \"" + escapeString(s) + "\"\n";
-	sendDataToGdbProcess(data);
-}
-
 void MainWindow::gdbProcessError(QProcess::ProcessError error)
 {
 	switch (error)
@@ -2126,19 +2132,14 @@ void MainWindow::updateBookmarksView()
 			 ));
 }
 
-void MainWindow::on_lineEditGdbMiCommand_returnPressed()
+void MainWindow::sendCommandsToGdb(QLineEdit * lineEdit)
 {
-QString s =  ui->lineEditGdbMiCommand->text();
-	/* Remove any newlines. This is possible if pasting text from the clipboard. */
-	s.replace('\n', ' ');
-	/*! \todo	Determine what and when exactly needs to be escaped. */
-#if 0
-	/* Escape. */
-	s.replace("\\", "/");
-	s.replace("\"", "\\\"");
-#endif
-	ui->lineEditGdbMiCommand->clear();
-	sendDataToGdbProcess(s + '\n');
+/* Newlines from the lineEdit are possible if pasting text from the clipboard. */
+QStringList l = lineEdit->text().split('\n');
+	lineEdit->clear();
+	for (const auto & s : l)
+		sendDataToGdbProcess(s + '\n');
+
 }
 
 void MainWindow::on_lineEditVarObjectExpression_returnPressed()
@@ -2928,12 +2929,4 @@ void MainWindow::on_pushButtonVerifyTargetMemory_clicked()
 			   GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_CHECK_MEMORY_CONTENTS));
 	gdbRequest += QString("%1\n").arg(t);
 	sendDataToGdbProcess(gdbRequest);
-}
-
-void MainWindow::on_pushButtonHide_clicked()
-{
-	static int xxx;
-	ui->splitterHorizontalSourceView->widget(0)->setHidden(xxx ^= 1);
-	ui->mainToolBar;
-	this->menuBar();
 }

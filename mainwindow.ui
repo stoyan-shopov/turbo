@@ -14,28 +14,7 @@
    <string>dds</string>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <layout class="QVBoxLayout" name="verticalLayout_24">
-    <item>
-     <layout class="QHBoxLayout" name="horizontalLayout_4">
-      <item>
-       <widget class="QLabel" name="label_4">
-        <property name="text">
-         <string>Search for text:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLineEdit" name="lineEditFindText"/>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButtonNavigateBack">
-        <property name="text">
-         <string>Navigate back</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </item>
+   <layout class="QVBoxLayout" name="verticalLayout_27">
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
@@ -72,13 +51,6 @@
          </widget>
         </item>
        </layout>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButtonHide">
-        <property name="text">
-         <string>hide</string>
-        </property>
-       </widget>
       </item>
       <item>
        <widget class="QGroupBox" name="groupBoxTargetConnected">
@@ -213,40 +185,15 @@
         </layout>
        </widget>
       </item>
-      <item>
-       <widget class="QLabel" name="label">
-        <property name="text">
-         <string>Gdb command:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLineEdit" name="lineEditGdbCommand">
-        <property name="text">
-         <string>file C:/src/build-troll-Desktop_Qt_5_12_0_MinGW_64_bit-Debug/troll-test-drive-files/blackmagic.elf</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="label_3">
-        <property name="text">
-         <string>Raw gdb MI command:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLineEdit" name="lineEditGdbMiCommand">
-        <property name="text">
-         <string>-stack-list-variables --all-values</string>
-        </property>
-       </widget>
-      </item>
      </layout>
     </item>
     <item>
      <widget class="QSplitter" name="splitterVerticalSourceView">
       <property name="orientation">
        <enum>Qt::Vertical</enum>
+      </property>
+      <property name="childrenCollapsible">
+       <bool>false</bool>
       </property>
       <widget class="QSplitter" name="splitterHorizontalSourceView">
        <property name="orientation">
@@ -255,57 +202,138 @@
        <property name="childrenCollapsible">
         <bool>false</bool>
        </property>
-       <widget class="QWidget" name="layoutWidget">
-        <layout class="QVBoxLayout" name="verticalLayout_23">
+       <widget class="QGroupBox" name="groupBoxTargetOutput">
+        <property name="title">
+         <string>Target output</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_25">
          <item>
-          <layout class="QHBoxLayout" name="horizontalLayout_23">
+          <layout class="QVBoxLayout" name="verticalLayout_23">
            <item>
-            <widget class="QLabel" name="label_15">
-             <property name="text">
-              <string>Lorem ipsum</string>
-             </property>
-            </widget>
+            <layout class="QHBoxLayout" name="horizontalLayout_23">
+             <item>
+              <widget class="QLabel" name="label_15">
+               <property name="text">
+                <string>Lorem ipsum</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="pushButton_4">
+               <property name="text">
+                <string>PushButton</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </item>
            <item>
-            <widget class="QPushButton" name="pushButton_4">
-             <property name="text">
-              <string>PushButton</string>
-             </property>
-            </widget>
+            <widget class="QPlainTextEdit" name="plainTextEditStderr"/>
            </item>
           </layout>
-         </item>
-         <item>
-          <widget class="QPlainTextEdit" name="plainTextEditStderr"/>
          </item>
         </layout>
        </widget>
-       <widget class="QPlainTextEdit" name="plainTextEditSourceView">
-        <property name="textInteractionFlags">
-         <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+       <widget class="QGroupBox" name="groupBox_3">
+        <property name="title">
+         <string>Source</string>
         </property>
-       </widget>
-       <widget class="QWidget" name="layoutWidget">
-        <layout class="QVBoxLayout" name="verticalLayout_3">
+        <layout class="QVBoxLayout" name="verticalLayout_24">
          <item>
-          <layout class="QHBoxLayout" name="horizontalLayout_3">
+          <layout class="QHBoxLayout" name="horizontalLayout_4">
            <item>
-            <widget class="QPushButton" name="pushButton_2">
+            <widget class="QLabel" name="label_3">
              <property name="text">
-              <string>PushButton</string>
+              <string>Gdb
+command:</string>
              </property>
             </widget>
            </item>
            <item>
-            <widget class="QLineEdit" name="lineEdit"/>
+            <widget class="QLineEdit" name="lineEditGdbCommand2"/>
            </item>
            <item>
-            <widget class="QComboBox" name="comboBox"/>
+            <widget class="QLabel" name="label_4">
+             <property name="text">
+              <string>Search
+for text:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="lineEditFindText"/>
+           </item>
+           <item>
+            <widget class="QPushButton" name="pushButtonNavigateBack">
+             <property name="text">
+              <string>Navigate
+back</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="pushButtonToggleGdbConsoles">
+             <property name="text">
+              <string>Toggle gdb
+consoles</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="pushButtonToggleTargetOuputView">
+             <property name="text">
+              <string>Toggle target
+output view</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="pushButtonToggleDisassemblyView">
+             <property name="text">
+              <string>Toggle disassembly
+view</string>
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
          <item>
-          <widget class="QPlainTextEdit" name="plainTextEditDisassembly"/>
+          <widget class="QPlainTextEdit" name="plainTextEditSourceView">
+           <property name="textInteractionFlags">
+            <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QGroupBox" name="groupBoxDisassembly">
+        <property name="title">
+         <string>Disassembly</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_26">
+         <item>
+          <layout class="QVBoxLayout" name="verticalLayout_3">
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_3">
+             <item>
+              <widget class="QPushButton" name="pushButton_2">
+               <property name="text">
+                <string>PushButton</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="lineEdit"/>
+             </item>
+             <item>
+              <widget class="QComboBox" name="comboBox"/>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QPlainTextEdit" name="plainTextEditDisassembly"/>
+           </item>
+          </layout>
          </item>
         </layout>
        </widget>
@@ -323,11 +351,32 @@
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_4">
          <item>
-          <widget class="QPushButton" name="pushButtonClearConsole">
-           <property name="text">
-            <string>Clear Console</string>
-           </property>
-          </widget>
+          <layout class="QHBoxLayout" name="horizontalLayout_24">
+           <item>
+            <widget class="QPushButton" name="pushButtonClearConsole">
+             <property name="text">
+              <string>Clear Console</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label">
+             <property name="text">
+              <string>Gdb command:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="lineEditGdbCommand1"/>
+           </item>
+           <item>
+            <widget class="QPushButton" name="pushButtonSendCommandToGdb1">
+             <property name="text">
+              <string>Send</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </item>
          <item>
           <widget class="QPlainTextEdit" name="plainTextEditConsoleStreamOutput"/>

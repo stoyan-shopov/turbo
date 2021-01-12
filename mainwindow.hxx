@@ -624,7 +624,6 @@ public slots:
 	void gdbMiLineAvailable(QString line);
 private slots:
 	void displayHelp(void);
-	void on_lineEditGdbCommand_returnPressed();
 	void gdbProcessError(QProcess::ProcessError error);
 	void gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
 	void sendDataToGdbProcess(const QString &data);
@@ -642,8 +641,6 @@ private slots:
 	void updateSymbolViews(void);
 	void updateBreakpointsView(void);
 	void updateBookmarksView(void);
-
-	void on_lineEditGdbMiCommand_returnPressed();
 
 	void on_lineEditVarObjectExpression_returnPressed();
 
@@ -995,6 +992,8 @@ private:
 	void moveCursorToNextMatch(void);
 	void moveCursorToPreviousMatch(void);
 
+	void sendCommandsToGdb(QLineEdit * lineEdit);
+
 	struct SourceFileData {
 		/* Enumeration constants used as a 'role' parameter in the treeview widget used for displaying
 		 * the list of source code files. */
@@ -1131,8 +1130,6 @@ private slots:
 	void on_pushButtonConnectGdbToGdbServer_clicked();
 
 	void on_pushButtonVerifyTargetMemory_clicked();
-
-	void on_pushButtonHide_clicked();
 
 private:
 	QTimer controlKeyPressTimer;
