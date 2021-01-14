@@ -67,9 +67,6 @@
          <property name="topMargin">
           <number>0</number>
          </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
          <property name="bottomMargin">
           <number>0</number>
          </property>
@@ -134,14 +131,14 @@
            </layout>
           </widget>
          </item>
+         <item>
+          <widget class="QPushButton" name="pushButtonDisconnectGdbServer">
+           <property name="text">
+            <string>Disconnect gdb server</string>
+           </property>
+          </widget>
+         </item>
         </layout>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButtonDisconnectGdbServer">
-        <property name="text">
-         <string>Disconnect gdb server</string>
-        </property>
        </widget>
       </item>
       <item>
@@ -211,6 +208,13 @@
           <layout class="QVBoxLayout" name="verticalLayout_23">
            <item>
             <layout class="QHBoxLayout" name="horizontalLayout_23">
+             <item>
+              <widget class="QPushButton" name="pushButtonHideTargetOutputView">
+               <property name="text">
+                <string>Hide</string>
+               </property>
+              </widget>
+             </item>
              <item>
               <widget class="QLabel" name="label_15">
                <property name="text">
@@ -316,9 +320,9 @@ view</string>
            <item>
             <layout class="QHBoxLayout" name="horizontalLayout_3">
              <item>
-              <widget class="QPushButton" name="pushButton_2">
+              <widget class="QPushButton" name="pushButtonHideDisassembly">
                <property name="text">
-                <string>PushButton</string>
+                <string>Hide disassembly</string>
                </property>
               </widget>
              </item>
@@ -352,6 +356,13 @@ view</string>
         <layout class="QVBoxLayout" name="verticalLayout_4">
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout_24">
+           <item>
+            <widget class="QPushButton" name="pushButtonHideGdbConsoles">
+             <property name="text">
+              <string>Hide consoles</string>
+             </property>
+            </widget>
+           </item>
            <item>
             <widget class="QPushButton" name="pushButtonClearConsole">
              <property name="text">

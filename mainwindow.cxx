@@ -298,8 +298,10 @@ MainWindow::MainWindow(QWidget *parent) :
 #endif
 			      ));
 
-	//gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
-	gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
+	gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
+	//gdbProcess->start("c:/src1/gdb-10.1-build-1/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
+	//gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
+	//gdbProcess->start("c:/src1/gdb-10.1-build-2/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 
 	ui->plainTextEditScratchpad->setPlainText(s.value("scratchpad-text-contents", QString("Lorem ipsum dolor sit amet")).toString());
 
@@ -446,22 +448,27 @@ reopen_last_file:
 			ui->groupBoxBlackMagicDisconnectedWidgets->setEnabled(true);
 			ui->groupBoxBlackMagicConnectedWidgets->setEnabled(false);
 			sendDataToGdbProcess("-target-disconnect\n");
-			isGdbServerConnectedToGdb = false;
 			});
 	ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: yellow");
 
 	connect(ui->pushButtonDisplayHelp, SIGNAL(clicked(bool)), this, SLOT(displayHelp()));
 	displayHelp();
 
+	/***************************************
+	 * Gdb and target state change handling.
+	 ***************************************/
+	 /*! \todo: Move this to a separate function */
 	targetStateDependentWidgets.enabledWidgetsWhenGdbServerDisconnected << ui->groupBoxTargetDisconnected;
 	targetStateDependentWidgets.disabledWidgetsWhenGdbServerDisconnected << ui->groupBoxTargetConnected;
 	connect(this, &MainWindow::gdbServerConnected, [&] {
-		if (isGdbServerConnectedToGdb)
-			*(int*)0=0;
-		isGdbServerConnectedToGdb = true;
 		////QMessageBox::information(0, "Gdb connection established", "Gdb successfully connected to remote gdb server");
 		ui->pushButtonScanForTargets->click();
 	});
+
+	connect(&blackMagicProbeServer, &BlackMagicProbeServer::GdbClientDisconnected, [&]
+		{ targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED);}
+	);
+
 	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->groupBoxTargetHalted << ui->groupBoxTargetConnected;
 	targetStateDependentWidgets.disabledWidgetsWhenTargetStopped << ui->groupBoxTargetRunning;
 	connect(this, &MainWindow::targetStopped, [&] {
@@ -486,7 +493,17 @@ reopen_last_file:
 		targetStateDependentWidgets.enterTargetState(target_state = TARGET_RUNNING);
 	});
 
+	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << targetStateDependentWidgets.enabledWidgetsWhenTargetRunning;
+	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << targetStateDependentWidgets.enabledWidgetsWhenTargetStopped;
+	connect(this, &MainWindow::targetDetached, [&]
+		{ targetStateDependentWidgets.enterTargetState(target_state = TARGET_DETACHED);}
+	);
+
+
 	targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED);
+	/***************************************
+	 ***************************************
+	 ***************************************/
 
 	connect(ui->pushButtonResetAndRunTarget, & QPushButton::clicked, [&] { sendDataToGdbProcess("-exec-run\n"); });
 	connect(ui->pushButtonContinue, & QPushButton::clicked, [&] { sendDataToGdbProcess("-exec-continue\n"); });
@@ -560,6 +577,10 @@ reopen_last_file:
 	connect(ui->lineEditGdbCommand1, & QLineEdit::returnPressed, [&] { sendCommandsToGdb(ui->lineEditGdbCommand1); });
 	connect(ui->pushButtonSendCommandToGdb1, & QPushButton::clicked, [&] { sendCommandsToGdb(ui->lineEditGdbCommand1); });
 	connect(ui->lineEditGdbCommand2, & QLineEdit::returnPressed, [&] { sendCommandsToGdb(ui->lineEditGdbCommand2); });
+
+	connect(ui->pushButtonHideGdbConsoles, & QPushButton::clicked, [&] { ui->splitterHorizontalGdbConsoles->hide(); });
+	connect(ui->pushButtonHideDisassembly, & QPushButton::clicked, [&] { ui->groupBoxDisassembly->hide(); });
+	connect(ui->pushButtonHideTargetOutputView, & QPushButton::clicked, [&] { ui->groupBoxTargetOutput->hide(); });
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -939,6 +960,11 @@ void MainWindow::gdbMiLineAvailable(QString line)
 					else
 						debugProcessId = match.captured(2).toULong(0, 0);
 
+				}
+				else if (line.startsWith("=thread-group-exited"))
+				{
+					emit targetDetached();
+					QMessageBox::information(0, "Target detached", "Gdb has detached from the target");
 				}
 			}
 		default:
@@ -2693,8 +2719,7 @@ void MainWindow::on_pushButtonConnectToBlackmagic_clicked()
 
 void MainWindow::on_pushButtonDisconnectGdbServer_clicked()
 {
-	*(int*)0=0;
-	//gdbserver->closeConnection();
+	blackMagicProbeServer.closeConnections();
 }
 
 void MainWindow::on_lineEditFindText_returnPressed()
@@ -2805,8 +2830,8 @@ void MainWindow::on_comboBoxSelectLayout_activated(int index)
 
 void MainWindow::on_pushButtonXmlTest_clicked()
 {
-	svdParser.parse("C:/src/cmsis-svd/data/STMicro/STM32F7x3.svd");
-	//svdParser.parse("C:/src/cmsis-svd/data/Atmel/ATSAMD21E15L.svd");
+	//svdParser.parse("C:/src/cmsis-svd/data/STMicro/STM32F7x3.svd");
+	svdParser.parse("C:/src1/cmsis-svd/data/Atmel/ATSAMD21E15L.svd");
 	ui->treeWidgetSvd->clear();
 
 	/* Note: if the device tree node is not added to the tree widget here, but at a later time instead, the

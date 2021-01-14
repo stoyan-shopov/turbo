@@ -134,6 +134,7 @@ private:
 			 * also deletes the connected sockets. Trying to delete the socket here is crashing the program. */
 			//delete gdb_client_socket;
 			gdb_client_socket = 0;
+			emit GdbClientDisconnected();
 		}
 
 		gdb_tcpserver.close();
@@ -143,6 +144,7 @@ private:
 	}
 signals:
 	void BlackMagicProbeConnected(void);
+	void GdbClientDisconnected(void);
 	void BlackMagicProbeDisconnected(void);
 private slots:
 	void probeErrorOccurred(QSerialPort::SerialPortError error)
@@ -247,6 +249,10 @@ public:
 			bmport.write(packet);
 		else
 			qDebug() << "WARNING: tried to send data to the blackmagic probe, and no probe is connected; data:" << packet;
+	}
+	void closeConnections(void)
+	{
+		shutdown();
 	}
 };
 
@@ -908,6 +914,7 @@ private:
 		GDBSERVER_DISCONNECTED = 0,
 		TARGET_RUNNING,
 		TARGET_STOPPED,
+		TARGET_DETACHED,
 	}
 	target_state = GDBSERVER_DISCONNECTED;
 
@@ -934,12 +941,21 @@ private:
 		QWidgetList disabledWidgetsWhenTargetRunning;
 		QWidgetList enabledWidgetsWhenTargetStopped;
 		QWidgetList disabledWidgetsWhenTargetStopped;
+		QWidgetList enabledWidgetsWhenTargetDetached;
+		QWidgetList disabledWidgetsWhenTargetDetached;
+
 		void enterTargetState(enum TARGET_STATE target_state)
 		{
 			switch (target_state)
 			{
 			default:
 				*(int*)0=0;
+			case TARGET_DETACHED:
+				for (const auto & w : disabledWidgetsWhenTargetDetached)
+					w->setEnabled(false);
+				for (const auto & w : enabledWidgetsWhenTargetDetached)
+					w->setEnabled(true);
+				break;
 			case GDBSERVER_DISCONNECTED:
 				for (const auto & w : disabledWidgetsWhenGdbServerDisconnected)
 					w->setEnabled(false);
@@ -962,7 +978,6 @@ private:
 		}
 	}
 	targetStateDependentWidgets;
-	bool isGdbServerConnectedToGdb = false;
 	QString loadedExecutableFileName;
 
 	std::shared_ptr<ELFIO::elfio> elfReader;
@@ -1275,11 +1290,16 @@ protected:
 signals:
 	void readyReadGdbProcess(const QByteArray data);
 	void findString(const QString & str, unsigned flags);
-	void targetRunning(void);
-	void gdbServerConnected(void);
-	void targetStopped(void);
 	void targetCallStackFrameChanged(void);
 	void addFilesToSearchSet(const QStringList sourceCodeFiles);
+
+signals:
+	/* Gdb and target state change signals. */
+	void gdbServerConnected(void);
+	void gdbServerDisonnected(void);
+	void targetStopped(void);
+	void targetRunning(void);
+	void targetDetached(void);
 };
 
 #endif // MAINWINDOW_HXX
