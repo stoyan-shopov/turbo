@@ -621,6 +621,8 @@ class MainWindow : public QMainWindow
 private:
 	/* The minimum string length that needs to be entered so that the object locator performs a search for the text entered. */
 	const int MIN_STRING_LENGTH_FOR_OBJECT_LOCATOR = 3;
+	const int MAX_LINE_LENGTH_IN_GDB_LOG_LIMITING_MODE = 10 * 1024;
+	const int MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE = 1 * 1024;
 
 public:
 	explicit MainWindow(QWidget *parent = nullptr);
@@ -1198,6 +1200,7 @@ private:
 			errorMessage = "No error";
 		return errorMessage;
 	}
+	void appendLineToGdbLog(const QString & data);
 
 	/* This map holds information about where children of gdb varobjects should be displayed in the user interface.
 	 *

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>2298</width>
-    <height>1001</height>
+    <height>1055</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -351,7 +351,7 @@ view</string>
        </property>
        <widget class="QGroupBox" name="groupBox">
         <property name="title">
-         <string>Gdb Console Output</string>
+         <string>Gdb Log</string>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_4">
          <item>
@@ -367,6 +367,13 @@ view</string>
             <widget class="QPushButton" name="pushButtonClearConsole">
              <property name="text">
               <string>Clear Console</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="checkBoxLimitGdbLog">
+             <property name="text">
+              <string>Limit gdb log</string>
              </property>
             </widget>
            </item>
@@ -390,7 +397,7 @@ view</string>
           </layout>
          </item>
          <item>
-          <widget class="QPlainTextEdit" name="plainTextEditConsoleStreamOutput"/>
+          <widget class="QPlainTextEdit" name="plainTextEditGdbLog"/>
          </item>
         </layout>
        </widget>
@@ -1244,7 +1251,7 @@ view</string>
   <connection>
    <sender>pushButtonClearConsole</sender>
    <signal>clicked()</signal>
-   <receiver>plainTextEditConsoleStreamOutput</receiver>
+   <receiver>plainTextEditGdbLog</receiver>
    <slot>clear()</slot>
    <hints>
     <hint type="sourcelabel">

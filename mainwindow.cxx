@@ -56,6 +56,13 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->groupBoxDisassembly->setVisible(s.value("is-disassembly-view-visible", true).toBool());
 	ui->groupBoxTargetOutput->setVisible(s.value("is-target-output-view-visible", true).toBool());
 
+	ui->plainTextEditGdbLog->setMaximumBlockCount(MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE);
+	connect(ui->checkBoxLimitGdbLog, & QCheckBox::stateChanged, [&](int newState)
+		{
+			ui->plainTextEditGdbLog->setMaximumBlockCount((newState == Qt::Checked) ? MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE : 0);
+		});
+	ui->checkBoxLimitGdbLog->setChecked(s.value("checkbox-gdb-limiting-mode", true).toBool());
+
 	gdbProcess = std::make_shared<QProcess>();
 	/*! \todo This doesn't need to live in a separate thread. */
 	gdbMiReceiver = new GdbMiReceiver();
@@ -298,9 +305,9 @@ MainWindow::MainWindow(QWidget *parent) :
 #endif
 			      ));
 
-	gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
+	//gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
+	gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 	//gdbProcess->start("c:/src1/gdb-10.1-build-1/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 	//gdbProcess->start("c:/src1/gdb-10.1-build-2/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 
 	ui->plainTextEditScratchpad->setPlainText(s.value("scratchpad-text-contents", QString("Lorem ipsum dolor sit amet")).toString());
@@ -613,6 +620,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	s.setValue("is-disassembly-view-visible", ui->groupBoxDisassembly->isVisible());
 	s.setValue("is-target-output-view-visible", ui->groupBoxTargetOutput->isVisible());
 
+	s.setValue("checkbox-gdb-limiting-mode", ui->checkBoxLimitGdbLog->isChecked());
+
 	QStringList traceLog;
 	for (int i = 0; i < ui->treeWidgetTraceLog->topLevelItemCount(); i ++)
 	{
@@ -844,6 +853,8 @@ MainWindow::~MainWindow()
 	delete ui;
 }
 
+/*! \todo	The 'line' argument should be handled better; it makes a difference for large input sizes; as a minimum,
+ * 		it should be 'const' */
 void MainWindow::gdbMiLineAvailable(QString line)
 {
 	if (!line.length())
@@ -861,7 +872,7 @@ void MainWindow::gdbMiLineAvailable(QString line)
 	{
 		case '~':
 		/* Console stream output. */
-			ui->plainTextEditConsoleStreamOutput->appendPlainText(normalizeGdbString(line.right(line.length() - 1)));
+			appendLineToGdbLog(normalizeGdbString(line.right(line.length() - 1)));
 			break;
 		case '&':
 		/* Log stream output. */
@@ -871,7 +882,7 @@ void MainWindow::gdbMiLineAvailable(QString line)
 		/* Exec-async output. */
 		case '^':
 		/* Result record. */
-			ui->plainTextEditConsoleStreamOutput->appendPlainText((tokenNumber ? QString("%1").arg(tokenNumber) : QString()) + line);
+			appendLineToGdbLog((tokenNumber ? QString("%1").arg(tokenNumber) : QString()) + line);
 			{
 				std::vector<GdbMiParser::MIResult> results;
 				GdbMiParser parser;
@@ -940,36 +951,34 @@ void MainWindow::gdbMiLineAvailable(QString line)
 		/* Target stream output - put it along with the console output, capturing it for later
 		 * processing, if necessary. */
 			targetDataCapture.captureLine(line.right(line.length() - 1));
-			/* Fall out. */
-			if (0)
-		case '=':
-			{
-				/* Handle gdb 'notify-async-output' records. */
-				/*! \todo	If the number of cases here grows too much,
-				 *		extract this into a separate function. */
-				if (line.startsWith("=breakpoint-created") || line.startsWith("=breakpoint-modified")
-						|| line.startsWith("=breakpoint-deleted"))
-					sendDataToGdbProcess("-break-list\n");
-				else if (line.startsWith("=thread-group-started"))
-				{
-					QRegularExpression rx("=thread-group-started,id=\"(.+)\",pid=\"(.+)\"");
-					QRegularExpressionMatch match = rx.match(line);
-					if (!match.hasMatch())
-						QMessageBox::critical(0, "Error parsing gdb notify async response",
-								      "Failed to parse gdb '=thread-group-started' response");
-					else
-						debugProcessId = match.captured(2).toULong(0, 0);
-
-				}
-				else if (line.startsWith("=thread-group-exited"))
-				{
-					emit targetDetached();
-					QMessageBox::information(0, "Target detached", "Gdb has detached from the target");
-				}
-			}
+			/* FALLTHROUGH */
 		default:
-			ui->plainTextEditConsoleStreamOutput->appendPlainText(line);
-		break;
+			appendLineToGdbLog(line);
+			break;
+		case '=':
+			appendLineToGdbLog(line);
+			/* Handle gdb 'notify-async-output' records. */
+			/*! \todo	If the number of cases here grows too much,
+				 *		extract this into a separate function. */
+			if (line.startsWith("=breakpoint-created") || line.startsWith("=breakpoint-modified")
+					|| line.startsWith("=breakpoint-deleted"))
+				sendDataToGdbProcess("-break-list\n");
+			else if (line.startsWith("=thread-group-started"))
+			{
+				QRegularExpression rx("=thread-group-started,id=\"(.+)\",pid=\"(.+)\"");
+				QRegularExpressionMatch match = rx.match(line);
+				if (!match.hasMatch())
+					QMessageBox::critical(0, "Error parsing gdb notify async response",
+							      "Failed to parse gdb '=thread-group-started' response");
+				else
+					debugProcessId = match.captured(2).toULong(0, 0);
+			}
+			else if (line.startsWith("=thread-group-exited"))
+			{
+				emit targetDetached();
+				QMessageBox::information(0, "Target detached", "Gdb has detached from the target");
+			}
+			break;
 	}
 }
 
@@ -1006,6 +1015,16 @@ QModelIndex MainWindow::locateVarObject(const QString &miName, const QModelIndex
 		if ((index = locateVarObject(miName, index, root)).isValid())
 			return index;
 	}
+}
+
+void MainWindow::appendLineToGdbLog(const QString &data)
+{
+	if (ui->checkBoxLimitGdbLog->isChecked() && data.length() > (MAX_LINE_LENGTH_IN_GDB_LOG_LIMITING_MODE << 1))
+	{
+		ui->plainTextEditGdbLog->appendPlainText(data.left(MAX_LINE_LENGTH_IN_GDB_LOG_LIMITING_MODE));
+		return;
+	}
+	ui->plainTextEditGdbLog->appendPlainText(data);
 }
 
 bool MainWindow::handleNameResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
@@ -1832,7 +1851,7 @@ void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
 
 void MainWindow::sendDataToGdbProcess(const QString & data)
 {
-	ui->plainTextEditConsoleStreamOutput->appendPlainText(">>> " + data);
+	appendLineToGdbLog(">>> " + data);
 	gdbProcess->write(data.toLocal8Bit());
 	gdbProcess->waitForBytesWritten();
 }
