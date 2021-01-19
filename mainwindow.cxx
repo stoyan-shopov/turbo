@@ -84,11 +84,13 @@ MainWindow::MainWindow(QWidget *parent) :
 
 	connect(&varObjectTreeItemModel, SIGNAL(readGdbVarObjectChildren(const QModelIndex)), this, SLOT(readGdbVarObjectChildren(QModelIndex)));
 	ui->treeViewDataObjects->setModel(&varObjectTreeItemModel);
-
+	ui->treeViewDataObjects->setUniformRowHeights(true);
+#if 0
 	ui->treeViewDataObjects->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 	ui->treeViewDataObjects->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
 	ui->treeViewDataObjects->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
 	ui->treeViewDataObjects->header()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+#endif
 
 	ui->treeWidgetSourceFiles->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 	ui->treeWidgetSourceFiles->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
@@ -289,6 +291,14 @@ MainWindow::MainWindow(QWidget *parent) :
 "\n"
 "QMainWindow::separator:hover {\n"
     "background: grey;\n"
+"}\n"
+
+"* { gridline-color: white }\n"
+
+"QTableView {\n"
+    "margin: 0px;\n"
+    "border-width: 0px;\n"
+    "padding: 0px;\n"
 "}\n"
 
 #if 0
@@ -1514,6 +1524,7 @@ bool MainWindow::handleChangelistResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 	if (parseResult != GdbMiParser::DONE || results.size() != 1 || results.at(0).variable != "changelist" || !(changelist = results.at(0).value->asList()))
 		return false;
 	std::unordered_set<const GdbVarObjectTreeItem *> highlightedItems;
+	//ui->treeViewDataObjects->setUpdatesEnabled(false);
 	for (const auto & c : changelist->values)
 	{
 		const GdbMiParser::MITuple * changeDetails;
@@ -1567,6 +1578,7 @@ bool MainWindow::handleChangelistResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 		highlightedItems.insert(node);
 	}
 	varObjectTreeItemModel.setHighlightedItems(highlightedItems);
+	//ui->treeViewDataObjects->setUpdatesEnabled(true);
 	return true;
 }
 
@@ -2973,4 +2985,74 @@ void MainWindow::on_pushButtonVerifyTargetMemory_clicked()
 			   GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_CHECK_MEMORY_CONTENTS));
 	gdbRequest += QString("%1\n").arg(t);
 	sendDataToGdbProcess(gdbRequest);
+}
+
+void MainWindow::on_pushButtonGenerateDataView_clicked()
+{
+	QString text;
+	std::function<void(const QString & header, const GdbVarObjectTreeItem * const item)> printer =  [&](const QString & header, const GdbVarObjectTreeItem * item) -> void
+	{
+#if 0
+		if (item->children.size() || item->getReportedChildCount())
+		{
+			text += header + " [+] "  + item->data(0).toString() + " " + '|' + item->data(1).toString() + " " + '|' + item->data(2).toString() + '\n';
+			QString t = header;
+			/*! \todo Make use of character replacement here, find the unicode codes of line art. This will be more efficient. */
+			QString h = t.replace("├", "│").replace("└", " ") + "  ├";
+			for (auto it = item->children.cbegin(); it != item->children.cend(); ++ it)
+			{
+				if (std::next(it) == item->children.cend())
+					h = t + "  └";
+				printer(h, * it);
+			}
+		}
+		else
+			text += header + item->data(0).toString() + " " + '|' + item->data(1).toString() + " " + '|' + item->data(2).toString() + '\n';
+#endif
+		if (item->children.size() || item->getReportedChildCount())
+		{
+			text += header + " [+] "  + item->data(0).toString() + " " + '|' + item->data(1).toString() + " " + '|' + item->data(2).toString() + '\n';
+			QString t = header;
+			/*! \todo Make use of character replacement here, find the unicode codes of line art. This will be more efficient. */
+			QString h = t.replace("├", " ").replace("└", " ") + "   ";
+			for (auto it = item->children.cbegin(); it != item->children.cend(); ++ it)
+			{
+				if (std::next(it) == item->children.cend())
+					h = t + "   ";
+				printer(h, * it);
+			}
+		}
+		else
+			text += header + item->data(0).toString() + " " + '|' + item->data(1).toString() + " " + '|' + item->data(2).toString() + '\n';
+
+	};
+	ui->plainTextEditDataView->clear();
+	for (const auto & v : varObjectTreeItemModel.root.children)
+		printer(QString(""), v);
+	QString t = text;
+	QStringList lines = t.split('\n');
+	ui->tableWidgetDataView->clearContents();
+	ui->tableWidgetDataView->setRowCount(0);
+
+	/*
+	QHeaderView *verticalHeader = ui->tableWidgetDataView->verticalHeader();
+	verticalHeader->setSectionResizeMode(QHeaderView::Fixed);
+	verticalHeader->setDefaultSectionSize(12);
+	*/
+
+	int i = 0;
+	for (const auto & l : lines)
+	{
+		QStringList columns = l.split('|');
+		if (columns.size() != 3)
+			continue;
+		ui->tableWidgetDataView->insertRow(i);
+		ui->tableWidgetDataView->setItem(i, 0, new QTableWidgetItem(columns[0]));
+		ui->tableWidgetDataView->setItem(i, 1, new QTableWidgetItem(columns[1]));
+		ui->tableWidgetDataView->setItem(i, 2, new QTableWidgetItem(columns[2]));
+		i ++;
+	}
+
+	//ui->plainTextEditDataView->setPlainText(text.replace('|', ' '));
+	ui->plainTextEditDataView->setPlainText(text);
 }

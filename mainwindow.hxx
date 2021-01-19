@@ -340,8 +340,9 @@ Q_DECLARE_METATYPE(QSharedPointer<QVector<StringFinder::SearchResult>>)
 
 struct GdbVarObjectTreeItem
 {
-private:
+public:
 	QList<GdbVarObjectTreeItem *> children;
+private:
 	GdbVarObjectTreeItem	* parent = 0;
 	/* This is the 'numchild' value as reported by the gdb mi varobject report. */
 	int reportedChildCount = 0;
@@ -398,10 +399,11 @@ class GdbVarObjectTreeItemModel : public QAbstractItemModel
 /* The 'Editable Tree Model' Qt example was very useful when making this customized
  * item model class. */
 	Q_OBJECT
-private:
+public:
 	/* Dummy root node. */
 	/*! \todo	THIS CURRENTLY LEAKS MEMORY */
 	GdbVarObjectTreeItem root;
+private:
 	/*! \todo	This is very evil... */
 	std::unordered_set<const GdbVarObjectTreeItem *> highlightedItems;
 
@@ -1147,6 +1149,8 @@ private slots:
 	void on_pushButtonConnectGdbToGdbServer_clicked();
 
 	void on_pushButtonVerifyTargetMemory_clicked();
+
+	void on_pushButtonGenerateDataView_clicked();
 
 private:
 	QTimer controlKeyPressTimer;
