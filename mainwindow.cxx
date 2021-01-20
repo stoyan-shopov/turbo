@@ -85,10 +85,18 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(&varObjectTreeItemModel, SIGNAL(readGdbVarObjectChildren(const QModelIndex)), this, SLOT(readGdbVarObjectChildren(QModelIndex)));
 	ui->treeViewDataObjects->setModel(&varObjectTreeItemModel);
 
+	/* Forcing the rows of the tree view to be of uniform height enables some optimizations, which
+	 * makes a significant difference when a large number of items is displayed. */
+	ui->treeViewDataObjects->setUniformRowHeights(true);
+#if 0
+	/* WARNING: this commented out code is kept here to warn that setting the header of a tree view to
+	 * automatically resize according to the column contents can be *VERY* slow. It is actually not
+	 * doing exactly what is expected. Do not use code like this! */
 	ui->treeViewDataObjects->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 	ui->treeViewDataObjects->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
 	ui->treeViewDataObjects->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
 	ui->treeViewDataObjects->header()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+#endif
 
 	ui->treeWidgetSourceFiles->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 	ui->treeWidgetSourceFiles->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
@@ -999,24 +1007,6 @@ QString s = miString;
 	return s;
 }
 
-QModelIndex MainWindow::locateVarObject(const QString &miName, const QModelIndex & root, const QModelIndex & parent)
-{
-	if (!root.isValid())
-		return QModelIndex();
-	GdbVarObjectTreeItem * t = static_cast<GdbVarObjectTreeItem*>(root.internalPointer());
-	if (t->miName == miName)
-		return root;
-	int i = 0;
-	while (true)
-	{
-		QModelIndex index = varObjectTreeItemModel.index(i ++, 0, parent);
-		if (!index.isValid())
-			return QModelIndex();
-		if ((index = locateVarObject(miName, index, root)).isValid())
-			return index;
-	}
-}
-
 void MainWindow::appendLineToGdbLog(const QString &data)
 {
 	if (ui->checkBoxLimitGdbLog->isChecked() && data.length() > (MAX_LINE_LENGTH_IN_GDB_LOG_LIMITING_MODE << 1))
@@ -1513,41 +1503,54 @@ bool MainWindow::handleChangelistResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 	const GdbMiParser::MIList * changelist;
 	if (parseResult != GdbMiParser::DONE || results.size() != 1 || results.at(0).variable != "changelist" || !(changelist = results.at(0).value->asList()))
 		return false;
+
 	std::unordered_set<const GdbVarObjectTreeItem *> highlightedItems;
+
+	struct varObjectUpdate
+	{
+		QString miName, value, newType;
+		unsigned newNumChildren = 0;
+		bool isInScope = false, isTypeChanged = true;
+	};
+	std::unordered_map<QString, struct varObjectUpdate> changedVarObjects;
+
 	for (const auto & c : changelist->values)
 	{
 		const GdbMiParser::MITuple * changeDetails;
 		if (!(changeDetails = c->asTuple()))
 			continue;
-		QString miName, value, newType;
-		unsigned newNumChildren = 0;
 		/*! \todo	There is some strange behavior in gdb - if you create a varobject for an expression
 		 * 		that has child items (e.g., an array), and then run the program, and then halt the
 		 * 		program at a context in which the varobject is no longer in scope, you are still
 		 * 		able to list the varobject child items, and gdb does not return an error, but instead
 		 * 		replies with empty strings for the values of leaf varobject items. */
-		bool isInScope = false, isTypeChanged = true;
+		varObjectUpdate v;
 		for (const auto & t : changeDetails->map)
 		{
 			if (t.first == "name")
-				miName = QString::fromStdString(t.second->asConstant()->constant());
+				v.miName = QString::fromStdString(t.second->asConstant()->constant());
 			else if (t.first == "value")
-				value = QString::fromStdString(t.second->asConstant()->constant());
+				v.value = QString::fromStdString(t.second->asConstant()->constant());
 			else if (t.first == "new_type")
-				newType = QString::fromStdString(t.second->asConstant()->constant());
+				v.newType = QString::fromStdString(t.second->asConstant()->constant());
 			else if (t.first == "new_num_children")
-				newNumChildren = QString::fromStdString(t.second->asConstant()->constant()).toUInt();
+				v.newNumChildren = QString::fromStdString(t.second->asConstant()->constant()).toUInt();
 			else if (t.first == "in_scope")
-				isInScope = (t.second->asConstant()->constant() == "true" ? true : false);
+				v.isInScope = (t.second->asConstant()->constant() == "true" ? true : false);
 			else if (t.first == "type_changed")
-				isTypeChanged = (t.second->asConstant()->constant() == "true" ? true : false);
+				v.isTypeChanged = (t.second->asConstant()->constant() == "true" ? true : false);
 		}
-		QModelIndex index = locateVarObject(miName, varObjectTreeItemModel.index(0, 0), QModelIndex());
-		GdbVarObjectTreeItem * node = static_cast<GdbVarObjectTreeItem *>(index.internalPointer());
-		/*! \todo	Document the gdb varobject state transition handling rationale and operation. */
-		if (!index.isValid())
-			*(int*)0=0;
-		if ((!isInScope || isTypeChanged) && node->childCount())
+		changedVarObjects.insert({v.miName, v});
+	}
+
+	std::function<void(QModelIndex & index)> updateNode = [&](QModelIndex & index)
+	{
+		GdbVarObjectTreeItem * node = static_cast<GdbVarObjectTreeItem*>(index.internalPointer());
+		auto it = changedVarObjects.find(node->miName);
+		if (it == changedVarObjects.end())
+			return;
+		struct varObjectUpdate & v = it->second;
+		if ((!v.isInScope || v.isTypeChanged) && node->childCount())
 		{
 			sendDataToGdbProcess(QString("-var-delete -c %1\n").arg(node->miName).toLocal8Bit());
 			/* The varobject item will be marked as out of scope below. If the item is currently
@@ -1556,16 +1559,41 @@ bool MainWindow::handleChangelistResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 			 * the item here. */
 			ui->treeViewDataObjects->collapse(index);
 		}
-		isInScope ? varObjectTreeItemModel.markNodeAsInsideScope(index) : varObjectTreeItemModel.markNodeAsOutOfScope(index);
-		if (isInScope)
+		v.isInScope ? varObjectTreeItemModel.markNodeAsInsideScope(index) : varObjectTreeItemModel.markNodeAsOutOfScope(index);
+		if (v.isInScope)
 		{
-			if (!isTypeChanged)
-				varObjectTreeItemModel.updateNodeValue(index, value);
+			if (!v.isTypeChanged)
+				varObjectTreeItemModel.updateNodeValue(index, v.value);
 			else
-				varObjectTreeItemModel.updateNodeType(index, newType, value, newNumChildren);
+				varObjectTreeItemModel.updateNodeType(index, v.newType, v.value, v.newNumChildren);
 		}
 		highlightedItems.insert(node);
+	};
+
+	std::function<QModelIndex(QModelIndex & root)> scan = [&](QModelIndex & root) -> QModelIndex
+	{
+		assert(root.isValid());
+		updateNode(root);
+		int i = 0;
+		while (true)
+		{
+			QModelIndex index = varObjectTreeItemModel.index(i ++, 0, root);
+			if (!index.isValid())
+				break;
+			scan(index);
+		}
+	};
+
+	int i = 0;
+	QModelIndex root = QModelIndex();
+	while (true)
+	{
+		QModelIndex index = varObjectTreeItemModel.index(i ++, 0, root);
+		if (!index.isValid())
+			break;
+		scan(index);
 	}
+
 	varObjectTreeItemModel.setHighlightedItems(highlightedItems);
 	return true;
 }

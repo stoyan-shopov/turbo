@@ -1182,8 +1182,6 @@ private:
 	GdbMiReceiver			* gdbMiReceiver;
 	QStringList targetRegisterNames;
 
-	QModelIndex locateVarObject(const QString & miName, const QModelIndex & root, const QModelIndex &parent);
-
 	/* Attempts to build an error strings out of a gdb result response. */
 	QString gdbErrorString(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results)
 	{
