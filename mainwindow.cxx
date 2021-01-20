@@ -82,7 +82,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(gdbProcess.get(), SIGNAL(errorOccurred(QProcess::ProcessError)), this, SLOT(gdbProcessError(QProcess::ProcessError)));
 	gdbMiReceiverThread.start();
 
-	connect(&varObjectTreeItemModel, SIGNAL(readGdbVarObjectChildren(const QModelIndex)), this, SLOT(readGdbVarObjectChildren(QModelIndex)));
+	connect(&varObjectTreeItemModel, SIGNAL(readGdbVarObjectChildren(const QString)), this, SLOT(readGdbVarObjectChildren(const QString)));
 	ui->treeViewDataObjects->setModel(&varObjectTreeItemModel);
 
 	/* Forcing the rows of the tree view to be of uniform height enables some optimizations, which
@@ -1052,6 +1052,19 @@ bool MainWindow::handleNumchildResponse(GdbMiParser::RESULT_CLASS_ENUM parseResu
 	if (!gdbTokenContext.hasContextForToken(tokenNumber)
 		|| gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_NUMCHILD)
 		return false;
+
+	struct GdbTokenContext::GdbResponseContext context = gdbTokenContext.readAndRemoveContext(tokenNumber);
+	QModelIndex index = varObjectTreeItemModel.indexForMiVariableName(context.s);
+	if (!index.isValid())
+	{
+		/* If this case is reached, this means that a gdb "-var-list-children" machine interface
+		 * command was issued to gdb, to list the children of some variable object, but when
+		 * the response is received, and processed here, the variable object, for which the
+		 * "-var-list-children" request was issued, no longer exists. Not a very common case,
+		 * but possible. */
+		return true;
+	}
+
 	std::vector<GdbVarObjectTreeItem *> children;
 	for (const auto & t : results)
 	{
@@ -1082,11 +1095,8 @@ bool MainWindow::handleNumchildResponse(GdbMiParser::RESULT_CLASS_ENUM parseResu
 			}
 		}
 	}
-	gdbTokenContext.readAndRemoveContext(tokenNumber);
-	QModelIndex m = varobjectParentModelIndexes.operator[](tokenNumber);
-	varobjectParentModelIndexes.erase(tokenNumber);
-	varObjectTreeItemModel.childrenFetched(m, children);
-	return false;
+	varObjectTreeItemModel.childrenFetched(index, children);
+	return true;
 }
 
 bool MainWindow::handleFilesResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber)
@@ -1883,16 +1893,11 @@ void MainWindow::sendDataToGdbProcess(const QString & data)
 	gdbProcess->write(data.toLocal8Bit());
 	gdbProcess->waitForBytesWritten();
 }
-void MainWindow::readGdbVarObjectChildren(const QModelIndex parent)
+void MainWindow::readGdbVarObjectChildren(const QString varObjectName)
 {
 	unsigned n = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
-							   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_NUMCHILD));
-	GdbVarObjectTreeItem * t = static_cast<GdbVarObjectTreeItem *>(parent.internalPointer());
-	if (varobjectParentModelIndexes.count(n))
-		*(int*)0=0;
-	varobjectParentModelIndexes.operator[](n) = parent;
-
-	sendDataToGdbProcess((QString("%1-var-list-children --all-values ").arg(n) + t->miName + "\n"));
+							   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_NUMCHILD, varObjectName));
+	sendDataToGdbProcess((QString("%1-var-list-children --all-values ").arg(n) + varObjectName + "\n"));
 }
 
 void MainWindow::showSourceCode(const QTreeWidgetItem *item)

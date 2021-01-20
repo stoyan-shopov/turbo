@@ -534,7 +534,7 @@ public:
 		GdbVarObjectTreeItem * t = static_cast<GdbVarObjectTreeItem *>(parent.internalPointer());
 		t->isChildrenFetchingInProgress = true;
 		if (t->getReportedChildCount() && !t->childCount())
-			emit readGdbVarObjectChildren(parent);
+			emit readGdbVarObjectChildren(t->miName);
 	}
 	void childrenFetched(const QModelIndex &parent, const std::vector<GdbVarObjectTreeItem *>& children)
 	{
@@ -609,8 +609,30 @@ public:
 		/*! \todo DON'T JUST WIPE OUT THE TYPE STRING: t->type = "???"; */
 		markIndexAsChanged(nodeIndex, t);
 	}
+	QModelIndex indexForMiVariableName(const QString & miName)
+	{
+		std::function<QModelIndex(const QModelIndex & root)> scan = [&](const QModelIndex & root) -> QModelIndex
+		{
+			GdbVarObjectTreeItem * t = static_cast<GdbVarObjectTreeItem *>(root.internalPointer());
+			if (t->miName == miName)
+				return root;
+			int i;
+			QModelIndex x;
+			while ((x = index(i ++, 0, root)).isValid())
+				if ((x = scan(x)).isValid())
+					break;
+			return x;
+		};
+
+		int i;
+		QModelIndex x, invalid = QModelIndex();
+		while ((x = index(i ++, 0, invalid)).isValid())
+			if ((x = scan(x)).isValid())
+				break;
+		return x;
+	}
 signals:
-	void readGdbVarObjectChildren(const QModelIndex parent);
+	void readGdbVarObjectChildren(const QString varObjectName);
 };
 
 
@@ -635,7 +657,7 @@ private slots:
 	void gdbProcessError(QProcess::ProcessError error);
 	void gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
 	void sendDataToGdbProcess(const QString &data);
-	void readGdbVarObjectChildren(const QModelIndex parent);
+	void readGdbVarObjectChildren(const QString varObjectName);
 	void showSourceCode(const QTreeWidgetItem * item);
 	QString getExecutableFilename(void);
 	void breakpointsContextMenuRequested(QPoint p);
@@ -1200,48 +1222,6 @@ private:
 	}
 	void appendLineToGdbLog(const QString & data);
 
-	/* This map holds information about where children of gdb varobjects should be displayed in the user interface.
-	 *
-	 * Currently, gdb varobjects are handled as nodes in a tree. For a simple gdb varobject, that has no children,
-	 * this is a single root node - with no children, and such objects cannot be 'expanded' in the user interface
-	 * (because they have no children).
-	 *
-	 * Compound gdb varobjects are ones, that have children, such as C 'struct' and array data types.
-	 * Such compound gdb varobjects can be expanded in the user interface, to show their contents, but these
-	 * compound gdb varobjects are not expanded by default (gdb does not expand them for the sake of efficiency).
-	 * To view the contents of such compound gdb varobjects, the debugger user explicitly requests expanding the
-	 * compound gdb varobjects through the user interface. Such requests from the debugger user are translated to
-	 * gdb machine interface commands that request fetching the gdb varobject's child.
-	 * However, multiple such requests - for expanding different gdb varobject children - may have been issued to gdb
-	 * at a time, before a response from gdb to any of these responses has been received.
-	 * When a response from gdb is received, it is necessary to know, for each such response, where, in the
-	 * user interface, to display the contents of the response.
-	 *
-	 * This map is devised for this purpose - to be able to determine, for a specific gdb varobject
-	 * child fetch request, where in the user interface to show the result of that request, when a response to
-	 * the request has been received.
-	 *
-	 * The basic workflow for expanding gdb varobjects is this:
-	 * - The debugger user requests, through the user interface, that a gdb varobject child is expanded, so that
-	 * the child's contents are shown.
-	 * - The debugger frontend captures this request from the debugger user, and translates it to an *annotated*
-	 * gdb machine interface command request for fetching the gdb varobject child's contents. Here, *annotated*
-	 * means that the gdb machine interface command for fetching the gdb varobject child's contents is sent to gdb
-	 * along with an *annotation* token, which is simply a non-negative number. By design, the gdb machine interface
-	 * protocol, guarantees, that the response to a specific gdb machine interface command request  - will contain
-	 * the very same, if any, annotation token that was present in the specific gdb machine interface command request.
-	 * These tokens (numbers) have absolutely no meaning to gdb, and are meant to be used as discriminators by gdb
-	 * machine interface consumers, such as gdb frontends.
-	 * - The annotation token (i.e., number) is used to set up this map, and also the 'gdbTokenContext' data
-	 * structure, so that a response from gdb is received, it can be determined where in the user interface
-	 * to show the requested gdb varobject child's contents.
-	 *
-	 * This is all there is about it. It may not seem too straightforward, but there is nothing special altogether.
-	 * There are details that need to be worked out when communicating with gdb over the gdb machine interface,
-	 * the approach here is probably not the most sane one to accomplish all of this, but I hope it is not too
-	 * irritating. */
-	std::unordered_map<unsigned /* gdb token number */, QModelIndex /* where to place the gdb varobject child fetch response */>
-		varobjectParentModelIndexes;
 	GdbVarObjectTreeItemModel varObjectTreeItemModel;
 
 	/* Functions for handling different response packets from gdb. */
