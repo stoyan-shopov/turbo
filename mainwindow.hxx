@@ -403,17 +403,14 @@ private:
 	/*! \todo	THIS CURRENTLY LEAKS MEMORY */
 	GdbVarObjectTreeItem root;
 	/*! \todo	This is very evil... */
-	std::unordered_set<const GdbVarObjectTreeItem *> highlightedItems;
+	QSet<const QString> highlightedVarObjectNames;
 
-	void markIndexAsChanged(const QModelIndex & nodeIndex, const GdbVarObjectTreeItem * item = 0)
+	void markIndexAsChanged(const QModelIndex & nodeIndex, const GdbVarObjectTreeItem * item)
 	{
-		if (!item)
-		{
-			if (!nodeIndex.isValid())
-				return;
-			item = static_cast<GdbVarObjectTreeItem *>(nodeIndex.internalPointer());
-		}
+		if (!nodeIndex.isValid())
+			return;
 		int row = item->row();
+		highlightedVarObjectNames.insert(item->miName);
 		emit dataChanged(index(row, 0, nodeIndex.parent()), index(row, item->columnCount() - 1, nodeIndex.parent()));
 	}
 public:
@@ -424,11 +421,11 @@ public:
 		root.type = "Type";
 	}
 	~GdbVarObjectTreeItemModel() { /*! \todo WRITE THIS */ }
+	void clearHighlightedVarObjectNames(void) { highlightedVarObjectNames.clear(); }
 	void dumpTree()
 	{
 		root.dump();
 	}
-	void setHighlightedItems(const std::unordered_set<const GdbVarObjectTreeItem *> items) { highlightedItems = items; }
 
 	void appendRootItem(GdbVarObjectTreeItem * item)
 	{
@@ -442,7 +439,7 @@ public:
 		if (!index.isValid())
 			return QVariant();
 		const GdbVarObjectTreeItem * node = static_cast<GdbVarObjectTreeItem*>(index.internalPointer());
-		if (role == Qt::ForegroundRole && highlightedItems.count(node))
+		if (role == Qt::ForegroundRole && highlightedVarObjectNames.contains(node->miName))
 			return QBrush(Qt::red);
 		if (role != Qt::DisplayRole)
 			return QVariant();

@@ -1515,6 +1515,7 @@ bool MainWindow::handleChangelistResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 		return false;
 
 	std::unordered_set<const GdbVarObjectTreeItem *> highlightedItems;
+	varObjectTreeItemModel.clearHighlightedVarObjectNames();
 
 	struct varObjectUpdate
 	{
@@ -1580,10 +1581,14 @@ bool MainWindow::handleChangelistResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 		highlightedItems.insert(node);
 	};
 
+	/* Mark all items in the data object tree view for updating */
 	std::function<QModelIndex(QModelIndex & root)> scan = [&](QModelIndex & root) -> QModelIndex
 	{
 		assert(root.isValid());
 		updateNode(root);
+		ui->treeViewDataObjects->update(root);
+		ui->treeViewDataObjects->update(root.siblingAtColumn(1));
+		ui->treeViewDataObjects->update(root.siblingAtColumn(2));
 		int i = 0;
 		while (true)
 		{
@@ -1603,8 +1608,8 @@ bool MainWindow::handleChangelistResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 			break;
 		scan(index);
 	}
+	ui->treeViewDataObjects->update();
 
-	varObjectTreeItemModel.setHighlightedItems(highlightedItems);
 	return true;
 }
 
