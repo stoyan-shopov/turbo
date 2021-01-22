@@ -36,6 +36,7 @@
 #include <QSerialPort>
 #include <QSerialPortInfo>
 #include <QInputDialog>
+#include <QSettings>
 
 #include <QMessageBox>
 #include <QFileSystemWatcher>
@@ -632,7 +633,6 @@ signals:
 	void readGdbVarObjectChildren(const QString varObjectName);
 };
 
-
 class MainWindow : public QMainWindow
 {
 	Q_OBJECT
@@ -642,6 +642,31 @@ private:
 	const int MIN_STRING_LENGTH_FOR_OBJECT_LOCATOR = 3;
 	const int MAX_LINE_LENGTH_IN_GDB_LOG_LIMITING_MODE = 10 * 1024;
 	const int MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE = 1 * 1024;
+
+	/* Settings-related data. */
+	const QString SETTINGS_FILE_NAME					= "turbo.rc";
+
+	const QString SETTINGS_MAINWINDOW_STATE					= "mainwindows-state";
+	const QString SETTINGS_MAINWINDOW_GEOMETRY				= "mainwindows-geometry";
+	const QString SETTINGS_SPLITTER_VERTICAL_SOURCE_VIEW_STATE		= "splitter-vertical-source-view-state";
+	const QString SETTINGS_SPLITTER_HORIZONTAL_SOURCE_VIEW_STATE		= "splitter-horizontal-source-view-state";
+	const QString SETTINGS_SPLITTER_HORIZONTAL_GDB_CONSOLES_STATE		= "splitter-horizontal-gdb-consoles-state";
+	const QString SETTINGS_IS_SPLITTER_HORIZONTAL_GDB_CONSOLES_VISIBLE	= "is-splitter-horizontal-gdb-consoles-visible";
+	const QString SETTINGS_IS_DISASSEMBLY_VIEW_VISIBLE			= "is-disassembly-view-visible";
+	const QString SETTINGS_IS_TARGET_OUTPUT_VIEW_VISIBLE			= "is-target-output-view-visible";
+
+	const QString SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE		= "checkbox-gdb-output-limiting-mode-state";
+	const QString SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_STATE		= "checkbox-show-full-file-name-state";
+	const QString SETTINGS_CHECKBOX_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE		= "checkbox-show-only-sources-with-machine-code";
+
+	const QString SETTINGS_SCRATCHPAD_TEXT_CONTENTS				= "scratchpad-text-contents";
+	const QString SETTINGS_BOOKMARKS					= "bookmarks";
+	const QString SETTINGS_TRACE_LOG					= "trace-log";
+	const QString SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE	= "checkbox-show-full-file-name-in-trace-log-state";
+
+	const QString SETTINGS_LAST_LOADED_EXECUTABLE_FILE			= "last-loaded-executable-file";
+
+	std::shared_ptr<QSettings> settings;
 
 public:
 	explicit MainWindow(QWidget *parent = nullptr);
@@ -656,7 +681,6 @@ private slots:
 	void sendDataToGdbProcess(const QString &data);
 	void readGdbVarObjectChildren(const QString varObjectName);
 	void showSourceCode(const QTreeWidgetItem * item);
-	QString getExecutableFilename(void);
 	void breakpointsContextMenuRequested(QPoint p);
 	void svdContextMenuRequested(QPoint p);
 	void bookmarksContextMenuRequested(QPoint p);
@@ -1167,6 +1191,8 @@ private slots:
 
 	void on_pushButtonVerifyTargetMemory_clicked();
 
+	void gdbStarted(void) { *(int*)0=0; }
+
 private:
 	QTimer controlKeyPressTimer;
 	const int controlKeyPressLockTimeMs = 400;
@@ -1274,7 +1300,6 @@ signals:
 signals:
 	/* Gdb and target state change signals. */
 	void gdbServerConnected(void);
-	void gdbServerDisonnected(void);
 	void targetStopped(void);
 	void targetRunning(void);
 	void targetDetached(void);

@@ -27,7 +27,6 @@
 #include "mainwindow.hxx"
 #include "ui_mainwindow.h"
 
-#include <QSettings>
 #include <QFileDialog>
 #include <QPainter>
 
@@ -44,24 +43,24 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->setupUi(this);
 	setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North);
 
-	QSettings s("qgbd.rc", QSettings::IniFormat);
-	restoreState(s.value("mainwindow-state", QByteArray()).toByteArray());
-	restoreGeometry(s.value("mainwindow-geometry", QByteArray()).toByteArray());
+	settings = std::make_shared<QSettings>(SETTINGS_FILE_NAME, QSettings::IniFormat);
+	restoreState(settings->value(SETTINGS_MAINWINDOW_STATE, QByteArray()).toByteArray());
+	restoreGeometry(settings->value(SETTINGS_MAINWINDOW_GEOMETRY, QByteArray()).toByteArray());
 
-	ui->splitterVerticalSourceView->restoreState(s.value("splitter-vertical-source-view-state", QByteArray()).toByteArray());
-	ui->splitterHorizontalGdbConsoles->restoreState(s.value("splitter-horizontal-gdb-consoles-state", QByteArray()).toByteArray());
-	ui->splitterHorizontalSourceView->restoreState(s.value("splitter-horizontal-source-view-state", QByteArray()).toByteArray());
+	ui->splitterVerticalSourceView->restoreState(settings->value(SETTINGS_SPLITTER_VERTICAL_SOURCE_VIEW_STATE, QByteArray()).toByteArray());
+	ui->splitterHorizontalSourceView->restoreState(settings->value(SETTINGS_SPLITTER_HORIZONTAL_SOURCE_VIEW_STATE, QByteArray()).toByteArray());
+	ui->splitterHorizontalGdbConsoles->restoreState(settings->value(SETTINGS_SPLITTER_HORIZONTAL_GDB_CONSOLES_STATE, QByteArray()).toByteArray());
 
-	ui->splitterHorizontalGdbConsoles->setVisible(s.value("is-splitter-horizontal-gdb-consoles-visible", true).toBool());
-	ui->groupBoxDisassembly->setVisible(s.value("is-disassembly-view-visible", true).toBool());
-	ui->groupBoxTargetOutput->setVisible(s.value("is-target-output-view-visible", true).toBool());
+	ui->splitterHorizontalGdbConsoles->setVisible(settings->value(SETTINGS_IS_SPLITTER_HORIZONTAL_GDB_CONSOLES_VISIBLE, true).toBool());
+	ui->groupBoxDisassembly->setVisible(settings->value(SETTINGS_IS_DISASSEMBLY_VIEW_VISIBLE, true).toBool());
+	ui->groupBoxTargetOutput->setVisible(settings->value(SETTINGS_IS_TARGET_OUTPUT_VIEW_VISIBLE, true).toBool());
 
 	ui->plainTextEditGdbLog->setMaximumBlockCount(MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE);
 	connect(ui->checkBoxLimitGdbLog, & QCheckBox::stateChanged, [&](int newState)
 		{
 			ui->plainTextEditGdbLog->setMaximumBlockCount((newState == Qt::Checked) ? MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE : 0);
 		});
-	ui->checkBoxLimitGdbLog->setChecked(s.value("checkbox-gdb-limiting-mode", true).toBool());
+	ui->checkBoxLimitGdbLog->setChecked(settings->value(SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE, true).toBool());
 
 	gdbProcess = std::make_shared<QProcess>();
 	/*! \todo This doesn't need to live in a separate thread. */
@@ -77,9 +76,14 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(gdbProcess.get(), & QProcess::readyReadStandardError,
 		[=] { QTextCursor c = ui->plainTextEditStderr->textCursor(); c.movePosition(QTextCursor::End); c.insertText(gdbProcess.get()->readAllStandardError()); });
 
+	/* It is possible that the user presses quickly the button for starting gdb, before the gdb process is started and the
+	 * button is disabled, so only start the gdb process here if it is not already started or running. */
+	connect(ui->pushButtonStartGdb, & QPushButton::clicked, [&] { if (!gdbProcess.get()->state() == QProcess::NotRunning) gdbProcess.get()->start(); });
+
+	connect(gdbProcess.get(), & QProcess::started, [&] { ui->pushButtonConnectGdbToGdbServer->setEnabled(true); ui->pushButtonStartGdb->setEnabled(false); });
 	connect(gdbProcess.get(), SIGNAL(finished(int, QProcess::ExitStatus)), this, SLOT(gdbProcessFinished(int,QProcess::ExitStatus)));
-	connect(gdbMiReceiver, SIGNAL(gdbMiOutputLineAvailable(QString)), this, SLOT(gdbMiLineAvailable(QString)));
 	connect(gdbProcess.get(), SIGNAL(errorOccurred(QProcess::ProcessError)), this, SLOT(gdbProcessError(QProcess::ProcessError)));
+	connect(gdbMiReceiver, SIGNAL(gdbMiOutputLineAvailable(QString)), this, SLOT(gdbMiLineAvailable(QString)));
 	gdbMiReceiverThread.start();
 
 	connect(&varObjectTreeItemModel, SIGNAL(readGdbVarObjectChildren(const QString)), this, SLOT(readGdbVarObjectChildren(const QString)));
@@ -144,10 +148,10 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->treeWidgetBreakpoints->header()->setSectionResizeMode(5, QHeaderView::ResizeToContents);
 
 	connect(ui->checkBoxShowFullFileNames, & QCheckBox::stateChanged, [=](int newState) { ui->treeWidgetSourceFiles->setColumnHidden(1, newState == 0); });
-	ui->checkBoxShowFullFileNames->setChecked(s.value("checkbox-show-full-file-name-state", false).toBool());
+	ui->checkBoxShowFullFileNames->setChecked(settings->value(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_STATE, false).toBool());
 
 	connect(ui->checkBoxShowOnlySourcesWithMachineCode, SIGNAL(stateChanged(int)), this, SLOT(updateSourceListView()));
-	ui->checkBoxShowOnlySourcesWithMachineCode->setChecked(s.value("checkbox-show-only-sources-with-machine-code", false).toBool());
+	ui->checkBoxShowOnlySourcesWithMachineCode->setChecked(settings->value(SETTINGS_CHECKBOX_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE, false).toBool());
 
 
 	connect(ui->treeWidgetBookmarks, & QTreeWidget::itemActivated, [=] (QTreeWidgetItem * item, int column)
@@ -314,15 +318,16 @@ MainWindow::MainWindow(QWidget *parent) :
 			      ));
 
 	//gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
-	gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
+	//gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
+	gdbProcess->start("xxx", QStringList() << "--interpreter=mi3");
 	//gdbProcess->start("c:/src1/gdb-10.1-build-1/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 	//gdbProcess->start("c:/src1/gdb-10.1-build-2/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 
-	ui->plainTextEditScratchpad->setPlainText(s.value("scratchpad-text-contents", QString("Lorem ipsum dolor sit amet")).toString());
+	ui->plainTextEditScratchpad->setPlainText(settings->value(SETTINGS_SCRATCHPAD_TEXT_CONTENTS, QString("Lorem ipsum dolor sit amet")).toString());
 
 	ui->plainTextEditSourceView->installEventFilter(this);
 	ui->plainTextEditSourceView->viewport()->installEventFilter(this);
-	QFileInfo f(s.value("last-loaded-executable-file", QString()).toString());
+	QFileInfo f(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
 	if (f.exists())
 	{
 		int choice = QMessageBox::question(0, "Reopen last executable for debugging",
@@ -341,7 +346,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	else
 	{
 select_new_file:
-		f = QFileInfo(getExecutableFilename());
+		f = QFileInfo(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
 		if (!f.canonicalFilePath().isEmpty())
 		{
 reopen_last_file:
@@ -413,7 +418,7 @@ reopen_last_file:
 	////gdbserver = new GdbServer(targetCorefile);
 
 	/* Load bookmarks. */
-	QStringList bookmarkStrings = s.value("bookmarks", QStringList()).toStringList();
+	QStringList bookmarkStrings = settings->value(SETTINGS_BOOKMARKS, QStringList()).toStringList();
 	for (const auto & bookmark : bookmarkStrings)
 	{
 		QStringList bookmarkData = bookmark.split('\n');
@@ -423,7 +428,7 @@ reopen_last_file:
 	}
 	updateBookmarksView();
 
-	QStringList traceLog = s.value("trace-log", QStringList()).toStringList();
+	QStringList traceLog = settings->value(SETTINGS_TRACE_LOG, QStringList()).toStringList();
 	for (const auto & l : traceLog)
 	{
 		QStringList t = l.split('|');
@@ -439,7 +444,7 @@ reopen_last_file:
 	}
 
 	connect(ui->checkBoxShowFullFileNamesInTraceLog, & QCheckBox::stateChanged, [&](int newState) { ui->treeWidgetTraceLog->setColumnHidden(2, newState == 0); });
-	ui->checkBoxShowFullFileNamesInTraceLog->setChecked(s.value("checkbox-show-full-file-name-state-in-trace-log", false).toBool());
+	ui->checkBoxShowFullFileNamesInTraceLog->setChecked(settings->value(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE, false).toBool());
 
 	connect(ui->treeWidgetTraceLog, & QTreeWidget::itemActivated, [=] (QTreeWidgetItem * item, int column)
 		{ showSourceCode(item); } );
@@ -606,29 +611,28 @@ void MainWindow::closeEvent(QCloseEvent *event)
 		/*! \todo	This should not be needed, remove it after checking. */
 		return;
 	}
-	QSettings s("qgbd.rc", QSettings::IniFormat);
-	s.setValue("mainwindow-geometry", saveGeometry());
-	s.setValue("mainwindow-state", saveState());
-	s.setValue("checkbox-show-full-file-name-state", ui->checkBoxShowFullFileNames->isChecked());
-	s.setValue("checkbox-show-full-file-name-state-in-trace-log", ui->checkBoxShowFullFileNamesInTraceLog->isChecked());
-	s.setValue("checkbox-show-only-sources-with-machine-code", ui->checkBoxShowOnlySourcesWithMachineCode->isChecked());
-	s.setValue("scratchpad-text-contents", ui->plainTextEditScratchpad->document()->toPlainText());
+	settings->setValue(SETTINGS_MAINWINDOW_STATE, saveState());
+	settings->setValue(SETTINGS_MAINWINDOW_GEOMETRY, saveGeometry());
+	settings->setValue(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_STATE, ui->checkBoxShowFullFileNames->isChecked());
+	settings->setValue(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE, ui->checkBoxShowFullFileNamesInTraceLog->isChecked());
+	settings->setValue(SETTINGS_CHECKBOX_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE, ui->checkBoxShowOnlySourcesWithMachineCode->isChecked());
+	settings->setValue(SETTINGS_SCRATCHPAD_TEXT_CONTENTS, ui->plainTextEditScratchpad->document()->toPlainText());
 
 	/* Save bookmarks. */
 	QStringList bookmarkStrings;
 	for (const auto & bookmark : bookmarks)
 		bookmarkStrings << QString("%1\n%2").arg(bookmark.fullFileName).arg(bookmark.lineNumber);
-	s.setValue("bookmarks", bookmarkStrings);
+	settings->setValue(SETTINGS_BOOKMARKS, bookmarkStrings);
 
-	s.setValue("splitter-vertical-source-view-state", ui->splitterVerticalSourceView->saveState());
-	s.setValue("splitter-horizontal-gdb-consoles-state", ui->splitterHorizontalGdbConsoles->saveState());
-	s.setValue("splitter-horizontal-source-view-state", ui->splitterHorizontalSourceView->saveState());
+	settings->setValue(SETTINGS_SPLITTER_VERTICAL_SOURCE_VIEW_STATE, ui->splitterVerticalSourceView->saveState());
+	settings->setValue(SETTINGS_SPLITTER_HORIZONTAL_GDB_CONSOLES_STATE, ui->splitterHorizontalGdbConsoles->saveState());
+	settings->setValue(SETTINGS_SPLITTER_HORIZONTAL_SOURCE_VIEW_STATE, ui->splitterHorizontalSourceView->saveState());
 
-	s.setValue("is-splitter-horizontal-gdb-consoles-visible", ui->splitterHorizontalGdbConsoles->isVisible());
-	s.setValue("is-disassembly-view-visible", ui->groupBoxDisassembly->isVisible());
-	s.setValue("is-target-output-view-visible", ui->groupBoxTargetOutput->isVisible());
+	settings->setValue(SETTINGS_IS_SPLITTER_HORIZONTAL_GDB_CONSOLES_VISIBLE, ui->splitterHorizontalGdbConsoles->isVisible());
+	settings->setValue(SETTINGS_IS_DISASSEMBLY_VIEW_VISIBLE, ui->groupBoxDisassembly->isVisible());
+	settings->setValue(SETTINGS_IS_TARGET_OUTPUT_VIEW_VISIBLE, ui->groupBoxTargetOutput->isVisible());
 
-	s.setValue("checkbox-gdb-limiting-mode", ui->checkBoxLimitGdbLog->isChecked());
+	settings->setValue(SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE, ui->checkBoxLimitGdbLog->isChecked());
 
 	QStringList traceLog;
 	for (int i = 0; i < ui->treeWidgetTraceLog->topLevelItemCount(); i ++)
@@ -636,7 +640,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 		const QTreeWidgetItem * l = ui->treeWidgetTraceLog->topLevelItem(i);
 		traceLog << l->text(0) + '|' + l->text(1) + '|' + l->text(2);
 	}
-	s.setValue("trace-log", traceLog);
+	settings->setValue(SETTINGS_TRACE_LOG, traceLog);
 	QWidget::closeEvent(event);
 }
 
@@ -1306,9 +1310,7 @@ bool MainWindow::handleFileExecAndSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM
 		return true;
 	}
 
-	loadedExecutableFileName = context.s;
-	QSettings s("qgbd.rc", QSettings::IniFormat);
-	s.setValue("last-loaded-executable-file", loadedExecutableFileName);
+	settings->setValue(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, loadedExecutableFileName);
 	elfReader = std::make_shared<elfio>();
 	if (!elfReader->load(loadedExecutableFileName.toStdString()))
 		elfReader.reset();
@@ -1865,6 +1867,8 @@ void MainWindow::gdbProcessError(QProcess::ProcessError error)
 			QMessageBox::critical(0, "Gdb process unknown error", "Unknown gdb error");
 			break;
 	}
+	ui->pushButtonConnectGdbToGdbServer->setEnabled(false);
+	ui->pushButtonStartGdb->setEnabled(true);
 }
 
 void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
@@ -1923,13 +1927,6 @@ void MainWindow::showSourceCode(const QTreeWidgetItem *item)
 	if (lineNumber == -1 || sourceFileName.isEmpty())
 		return;
 	displaySourceCodeFile(SourceCodeLocation(sourceFileName, lineNumber));
-}
-
-QString MainWindow::getExecutableFilename()
-{
-	QSettings s("qgbd.rc", QSettings::IniFormat);
-	QFileInfo f(s.value("last-loaded-executable-file", QString()).toString());
-	return QFileDialog::getOpenFileName(0, "Load executable for debugging", f.canonicalPath());
 }
 
 void MainWindow::breakpointsContextMenuRequested(QPoint p)
