@@ -92,7 +92,8 @@ MainWindow::MainWindow(QWidget *parent) :
 	/* Forcing the rows of the tree view to be of uniform height enables some optimizations, which
 	 * makes a significant difference when a large number of items is displayed. */
 	ui->treeViewDataObjects->setUniformRowHeights(true);
-#if 0
+
+#if KEEP_THIS_FOR_DOCUMENTATION_PURPOSES
 	/* WARNING: this commented out code is kept here to warn that setting the header of a tree view to
 	 * automatically resize according to the column contents can be *VERY* slow. It is actually not
 	 * doing exactly what is expected. Do not use code like this! */
@@ -3008,4 +3009,9 @@ void MainWindow::on_pushButtonVerifyTargetMemory_clicked()
 			   GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_CHECK_MEMORY_CONTENTS));
 	gdbRequest += QString("%1\n").arg(t);
 	sendDataToGdbProcess(gdbRequest);
+}
+
+void MainWindow::gdbStarted()
+{
+	{ *(int*)0=0; }
 }

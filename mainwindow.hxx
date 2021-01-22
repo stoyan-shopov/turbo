@@ -1191,7 +1191,7 @@ private slots:
 
 	void on_pushButtonVerifyTargetMemory_clicked();
 
-	void gdbStarted(void) { *(int*)0=0; }
+	void gdbStarted(void);
 
 private:
 	QTimer controlKeyPressTimer;
