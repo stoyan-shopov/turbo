@@ -72,6 +72,8 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(this, SIGNAL(readyReadGdbProcess(QByteArray)), gdbMiReceiver, SLOT(gdbInputAvailable(QByteArray)));
 
 	connect(ui->pushButtonNavigateBack, &QPushButton::clicked, [&] { navigateBack(); });
+	connect(ui->pushButtonShowWindow, & QPushButton::clicked, [&]
+		{ QContextMenuEvent event(QContextMenuEvent::Other, QPoint(0, 0)); QApplication::sendEvent(ui->mainToolBar, & event); });
 
 	connect(gdbProcess.get(), & QProcess::readyReadStandardError,
 		[=] { QTextCursor c = ui->plainTextEditStderr->textCursor(); c.movePosition(QTextCursor::End); c.insertText(gdbProcess.get()->readAllStandardError()); });
