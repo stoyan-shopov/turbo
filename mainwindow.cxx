@@ -321,8 +321,8 @@ MainWindow::MainWindow(QWidget *parent) :
 			      ));
 
 	//gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
-	gdbProcess->start("xxx", QStringList() << "--interpreter=mi3");
+	gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
+	//gdbProcess->start("xxx", QStringList() << "--interpreter=mi3");
 	//gdbProcess->start("c:/src1/gdb-10.1-build-1/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 	//gdbProcess->start("c:/src1/gdb-10.1-build-2/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 
@@ -350,6 +350,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	{
 select_new_file:
 		f = QFileInfo(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
+		f = QFileInfo(QFileDialog::getOpenFileName(0, "Load executable for debugging", f.canonicalPath()));
 		if (!f.canonicalFilePath().isEmpty())
 		{
 reopen_last_file:
@@ -1313,7 +1314,7 @@ bool MainWindow::handleFileExecAndSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM
 		return true;
 	}
 
-	settings->setValue(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, loadedExecutableFileName);
+	settings->setValue(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, loadedExecutableFileName = context.s);
 	elfReader = std::make_shared<elfio>();
 	if (!elfReader->load(loadedExecutableFileName.toStdString()))
 		elfReader.reset();
