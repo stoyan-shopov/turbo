@@ -41,8 +41,10 @@ public:
 		unsigned	bitOffset = -1;
 		unsigned	bitWidth = -1;
 	};
-	struct SvdRegisterNode
+	struct SvdRegisterOrClusterNode
 	{
+		bool		isRegisterNode = true;
+		QString		derivedFrom;
 		QString		name;
 		QString		displayName;
 		QString		description;
@@ -52,6 +54,7 @@ public:
 		unsigned	size = -1;
 		unsigned	resetValue = -1;
 		std::vector<SvdRegisterFieldNode>	fields;
+		std::vector<SvdRegisterOrClusterNode>	children;
 	};
 	struct SvdAddressBlockNode
 	{
@@ -74,7 +77,7 @@ public:
 		unsigned	baseAddress = -1;
 		std::vector<SvdInterruptNode>		interrupts;
 		std::vector<SvdAddressBlockNode>	addressBlocks;
-		std::vector<SvdRegisterNode>		registers;
+		std::vector<SvdRegisterOrClusterNode>	registersAndClusters;
 	};
 	struct SvdCpuNode
 	{
@@ -105,7 +108,7 @@ private:
 	const SvdPeripheralNode * findPeripheral(const QString & peripheralName);
 
 	SvdRegisterFieldNode parseRegisterField(void);
-	SvdRegisterNode parseRegister(void);
+	SvdRegisterOrClusterNode parseRegisterOrCluster(void);
 	SvdAddressBlockNode parseAddressBlock(void);
 	SvdInterruptNode parseInterrupt(void);
 	SvdPeripheralNode parsePeripheral(void);

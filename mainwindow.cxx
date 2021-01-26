@@ -2593,7 +2593,7 @@ void MainWindow::createSvdRegisterView(QTreeWidgetItem *item, int column)
 {
 	if (item->data(0, SVD_REGISTER_POINTER).isNull())
 		return;
-	SvdFileParser::SvdRegisterNode * svdRegister = static_cast<SvdFileParser::SvdRegisterNode *>(item->data(0, SVD_REGISTER_POINTER).value<void *>());
+	SvdFileParser::SvdRegisterOrClusterNode * svdRegister = static_cast<SvdFileParser::SvdRegisterOrClusterNode *>(item->data(0, SVD_REGISTER_POINTER).value<void *>());
 
 	QDialog * dialog = new QDialog();
 	QGroupBox * fieldsGroupBox = new QGroupBox();
@@ -2888,8 +2888,9 @@ void MainWindow::on_comboBoxSelectLayout_activated(int index)
 
 void MainWindow::on_pushButtonXmlTest_clicked()
 {
-	//svdParser.parse("C:/src/cmsis-svd/data/STMicro/STM32F7x3.svd");
-	svdParser.parse("C:/src1/cmsis-svd/data/Atmel/ATSAMD21E15L.svd");
+	//svdParser.parse("C:/src1/cmsis-svd/data/Atmel/ATSAMD21E15L.svd");
+	//svdParser.parse("C:/src1/cmsis-svd/data/Atmel/ATSAM3N2A.svd");
+	svdParser.parse("C:/src1/cmsis-svd/data/Spansion/MB9AFA4xM.svd");
 	ui->treeWidgetSvd->clear();
 
 	/* Note: if the device tree node is not added to the tree widget here, but at a later time instead, the
@@ -2912,7 +2913,7 @@ void MainWindow::on_pushButtonXmlTest_clicked()
 	}
 	/* This is used to remove any excessive whitespace in description strings. */
 	QRegularExpression rx("\\s\\s+");
-	auto populateRegister = [&] (QTreeWidgetItem * parent, const SvdFileParser::SvdRegisterNode & reg, uint32_t baseAddress) -> void
+	auto populateRegister = [&] (QTreeWidgetItem * parent, const SvdFileParser::SvdRegisterOrClusterNode & reg, uint32_t baseAddress) -> void
 	{
 		uint32_t address = reg.addressOffset + baseAddress;
 		QTreeWidgetItem * r = new QTreeWidgetItem(parent, QStringList() << reg.name << QString("0x%1").arg(address, 8, 16, QChar('0'))
@@ -2934,7 +2935,7 @@ void MainWindow::on_pushButtonXmlTest_clicked()
 	auto populatePeripheral = [&] (QTreeWidgetItem * parent, const SvdFileParser::SvdPeripheralNode * peripheral) -> void
 	{
 		QTreeWidgetItem * p = new QTreeWidgetItem(parent, QStringList() << peripheral->name << QString("0x%1").arg(peripheral->baseAddress, 8, 16, QChar('0')) << peripheral->description);
-		const std::vector<SvdFileParser::SvdRegisterNode> & registers = peripheral->registers;
+		const std::vector<SvdFileParser::SvdRegisterOrClusterNode> & registers = peripheral->registersAndClusters;
 
 		for (const auto & r : registers)
 			populateRegister(p, r, peripheral->baseAddress);
@@ -2954,7 +2955,7 @@ void MainWindow::on_pushButtonXmlTest_clicked()
 		if (p.groupName.length())
 			continue;
 		QTreeWidgetItem * peripheral = new QTreeWidgetItem(peripherals, QStringList() << p.name << QString("0x%1").arg(p.baseAddress, 8, 16, QChar('0')) << p.description);
-		for (const auto & r : p.registers)
+		for (const auto & r : p.registersAndClusters)
 			populateRegister(peripheral, r, p.baseAddress);
 	}
 }

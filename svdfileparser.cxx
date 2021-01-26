@@ -61,8 +61,8 @@ void SvdFileParser::parse(const QString & svdFileName)
 				p.groupName = target->groupName;
 			if (p.name.isEmpty())
 				p.name = target->name;
-			if (p.registers.empty())
-				p.registers = target->registers;
+			if (p.registersAndClusters.empty())
+				p.registersAndClusters = target->registersAndClusters;
 
 			qDebug() << "Successfully resolved peripheral " << p.name;
 		}
@@ -111,12 +111,15 @@ SvdFileParser::SvdRegisterFieldNode SvdFileParser::parseRegisterField()
 	return field;
 }
 
-SvdFileParser::SvdRegisterNode SvdFileParser::parseRegister()
+SvdFileParser::SvdRegisterOrClusterNode SvdFileParser::parseRegisterOrCluster()
 {
-	qDebug() << xml.isStartElement() << xml.name();
-	Q_ASSERT(xml.isStartElement() && xml.name() == "register");
-	SvdRegisterNode r;
+	Q_ASSERT(xml.isStartElement() && (xml.name() == "register" || xml.name() == "cluster"));
+	SvdRegisterOrClusterNode r;
+	if (xml.name() == "cluster")
+		r.isRegisterNode = false;
 	bool ok;
+
+	r.derivedFrom = xml.attributes().value("derivedFrom").toString();
 
 	while (xml.readNextStartElement())
 	{
@@ -130,6 +133,8 @@ SvdFileParser::SvdRegisterNode SvdFileParser::parseRegister()
 			r.alternateRegister = xml.readElementText();
 		else if (xml.name() == "access")
 			r.access = xml.readElementText();
+		else if (xml.name() == "register")
+			r.children.push_back(parseRegisterOrCluster());
 		else if (xml.name() == "fields")
 		{
 			while (xml.readNextStartElement())
@@ -155,7 +160,7 @@ SvdFileParser::SvdRegisterNode SvdFileParser::parseRegister()
 		}
 		else
 		{
-			qDebug() << "unhandled register element: " << xml.name();
+			qDebug() << "unhandled register/cluster element: " << xml.name();
 			xml.skipCurrentElement();
 		}
 	}
@@ -245,7 +250,7 @@ SvdFileParser::SvdPeripheralNode SvdFileParser::parsePeripheral()
 		else if (xml.name() == "registers")
 		{
 			while (xml.readNextStartElement())
-				peripheral.registers.push_back(parseRegister());
+				peripheral.registersAndClusters.push_back(parseRegisterOrCluster());
 		}
 		else
 		{
