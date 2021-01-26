@@ -2888,9 +2888,9 @@ void MainWindow::on_comboBoxSelectLayout_activated(int index)
 
 void MainWindow::on_pushButtonXmlTest_clicked()
 {
-	//svdParser.parse("C:/src1/cmsis-svd/data/Atmel/ATSAMD21E15L.svd");
+	svdParser.parse("C:/src1/cmsis-svd/data/Atmel/ATSAMD21E15L.svd");
 	//svdParser.parse("C:/src1/cmsis-svd/data/Atmel/ATSAM3N2A.svd");
-	svdParser.parse("C:/src1/cmsis-svd/data/Spansion/MB9AFA4xM.svd");
+	//svdParser.parse("C:/src1/cmsis-svd/data/Spansion/MB9AFA4xM.svd");
 	ui->treeWidgetSvd->clear();
 
 	/* Note: if the device tree node is not added to the tree widget here, but at a later time instead, the

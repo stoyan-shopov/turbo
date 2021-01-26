@@ -48,24 +48,83 @@ void SvdFileParser::parse(const QString & svdFileName)
 	/*! \todo	This is incomplete. For more complicated samples, see, e.g., file ATSAMD21E15L.svd. */
 	for (auto & p : device.peripherals)
 	{
-		const SvdPeripheralNode * target;
-		if (!p.derivedFrom.isEmpty() && (target = findPeripheral(p.derivedFrom)) != 0)
+		const SvdPeripheralNode * origin;
+		if (!p.derivedFrom.isEmpty() && (origin = findPeripheral(p.derivedFrom)) != 0)
 		{
 			/* Merge the peripheral, from which this peripheral has been derived from,
 			 * into this peripheral. */
 			if (p.addressBlocks.empty())
-				p.addressBlocks = target->addressBlocks;
+				p.addressBlocks = origin->addressBlocks;
 			if (p.description.isEmpty())
-				p.description = target->description;
+				p.description = origin->description;
 			if (p.groupName.isEmpty())
-				p.groupName = target->groupName;
+				p.groupName = origin->groupName;
 			if (p.name.isEmpty())
-				p.name = target->name;
+				p.name = origin->name;
 			if (p.registersAndClusters.empty())
-				p.registersAndClusters = target->registersAndClusters;
+				p.registersAndClusters = origin->registersAndClusters;
 
 			qDebug() << "Successfully resolved peripheral " << p.name;
 		}
+
+		qDebug() << "descending in peripheral:" << p.name;
+		std::function<void(SvdRegisterOrClusterNode & registerOrCluster, const std::vector<SvdRegisterOrClusterNode> & siblings)>
+			resolveRegistersAndClusters = [&](SvdRegisterOrClusterNode & registerOrCluster, const std::vector<SvdRegisterOrClusterNode> & siblings) -> void
+		{
+			QString originName;
+			if (!(originName = registerOrCluster.derivedFrom).isEmpty())
+			{
+				if (originName.contains(QChar('.')))
+				{
+					/* Most probably, this is a qualified 'derivedFrom' target. These are
+					 * not handled at this time, because I have not seen such samples
+					 * in the cmsis-svd database here:
+					 * https://github.com/posborne/cmsis-svd.git */
+					qDebug() << "WARNING: qualified svd elements not yet handled, please report this case, so that it may be handled properly!";
+				}
+				else
+				{
+					/* Try to resolve the derived element amonsg its sibling elements. */
+					SvdRegisterOrClusterNode const * origin = 0;
+					for (const auto & s : siblings)
+						if (s.name == originName)
+						{
+							origin = & s;
+							break;
+						}
+					if (!origin)
+						qDebug() << "WARNING: could not resolve svd element, please report this case, so that it may be handled properly!";
+					else
+					{
+						/* Merge the origin into this node. */
+						if (registerOrCluster.name.isEmpty())
+							registerOrCluster.name = origin->name;
+						if (registerOrCluster.displayName.isEmpty())
+							registerOrCluster.displayName = origin->displayName;
+						if (registerOrCluster.description.isEmpty())
+							registerOrCluster.description = origin->description;
+						if (registerOrCluster.alternateRegister.isEmpty())
+							registerOrCluster.alternateRegister = origin->alternateRegister;
+						if (registerOrCluster.access.isEmpty())
+							registerOrCluster.access = origin->access;
+						if (registerOrCluster.addressOffset == -1)
+							registerOrCluster.addressOffset = origin->addressOffset;
+						if (registerOrCluster.size == -1)
+							registerOrCluster.size = origin->size;
+						if (registerOrCluster.resetValue == -1)
+							registerOrCluster.resetValue = origin->resetValue;
+						if (!registerOrCluster.fields.size())
+							registerOrCluster.fields = origin->fields;
+						if (!registerOrCluster.children.size())
+							registerOrCluster.children = origin->children;
+					}
+				}
+			}
+			for (auto & rc : registerOrCluster.children)
+				resolveRegistersAndClusters(rc, registerOrCluster.children);
+		};
+		for (auto & t : p.registersAndClusters)
+			resolveRegistersAndClusters(t, p.registersAndClusters);
 	}
 }
 
