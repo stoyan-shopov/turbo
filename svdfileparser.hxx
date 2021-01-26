@@ -20,6 +20,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+/* For details about the SVD file format and interpretation, look at the ARM CMSIS-SVD documentation. */
+
 #ifndef SVDFILEPARSER_HXX
 #define SVDFILEPARSER_HXX
 
@@ -33,6 +35,56 @@
 class SvdFileParser
 {
 public:
+	/* Note, that 'dimElementGroup' elements are possible for peripheral, cluster, register, and field elements,
+	 * but have currently been observed only for registers and fields. */
+	struct SvdDimElementGroup
+	{
+		int		dim = -1;
+		int		dimIncrement = -1;
+		/* The 'dimIndex' element is of type 'dimIndexType', and is used for substitution, to define a list (sequence)
+		 * of elements.
+		 * The type is formally defined in the ARM CMSIS-SVD Schema File as:
+		 *
+			<xs:simpleType name="dimIndexType">
+				<xs:restriction base="xs:string">
+					<xs:pattern value="[0-9]+\-[0-9]+|[A-Z]-[A-Z]|[_0-9a-zA-Z]+(,\s*[_0-9a-zA-Z]+)+"/>
+				</xs:restriction>
+			</xs:simpleType>
+		 *
+		 * These are some useful examples from the documentation:
+			Example: The examples creates definitions for registers.
+			...
+			<register>
+			    <dim>6</dim>
+			    <dimIncrement>4</dimIncrement>
+			    <dimIndex>A,B,C,D,E,Z</dimIndex>
+			    <name>GPIO_%s_CTRL</name>
+			...
+			</register>
+
+			The code above generates the list: => GPIO_A_CTRL, GPIO_B_CTRL, GPIO_C_CTRL, GPIO_D_CTRL, GPIO_E_CTRL, GPIO_Z_CTRL
+			...
+			<register>
+			    <dim>4</dim>
+			    <dimIncrement>4</dimIncrement>
+			    <dimIndex>3-6</dimIndex>
+			    <name>IRQ%s</name>
+			...
+			</register>
+
+			The example above generates the list: => IRQ3, IRQ4, IRQ5, IRQ6
+			...
+			<register>
+			    <dim>4</dim>
+			    <dimIncrement>4</dimIncrement>
+			    <name>MyArr[%s]</name>
+			...
+			</register>
+
+			The example above generates the array: => MyArr[4]
+		 */
+		QString		dimIndex;
+	};
 	struct SvdRegisterFieldNode
 	{
 		QString		name;

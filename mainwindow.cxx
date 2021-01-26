@@ -2913,22 +2913,34 @@ void MainWindow::on_pushButtonXmlTest_clicked()
 	}
 	/* This is used to remove any excessive whitespace in description strings. */
 	QRegularExpression rx("\\s\\s+");
-	auto populateRegister = [&] (QTreeWidgetItem * parent, const SvdFileParser::SvdRegisterOrClusterNode & reg, uint32_t baseAddress) -> void
+	std::function<void(QTreeWidgetItem * parent, const SvdFileParser::SvdRegisterOrClusterNode & rc, uint32_t baseAddress)> populateRegisterOrCluster =
+		[&] (QTreeWidgetItem * parent, const SvdFileParser::SvdRegisterOrClusterNode & rc, uint32_t baseAddress) -> void
 	{
-		uint32_t address = reg.addressOffset + baseAddress;
-		QTreeWidgetItem * r = new QTreeWidgetItem(parent, QStringList() << reg.name << QString("0x%1").arg(address, 8, 16, QChar('0'))
-							  << QString(reg.description).replace(rx, " "));
-		r->setData(0, SVD_REGISTER_POINTER, QVariant::fromValue((void *) & reg));
-		r->setData(0, SVD_REGISTER_ADDRESS, address);
-		for (const auto & f : reg.fields)
+		if (rc.isRegisterNode)
 		{
-			QStringList fieldHeaders;
-			fieldHeaders << f.name;
-			fieldHeaders << QString("%1").arg(f.bitOffset);
-			if (f.bitWidth > 1)
-				fieldHeaders.last().append(QString(":%1").arg(f.bitOffset + f.bitWidth - 1));
-			fieldHeaders << QString(f.description).replace(rx, " ");
-			new QTreeWidgetItem(r, fieldHeaders);
+			/* Create a register node. */
+			uint32_t address = rc.addressOffset + baseAddress;
+			QTreeWidgetItem * r = new QTreeWidgetItem(parent, QStringList() << rc.name << QString("0x%1").arg(address, 8, 16, QChar('0'))
+								  << QString(rc.description).replace(rx, " "));
+			r->setData(0, SVD_REGISTER_POINTER, QVariant::fromValue((void *) & rc));
+			r->setData(0, SVD_REGISTER_ADDRESS, address);
+			for (const auto & f : rc.fields)
+			{
+				QStringList fieldHeaders;
+				fieldHeaders << f.name;
+				fieldHeaders << QString("%1").arg(f.bitOffset);
+				if (f.bitWidth > 1)
+					fieldHeaders.last().append(QString(":%1").arg(f.bitOffset + f.bitWidth - 1));
+				fieldHeaders << QString(f.description).replace(rx, " ");
+				new QTreeWidgetItem(r, fieldHeaders);
+			}
+		}
+		else
+		{
+			/* Create a cluster node. */
+			QTreeWidgetItem * cluster = new QTreeWidgetItem(parent, QStringList() << rc.name << "<cluster lorem ipsum>" << rc.description);
+			for (const auto & r : rc.children)
+				populateRegisterOrCluster(cluster, r, baseAddress + rc.addressOffset);
 		}
 
 	};
@@ -2938,7 +2950,7 @@ void MainWindow::on_pushButtonXmlTest_clicked()
 		const std::vector<SvdFileParser::SvdRegisterOrClusterNode> & registers = peripheral->registersAndClusters;
 
 		for (const auto & r : registers)
-			populateRegister(p, r, peripheral->baseAddress);
+			populateRegisterOrCluster(p, r, peripheral->baseAddress);
 	};
 	/* First, populate peripheral groups. */
 	for (const auto & p : peripheralGroups)
@@ -2956,7 +2968,7 @@ void MainWindow::on_pushButtonXmlTest_clicked()
 			continue;
 		QTreeWidgetItem * peripheral = new QTreeWidgetItem(peripherals, QStringList() << p.name << QString("0x%1").arg(p.baseAddress, 8, 16, QChar('0')) << p.description);
 		for (const auto & r : p.registersAndClusters)
-			populateRegister(peripheral, r, p.baseAddress);
+			populateRegisterOrCluster(peripheral, r, p.baseAddress);
 	}
 }
 
