@@ -38,7 +38,7 @@ void SvdFileParser::parse(const QString & svdFileName)
 	}
 	while (xml.readNextStartElement())
 		if (xml.name() == "device")
-			device = parseDevice();
+			parseDevice(device);
 		else
 		{
 			qDebug() << "unhandled top level element: " << xml.name();
@@ -77,10 +77,9 @@ const SvdFileParser::SvdPeripheralNode *SvdFileParser::findPeripheral(const QStr
 	return 0;
 }
 
-SvdFileParser::SvdRegisterFieldNode SvdFileParser::parseRegisterField()
+void SvdFileParser::parseRegisterField(SvdRegisterFieldNode & field)
 {
 	Q_ASSERT(xml.isStartElement() && xml.name() == "field");
-	SvdRegisterFieldNode field;
 	bool ok;
 
 	while (xml.readNextStartElement())
@@ -107,14 +106,12 @@ SvdFileParser::SvdRegisterFieldNode SvdFileParser::parseRegisterField()
 			qDebug() << "unhandled register field element: " << xml.name();
 			xml.skipCurrentElement();
 		}
-
-	return field;
 }
 
-SvdFileParser::SvdRegisterOrClusterNode SvdFileParser::parseRegisterOrCluster()
+void SvdFileParser::parseRegisterOrCluster(SvdRegisterOrClusterNode & registerOrCluster)
 {
 	Q_ASSERT(xml.isStartElement() && (xml.name() == "register" || xml.name() == "cluster"));
-	SvdRegisterOrClusterNode r;
+	SvdRegisterOrClusterNode & r = registerOrCluster;
 	if (xml.name() == "cluster")
 		r.isRegisterNode = false;
 	bool ok;
@@ -134,11 +131,17 @@ SvdFileParser::SvdRegisterOrClusterNode SvdFileParser::parseRegisterOrCluster()
 		else if (xml.name() == "access")
 			r.access = xml.readElementText();
 		else if (xml.name() == "register")
-			r.children.push_back(parseRegisterOrCluster());
+		{
+			r.children.push_back(SvdRegisterOrClusterNode());
+			parseRegisterOrCluster(r.children.back());
+		}
 		else if (xml.name() == "fields")
 		{
 			while (xml.readNextStartElement())
-				r.fields.push_back(parseRegisterField());
+			{
+				r.fields.push_back(SvdRegisterFieldNode());
+				parseRegisterField(r.fields.back());
+			}
 		}
 		else if (xml.name() == "addressOffset")
 		{
@@ -164,14 +167,11 @@ SvdFileParser::SvdRegisterOrClusterNode SvdFileParser::parseRegisterOrCluster()
 			xml.skipCurrentElement();
 		}
 	}
-
-	return r;
 }
 
-SvdFileParser::SvdAddressBlockNode SvdFileParser::parseAddressBlock()
+void SvdFileParser::parseAddressBlock(SvdAddressBlockNode & addressBlock)
 {
 	Q_ASSERT(xml.isStartElement() && xml.name() == "addressBlock");
-	SvdAddressBlockNode addressBlock;
 	bool ok;
 
 	while (xml.readNextStartElement())
@@ -194,13 +194,11 @@ SvdFileParser::SvdAddressBlockNode SvdFileParser::parseAddressBlock()
 			qDebug() << "unhandled address block element: " << xml.name();
 			xml.skipCurrentElement();
 		}
-	return addressBlock;
 }
 
-SvdFileParser::SvdInterruptNode SvdFileParser::parseInterrupt()
+void SvdFileParser::parseInterrupt(SvdInterruptNode & interrupt)
 {
 	Q_ASSERT(xml.isStartElement() && xml.name() == "interrupt");
-	SvdInterruptNode interrupt;
 	bool ok;
 
 	while (xml.readNextStartElement())
@@ -219,13 +217,11 @@ SvdFileParser::SvdInterruptNode SvdFileParser::parseInterrupt()
 			qDebug() << "unhandled interrupt element: " << xml.name();
 			xml.skipCurrentElement();
 		}
-	return interrupt;
 }
 
-SvdFileParser::SvdPeripheralNode SvdFileParser::parsePeripheral()
+void SvdFileParser::parsePeripheral(SvdPeripheralNode & peripheral)
 {
 	Q_ASSERT(xml.isStartElement() && xml.name() == "peripheral");
-	SvdPeripheralNode peripheral;
 	bool ok;
 
 	peripheral.derivedFrom = xml.attributes().value("derivedFrom").toString();
@@ -244,13 +240,22 @@ SvdFileParser::SvdPeripheralNode SvdFileParser::parsePeripheral()
 				peripheral.baseAddress = t;
 		}
 		else if (xml.name() == "addressBlock")
-			peripheral.addressBlocks.push_back(parseAddressBlock());
+		{
+			peripheral.addressBlocks.push_back(SvdAddressBlockNode());
+			parseAddressBlock(peripheral.addressBlocks.back());
+		}
 		else if (xml.name() == "interrupt")
-			peripheral.interrupts.push_back(parseInterrupt());
+		{
+			peripheral.interrupts.push_back(SvdInterruptNode());
+			parseInterrupt(peripheral.interrupts.back());
+		}
 		else if (xml.name() == "registers")
 		{
 			while (xml.readNextStartElement())
-				peripheral.registersAndClusters.push_back(parseRegisterOrCluster());
+			{
+				peripheral.registersAndClusters.push_back(SvdRegisterOrClusterNode());
+				parseRegisterOrCluster(peripheral.registersAndClusters.back());
+			}
 		}
 		else
 		{
@@ -258,13 +263,11 @@ SvdFileParser::SvdPeripheralNode SvdFileParser::parsePeripheral()
 			xml.skipCurrentElement();
 		}
 	qDebug() << "processed peripheral " << peripheral.name;
-	return peripheral;
 }
 
-SvdFileParser::SvdCpuNode SvdFileParser::parseCpu()
+void SvdFileParser::parseCpu(SvdCpuNode & cpu)
 {
 	Q_ASSERT(xml.isStartElement() && xml.name() == "cpu");
-	SvdCpuNode cpu;
 	bool ok;
 
 	while (xml.readNextStartElement())
@@ -289,13 +292,11 @@ SvdFileParser::SvdCpuNode SvdFileParser::parseCpu()
 			qDebug() << "unhandled cpu element: " << xml.name();
 			xml.skipCurrentElement();
 		}
-	return cpu;
 }
 
-SvdFileParser::SvdDeviceNode SvdFileParser::parseDevice()
+void SvdFileParser::parseDevice(SvdDeviceNode & device)
 {
 	Q_ASSERT(xml.isStartElement() && xml.name() == "device");
-	SvdDeviceNode device;
 	bool ok;
 
 	while (xml.readNextStartElement())
@@ -306,11 +307,14 @@ SvdFileParser::SvdDeviceNode SvdFileParser::parseDevice()
 		else if (xml.name() == "description")
 			device.description = xml.readElementText();
 		else if (xml.name() == "cpu")
-			device.cpu = parseCpu();
+			parseCpu(device.cpu);
 		else if (xml.name() == "peripherals")
 		{
 			while (xml.readNextStartElement())
-				device.peripherals.push_back(parsePeripheral());
+			{
+				device.peripherals.push_back(SvdPeripheralNode());
+				parsePeripheral(device.peripherals.back());
+			}
 		}
 		else if (xml.name() == "addressUnitBits")
 		{
@@ -347,5 +351,4 @@ SvdFileParser::SvdDeviceNode SvdFileParser::parseDevice()
 			qDebug() << "unhandled device element: " << xml.name();
 			xml.skipCurrentElement();
 		}
-	return device;
 }

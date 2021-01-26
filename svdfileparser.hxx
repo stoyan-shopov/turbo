@@ -107,13 +107,13 @@ private:
 	QXmlStreamReader xml;
 	const SvdPeripheralNode * findPeripheral(const QString & peripheralName);
 
-	SvdRegisterFieldNode parseRegisterField(void);
-	SvdRegisterOrClusterNode parseRegisterOrCluster(void);
-	SvdAddressBlockNode parseAddressBlock(void);
-	SvdInterruptNode parseInterrupt(void);
-	SvdPeripheralNode parsePeripheral(void);
-	SvdCpuNode parseCpu(void);
-	SvdDeviceNode parseDevice(void);
+	void parseRegisterField(SvdRegisterFieldNode & field);
+	void parseRegisterOrCluster(SvdRegisterOrClusterNode & registerOrCluster);
+	void parseAddressBlock(SvdAddressBlockNode & addressBlock);
+	void parseInterrupt(SvdInterruptNode & interrupt);
+	void parsePeripheral(SvdPeripheralNode & peripheral);
+	void parseCpu(SvdCpuNode & cpu);
+	void parseDevice(SvdDeviceNode & device);
 public:
 	SvdDeviceNode	device;
 	SvdFileParser(void) {}
