@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1328</width>
-    <height>700</height>
+    <width>1346</width>
+    <height>708</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -265,7 +265,7 @@ gdb server</string>
           <number>0</number>
          </property>
          <property name="rightMargin">
-          <number>0</number>
+          <number>4</number>
          </property>
          <property name="bottomMargin">
           <number>0</number>
@@ -306,19 +306,44 @@ gdb server</string>
           <number>0</number>
          </property>
          <property name="leftMargin">
-          <number>0</number>
+          <number>4</number>
          </property>
          <property name="topMargin">
           <number>0</number>
          </property>
          <property name="rightMargin">
-          <number>0</number>
+          <number>4</number>
          </property>
          <property name="bottomMargin">
           <number>0</number>
          </property>
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout_4">
+           <item>
+            <layout class="QVBoxLayout" name="verticalLayout_28">
+             <item>
+              <widget class="QCheckBox" name="checkBoxShowDisassembly">
+               <property name="text">
+                <string>Show disassembly</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="checkBoxShowTargetOutput">
+               <property name="text">
+                <string>Show target output</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="checkBoxShowGdbConsoles">
+             <property name="text">
+              <string>Show gdb consoles</string>
+             </property>
+            </widget>
+           </item>
            <item>
             <widget class="QLabel" name="label_3">
              <property name="text">
@@ -349,30 +374,6 @@ back</string>
              </property>
             </widget>
            </item>
-           <item>
-            <widget class="QPushButton" name="pushButtonToggleGdbConsoles">
-             <property name="text">
-              <string>Toggle gdb
-consoles</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="pushButtonToggleTargetOuputView">
-             <property name="text">
-              <string>Toggle target
-output view</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="pushButtonToggleDisassemblyView">
-             <property name="text">
-              <string>Toggle
-disassembly</string>
-             </property>
-            </widget>
-           </item>
           </layout>
          </item>
          <item>
@@ -393,7 +394,7 @@ disassembly</string>
           <number>0</number>
          </property>
          <property name="leftMargin">
-          <number>0</number>
+          <number>4</number>
          </property>
          <property name="topMargin">
           <number>0</number>
@@ -540,7 +541,7 @@ disassembly</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1328</width>
+     <width>1346</width>
      <height>21</height>
     </rect>
    </property>

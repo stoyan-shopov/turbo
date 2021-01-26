@@ -51,9 +51,22 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->splitterHorizontalSourceView->restoreState(settings->value(SETTINGS_SPLITTER_HORIZONTAL_SOURCE_VIEW_STATE, QByteArray()).toByteArray());
 	ui->splitterHorizontalGdbConsoles->restoreState(settings->value(SETTINGS_SPLITTER_HORIZONTAL_GDB_CONSOLES_STATE, QByteArray()).toByteArray());
 
-	ui->splitterHorizontalGdbConsoles->setVisible(settings->value(SETTINGS_IS_SPLITTER_HORIZONTAL_GDB_CONSOLES_VISIBLE, true).toBool());
-	ui->groupBoxDisassembly->setVisible(settings->value(SETTINGS_IS_DISASSEMBLY_VIEW_VISIBLE, true).toBool());
-	ui->groupBoxTargetOutput->setVisible(settings->value(SETTINGS_IS_TARGET_OUTPUT_VIEW_VISIBLE, true).toBool());
+	bool flag;
+
+	ui->splitterHorizontalGdbConsoles->setVisible(flag = settings->value(SETTINGS_IS_SPLITTER_HORIZONTAL_GDB_CONSOLES_VISIBLE, true).toBool());
+	ui->checkBoxShowGdbConsoles->setCheckState(flag ? Qt::Checked : Qt::Unchecked);
+	connect(ui->checkBoxShowGdbConsoles, & QCheckBox::stateChanged, [&](int newState) { ui->splitterHorizontalGdbConsoles->setVisible(newState != Qt::Unchecked); });
+	connect(ui->pushButtonHideGdbConsoles, & QPushButton::clicked, [&] { ui->checkBoxShowGdbConsoles->setCheckState(Qt::Unchecked); });
+
+	ui->groupBoxDisassembly->setVisible(flag = settings->value(SETTINGS_IS_DISASSEMBLY_VIEW_VISIBLE, true).toBool());
+	ui->checkBoxShowDisassembly->setCheckState(flag ? Qt::Checked : Qt::Unchecked);
+	connect(ui->checkBoxShowDisassembly, & QCheckBox::stateChanged, [&](int newState) { ui->groupBoxDisassembly->setVisible(newState != Qt::Unchecked); });
+	connect(ui->pushButtonHideDisassembly, & QPushButton::clicked, [&] { ui->checkBoxShowDisassembly->setCheckState(Qt::Unchecked); });
+
+	ui->groupBoxTargetOutput->setVisible(flag = settings->value(SETTINGS_IS_TARGET_OUTPUT_VIEW_VISIBLE, true).toBool());
+	ui->checkBoxShowTargetOutput->setCheckState(flag ? Qt::Checked : Qt::Unchecked);
+	connect(ui->checkBoxShowTargetOutput, & QCheckBox::stateChanged, [&](int newState) { ui->groupBoxTargetOutput->setVisible(newState != Qt::Unchecked); });
+	connect(ui->pushButtonHideTargetOutputView, & QPushButton::clicked, [&] { ui->checkBoxShowTargetOutput->setCheckState(Qt::Unchecked); });
 
 	ui->plainTextEditGdbLog->setMaximumBlockCount(MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE);
 	connect(ui->checkBoxLimitGdbLog, & QCheckBox::stateChanged, [&](int newState)
@@ -594,17 +607,9 @@ reopen_last_file:
 
 	connect(ui->treeWidgetSvd, SIGNAL(itemDoubleClicked(QTreeWidgetItem*,int)), this, SLOT(createSvdRegisterView(QTreeWidgetItem*,int)));
 
-	connect(ui->pushButtonToggleTargetOuputView, & QPushButton::clicked, [&] { ui->groupBoxTargetOutput->setVisible(!ui->groupBoxTargetOutput->isVisible()); });
-	connect(ui->pushButtonToggleDisassemblyView, & QPushButton::clicked, [&] { ui->groupBoxDisassembly->setVisible(!ui->groupBoxDisassembly->isVisible()); });
-	connect(ui->pushButtonToggleGdbConsoles, & QPushButton::clicked, [&] { ui->splitterHorizontalGdbConsoles->setVisible(!ui->splitterHorizontalGdbConsoles->isVisible()); });
-
 	connect(ui->lineEditGdbCommand1, & QLineEdit::returnPressed, [&] { sendCommandsToGdb(ui->lineEditGdbCommand1); });
 	connect(ui->pushButtonSendCommandToGdb1, & QPushButton::clicked, [&] { sendCommandsToGdb(ui->lineEditGdbCommand1); });
 	connect(ui->lineEditGdbCommand2, & QLineEdit::returnPressed, [&] { sendCommandsToGdb(ui->lineEditGdbCommand2); });
-
-	connect(ui->pushButtonHideGdbConsoles, & QPushButton::clicked, [&] { ui->splitterHorizontalGdbConsoles->hide(); });
-	connect(ui->pushButtonHideDisassembly, & QPushButton::clicked, [&] { ui->groupBoxDisassembly->hide(); });
-	connect(ui->pushButtonHideTargetOutputView, & QPushButton::clicked, [&] { ui->groupBoxTargetOutput->hide(); });
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -1020,6 +1025,7 @@ void MainWindow::appendLineToGdbLog(const QString &data)
 	if (ui->checkBoxLimitGdbLog->isChecked() && data.length() > (MAX_LINE_LENGTH_IN_GDB_LOG_LIMITING_MODE << 1))
 	{
 		ui->plainTextEditGdbLog->appendPlainText(data.left(MAX_LINE_LENGTH_IN_GDB_LOG_LIMITING_MODE));
+		ui->plainTextEditGdbLog->appendPlainText("... <truncated, gdb log limiting active>");
 		return;
 	}
 	ui->plainTextEditGdbLog->appendPlainText(data);

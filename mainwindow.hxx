@@ -640,7 +640,7 @@ class MainWindow : public QMainWindow
 private:
 	/* The minimum string length that needs to be entered so that the object locator performs a search for the text entered. */
 	const int MIN_STRING_LENGTH_FOR_OBJECT_LOCATOR = 3;
-	const int MAX_LINE_LENGTH_IN_GDB_LOG_LIMITING_MODE = 10 * 1024;
+	const int MAX_LINE_LENGTH_IN_GDB_LOG_LIMITING_MODE = 1 * 1024;
 	const int MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE = 1 * 1024;
 
 	/* Settings-related data. */
@@ -657,7 +657,7 @@ private:
 
 	const QString SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE		= "checkbox-gdb-output-limiting-mode-state";
 	const QString SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_STATE		= "checkbox-show-full-file-name-state";
-	const QString SETTINGS_CHECKBOX_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE		= "checkbox-show-only-sources-with-machine-code";
+	const QString SETTINGS_CHECKBOX_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE		= "checkbox-show-only-sources-with-machine-code-state";
 
 	const QString SETTINGS_SCRATCHPAD_TEXT_CONTENTS				= "scratchpad-text-contents";
 	const QString SETTINGS_BOOKMARKS					= "bookmarks";
