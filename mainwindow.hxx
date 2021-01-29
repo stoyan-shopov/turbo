@@ -65,7 +65,9 @@
 #include <functional>
 
 #include "bmpdetect.hxx"
+#include "ui_settings-dialog.h"
 
+#if 0
 namespace std
 {
 template<> struct hash<QString>
@@ -76,6 +78,7 @@ template<> struct hash<QString>
 	}
 };
 }
+#endif
 
 namespace Ui {
 class MainWindow;
@@ -665,8 +668,12 @@ private:
 	const QString SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE	= "checkbox-show-full-file-name-in-trace-log-state";
 
 	const QString SETTINGS_LAST_LOADED_EXECUTABLE_FILE			= "last-loaded-executable-file";
+	const QString SETTINGS_GDB_EXECUTABLE_FILENAME				= "gdb-executable-filename";
 
 	std::shared_ptr<QSettings> settings;
+
+	Ui::DialogSettings settingsUi;
+	QDialog * dialogEditSettings;
 
 public:
 	explicit MainWindow(QWidget *parent = nullptr);

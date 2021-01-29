@@ -47,9 +47,9 @@
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="pushButtonXmlTest">
+         <widget class="QPushButton" name="pushButtonSettings">
           <property name="text">
-           <string>xml test</string>
+           <string>Settings</string>
           </property>
          </widget>
         </item>
@@ -81,6 +81,13 @@
          </widget>
         </item>
        </layout>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButtonXmlTest">
+        <property name="text">
+         <string>xml test</string>
+        </property>
+       </widget>
       </item>
       <item>
        <widget class="QGroupBox" name="groupBoxTargetConnected">

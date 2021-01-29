@@ -51,7 +51,8 @@ HEADERS += \
 	   troll/gdb-remote.hxx
 
 FORMS += \
-        mainwindow.ui
+        mainwindow.ui \
+        settings-dialog.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

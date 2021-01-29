@@ -47,6 +47,29 @@ MainWindow::MainWindow(QWidget *parent) :
 	restoreState(settings->value(SETTINGS_MAINWINDOW_STATE, QByteArray()).toByteArray());
 	restoreGeometry(settings->value(SETTINGS_MAINWINDOW_GEOMETRY, QByteArray()).toByteArray());
 
+	/*****************************************
+	 * Settings.
+	 *****************************************/
+	dialogEditSettings = new QDialog(this);
+	settingsUi.setupUi(dialogEditSettings);
+	connect(ui->pushButtonSettings, & QPushButton::clicked, [&](){
+		settingsUi.lineEditGdbExecutable->setText(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString());
+		dialogEditSettings->open();
+	});
+	connect(settingsUi.pushButtonSelectGdbExecutableFile, & QPushButton::clicked, [&](){
+		QString s = QFileDialog::getOpenFileName(0, "Select gdb executable");
+		if (!s.isEmpty())
+			settingsUi.lineEditGdbExecutable->setText(s);
+	});
+	connect(settingsUi.pushButtonSettingsOk, & QPushButton::clicked, [&](){
+		settings->setValue(SETTINGS_GDB_EXECUTABLE_FILENAME, settingsUi.lineEditGdbExecutable->text());
+		dialogEditSettings->hide();
+	});
+	connect(settingsUi.pushButtonSettingsCancel, & QPushButton::clicked, [&](){ dialogEditSettings->hide(); });
+	/*****************************************
+	 * End Settings.
+	 *****************************************/
+
 	ui->splitterVerticalSourceView->restoreState(settings->value(SETTINGS_SPLITTER_VERTICAL_SOURCE_VIEW_STATE, QByteArray()).toByteArray());
 	ui->splitterHorizontalSourceView->restoreState(settings->value(SETTINGS_SPLITTER_HORIZONTAL_SOURCE_VIEW_STATE, QByteArray()).toByteArray());
 	ui->splitterHorizontalGdbConsoles->restoreState(settings->value(SETTINGS_SPLITTER_HORIZONTAL_GDB_CONSOLES_STATE, QByteArray()).toByteArray());
@@ -93,7 +116,14 @@ MainWindow::MainWindow(QWidget *parent) :
 
 	/* It is possible that the user presses quickly the button for starting gdb, before the gdb process is started and the
 	 * button is disabled, so only start the gdb process here if it is not already started or running. */
-	connect(ui->pushButtonStartGdb, & QPushButton::clicked, [&] { if (!gdbProcess.get()->state() == QProcess::NotRunning) gdbProcess.get()->start(); });
+	connect(ui->pushButtonStartGdb, & QPushButton::clicked, [&] {
+		qDebug() << "gdb state" << gdbProcess->state();
+		if (gdbProcess->state() == QProcess::NotRunning)
+		{
+			gdbProcess->setProgram(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString());
+			gdbProcess->start();
+		}
+	});
 
 	connect(gdbProcess.get(), & QProcess::started, [&] { ui->pushButtonConnectGdbToGdbServer->setEnabled(true); ui->pushButtonStartGdb->setEnabled(false); });
 	connect(gdbProcess.get(), SIGNAL(finished(int, QProcess::ExitStatus)), this, SLOT(gdbProcessFinished(int,QProcess::ExitStatus)));
@@ -334,10 +364,11 @@ MainWindow::MainWindow(QWidget *parent) :
 			      ));
 
 	//gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
-	gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
+	//gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 	//gdbProcess->start("xxx", QStringList() << "--interpreter=mi3");
 	//gdbProcess->start("c:/src1/gdb-10.1-build-1/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 	//gdbProcess->start("c:/src1/gdb-10.1-build-2/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
+	gdbProcess->start(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString(), QStringList() << "--interpreter=mi3");
 
 	ui->plainTextEditScratchpad->setPlainText(settings->value(SETTINGS_SCRATCHPAD_TEXT_CONTENTS, QString("Lorem ipsum dolor sit amet")).toString());
 
