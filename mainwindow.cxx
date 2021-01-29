@@ -197,7 +197,9 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->checkBoxShowFullFileNames->setChecked(settings->value(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_STATE, false).toBool());
 
 	connect(ui->checkBoxShowOnlySourcesWithMachineCode, SIGNAL(stateChanged(int)), this, SLOT(updateSourceListView()));
+	connect(ui->checkBoxShowOnlyExistingSourceFiles, SIGNAL(stateChanged(int)), this, SLOT(updateSourceListView()));
 	ui->checkBoxShowOnlySourcesWithMachineCode->setChecked(settings->value(SETTINGS_CHECKBOX_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE, false).toBool());
+	ui->checkBoxShowOnlyExistingSourceFiles->setChecked(settings->value(SETTINGS_CHECKBOX_SHOW_ONLY_EXISTING_SOURCE_FILES, false).toBool());
 
 
 	connect(ui->treeWidgetBookmarks, & QTreeWidget::itemActivated, [=] (QTreeWidgetItem * item, int column)
@@ -656,6 +658,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	settings->setValue(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_STATE, ui->checkBoxShowFullFileNames->isChecked());
 	settings->setValue(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE, ui->checkBoxShowFullFileNamesInTraceLog->isChecked());
 	settings->setValue(SETTINGS_CHECKBOX_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE, ui->checkBoxShowOnlySourcesWithMachineCode->isChecked());
+	settings->setValue(SETTINGS_CHECKBOX_SHOW_ONLY_EXISTING_SOURCE_FILES, ui->checkBoxShowOnlyExistingSourceFiles->isChecked());
 	settings->setValue(SETTINGS_SCRATCHPAD_TEXT_CONTENTS, ui->plainTextEditScratchpad->document()->toPlainText());
 
 	/* Save bookmarks. */
@@ -828,7 +831,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 			break;
 		case Qt::Key_O:
 			if (target_state == TARGET_STOPPED)
-				sendDataToGdbProcess("n\n");
+				sendDataToGdbProcess("-exec-next\n");
 			result = true;
 			break;
 		case Qt::Key_C:
@@ -1301,7 +1304,7 @@ bool MainWindow::handleSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM parseResul
 					}
 				if (!sourceFiles.count(fullFileName))
 				{
-					/* Symbols found for file which was not reported by gdb in the list of source code files
+					/* Symbols found for a file, which was not reported by gdb in the list of source code files
 					 * by the response of the "-file-list-exec-source-files" machine interface command.
 					 * This is possible when gdb replies to a "-symbol-info-types" machine interface command,
 					 * and the reported filename in the response was not previously present in the reply of
@@ -2159,9 +2162,22 @@ void MainWindow::stringSearchReady(const QString pattern, QSharedPointer<QVector
 void MainWindow::updateSourceListView()
 {
 bool showOnlySourcesWithMachineCode = ui->checkBoxShowOnlySourcesWithMachineCode->isChecked();
+bool showOnlyExistingSourceFiles = ui->checkBoxShowOnlyExistingSourceFiles->isChecked();
+
+	std::function<bool(const SourceFileData & fileData)> shouldFileBeListed = [&] (const SourceFileData & fileData) -> bool
+	{
+		if (showOnlyExistingSourceFiles)
+		{
+			/* WARNING: this is potentially expensive! */
+			QFileInfo f(fileData.fullFileName);
+			if (!f.exists())
+				return false;
+		}
+		return !showOnlySourcesWithMachineCode || /* This is a safe-catch. */ !fileData.isSourceLinesFetched || fileData.machineCodeLineNumbers.size();
+	};
 	ui->treeWidgetSourceFiles->clear();
 	for (const auto & f : sourceFiles)
-		if (!showOnlySourcesWithMachineCode || !f.isSourceLinesFetched || f.machineCodeLineNumbers.size())
+		if (shouldFileBeListed(f))
 		{
 			QTreeWidgetItem * t = createNavigationWidgetItem(QStringList() << f.fileName << f.fullFileName, f.fullFileName, 0, SourceFileData::SymbolData::SOURCE_FILE_NAME);
 			ui->treeWidgetSourceFiles->addTopLevelItem(t);

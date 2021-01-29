@@ -661,6 +661,7 @@ private:
 	const QString SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE		= "checkbox-gdb-output-limiting-mode-state";
 	const QString SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_STATE		= "checkbox-show-full-file-name-state";
 	const QString SETTINGS_CHECKBOX_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE		= "checkbox-show-only-sources-with-machine-code-state";
+	const QString SETTINGS_CHECKBOX_SHOW_ONLY_EXISTING_SOURCE_FILES		= "checkbox-show-only-existing-source-files";
 
 	const QString SETTINGS_SCRATCHPAD_TEXT_CONTENTS				= "scratchpad-text-contents";
 	const QString SETTINGS_BOOKMARKS					= "bookmarks";

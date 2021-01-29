@@ -648,6 +648,13 @@ back</string>
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QCheckBox" name="checkBoxShowOnlyExistingSourceFiles">
+         <property name="text">
+          <string>Only exising files</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </item>
      <item>
