@@ -664,7 +664,11 @@ private:
 	const QString SETTINGS_CHECKBOX_SHOW_ONLY_EXISTING_SOURCE_FILES		= "checkbox-show-only-existing-source-files";
 
 	const QString SETTINGS_SCRATCHPAD_TEXT_CONTENTS				= "scratchpad-text-contents";
+
 	const QString SETTINGS_BOOKMARKS					= "bookmarks";
+	const QString SETTINGS_BREAKPOINT_LIST					= "breakpoint-list";
+	const QString SETTINGS_BREAKPOINT_LIST_SEPARATOR			= "<>";
+
 	const QString SETTINGS_TRACE_LOG					= "trace-log";
 	const QString SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE	= "checkbox-show-full-file-name-in-trace-log-state";
 

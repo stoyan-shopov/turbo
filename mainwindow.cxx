@@ -666,6 +666,11 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	for (const auto & bookmark : bookmarks)
 		bookmarkStrings << QString("%1\n%2").arg(bookmark.fullFileName).arg(bookmark.lineNumber);
 	settings->setValue(SETTINGS_BOOKMARKS, bookmarkStrings);
+	/* Save breakpoints. This is evil... */
+	QStringList breakpointList;
+	for (int i = 0; i < ui->treeWidgetBreakpoints->topLevelItemCount(); i ++)
+		breakpointList << ui->treeWidgetBreakpoints->topLevelItem(i)->text(5);
+	settings->setValue(SETTINGS_BREAKPOINT_LIST, breakpointList.join(SETTINGS_BREAKPOINT_LIST_SEPARATOR));
 
 	settings->setValue(SETTINGS_SPLITTER_VERTICAL_SOURCE_VIEW_STATE, ui->splitterVerticalSourceView->saveState());
 	settings->setValue(SETTINGS_SPLITTER_HORIZONTAL_GDB_CONSOLES_STATE, ui->splitterHorizontalGdbConsoles->saveState());
@@ -1765,6 +1770,11 @@ bool MainWindow::handleSequencePoints(GdbMiParser::RESULT_CLASS_ENUM parseResult
 	case GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_SOURCE_CODE_ADDRESSES_RETRIEVED:
 		updateSourceListView();
 		updateSymbolViews();
+		QStringList breakpointList = settings->value(SETTINGS_BREAKPOINT_LIST, QString("")).toString().split(SETTINGS_BREAKPOINT_LIST_SEPARATOR);
+		qDebug() << "saved breakpoint count:" << breakpointList.count() << breakpointList;
+		for (const auto b : breakpointList)
+			sendDataToGdbProcess(QString("b %1\n").arg(escapeString(b)));
+
 		break;
 	}
 	if (response_handled)
@@ -2628,7 +2638,7 @@ int currentBlockNumber = ui->plainTextEditSourceView->textCursor().blockNumber()
 			refreshSourceCodeView();
 		navigationStack.push(sourceCodeLocation);
 	}
-	setWindowTitle(QString("qgdb: ") + displayedSourceCodeFile);
+	setWindowTitle(QString(windowTitle()) + ": " + displayedSourceCodeFile);
 	ui->plainTextEditSourceView->blockSignals(false);
 	sourceFileWatcher.removePaths(sourceFileWatcher.files());
 	qDebug() << "Watching file: " << fi.absoluteFilePath();
