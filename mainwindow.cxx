@@ -1776,7 +1776,7 @@ bool MainWindow::handleSequencePoints(GdbMiParser::RESULT_CLASS_ENUM parseResult
 		qDebug() << "saved breakpoint count:" << breakpointList.count() << breakpointList;
 		for (const auto & b : breakpointList)
 			if (!b.isEmpty())
-				sendDataToGdbProcess(QString("b %1\n").arg(escapeString(b)));
+				sendDataToGdbProcess(QString("b %1\n").arg(b));
 
 		break;
 	}
