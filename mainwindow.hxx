@@ -68,6 +68,9 @@
 #include "ui_settings-dialog.h"
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+/* It seems that prior to Qt version 5.14, Qt does not provide a specialization
+ * for 'std::hash<QString>'. If this is the case, provide a specialization for
+ * Qt versions prior to 5.14. */
 namespace std
 {
 template<> struct hash<QString>
