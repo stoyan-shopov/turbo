@@ -1063,7 +1063,7 @@ private:
 	void sourceItemContextMenuRequested(const QTreeWidget * treeWidget, QPoint p);
 
 	/* Returns true, if the source view was refreshed, false otherwise. */
-	bool searchCurrentSourceText(const QString pattern);
+	void searchCurrentSourceText(const QString &pattern);
 	void moveCursorToNextMatch(void);
 	void moveCursorToPreviousMatch(void);
 

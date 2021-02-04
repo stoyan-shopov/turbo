@@ -2395,31 +2395,31 @@ void MainWindow::navigateBack()
 	}
 }
 
-bool MainWindow::searchCurrentSourceText(const QString pattern)
+void MainWindow::searchCurrentSourceText(const QString & pattern)
 {
-	if (pattern.length() == 0)
-		return false;
-	searchData.matchPositions.clear();
-	QString document = ui->plainTextEditSourceView->toPlainText();
-	int index = 0, position;
-	while ((position = document.indexOf(pattern, index)) != -1)
-		searchData.matchPositions.push_back(position), index = position + 1;
-
 	searchData.lastSearchedText = pattern;
+	searchData.matchPositions.clear();
 	sourceCodeViewHighlights.searchedTextMatches.clear();
-	QTextCursor c(ui->plainTextEditSourceView->textCursor());
-	int matchLength = pattern.size();
-	for (const auto & matchPosition : searchData.matchPositions)
+	if (pattern.length() != 0)
 	{
-		c.setPosition(matchPosition);
-		c.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor, matchLength);
-		QTextEdit::ExtraSelection s;
-		s.cursor = c;
-		s.format = sourceCodeViewHighlightFormats.searchedText;
-		sourceCodeViewHighlights.searchedTextMatches << s;
+		QString document = ui->plainTextEditSourceView->toPlainText();
+		int index = 0, position;
+		while ((position = document.indexOf(pattern, index)) != -1)
+			searchData.matchPositions.push_back(position), index = position + 1;
+
+		QTextCursor c(ui->plainTextEditSourceView->textCursor());
+		int matchLength = pattern.length();
+		for (const auto & matchPosition : searchData.matchPositions)
+		{
+			c.setPosition(matchPosition);
+			c.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor, matchLength);
+			QTextEdit::ExtraSelection s;
+			s.cursor = c;
+			s.format = sourceCodeViewHighlightFormats.searchedText;
+			sourceCodeViewHighlights.searchedTextMatches << s;
+		}
 	}
 	refreshSourceCodeView();
-	return true;
 }
 
 void MainWindow::moveCursorToNextMatch()
@@ -2637,8 +2637,7 @@ int currentBlockNumber = ui->plainTextEditSourceView->textCursor().blockNumber()
 			sourceCodeViewHighlights.navigatedSourceCodeLine << selection;
 		}
 		displayedSourceCodeFile = sourceCodeLocation.fullFileName;
-		if (!searchCurrentSourceText(searchData.lastSearchedText))
-			refreshSourceCodeView();
+		searchCurrentSourceText(searchData.lastSearchedText);
 		navigationStack.push(sourceCodeLocation);
 	}
 	setWindowTitle(QString(windowTitle()) + ": " + displayedSourceCodeFile);
