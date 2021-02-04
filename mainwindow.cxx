@@ -125,7 +125,9 @@ MainWindow::MainWindow(QWidget *parent) :
 		}
 	});
 
-	connect(gdbProcess.get(), & QProcess::started, [&] { ui->pushButtonConnectGdbToGdbServer->setEnabled(true); ui->pushButtonStartGdb->setEnabled(false); });
+	connect(gdbProcess.get(), & QProcess::started, [&] {
+		ui->pushButtonConnectGdbToGdbServer->setEnabled(true); ui->pushButtonStartGdb->setEnabled(false);
+	});
 	connect(gdbProcess.get(), SIGNAL(finished(int, QProcess::ExitStatus)), this, SLOT(gdbProcessFinished(int,QProcess::ExitStatus)));
 	connect(gdbProcess.get(), SIGNAL(errorOccurred(QProcess::ProcessError)), this, SLOT(gdbProcessError(QProcess::ProcessError)));
 	connect(gdbMiReceiver, SIGNAL(gdbMiOutputLineAvailable(QString)), this, SLOT(gdbMiLineAvailable(QString)));
@@ -370,12 +372,12 @@ MainWindow::MainWindow(QWidget *parent) :
 	//gdbProcess->start("xxx", QStringList() << "--interpreter=mi3");
 	//gdbProcess->start("c:/src1/gdb-10.1-build-1/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 	//gdbProcess->start("c:/src1/gdb-10.1-build-2/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
-	gdbProcess->start(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString(), QStringList() << "--interpreter=mi3");
-
 	ui->plainTextEditScratchpad->setPlainText(settings->value(SETTINGS_SCRATCHPAD_TEXT_CONTENTS, QString("Lorem ipsum dolor sit amet")).toString());
 
 	ui->plainTextEditSourceView->installEventFilter(this);
 	ui->plainTextEditSourceView->viewport()->installEventFilter(this);
+	/*! \todo	Only execute the code below after gdb has been successfully started. */
+	gdbProcess->start(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString(), QStringList() << "--interpreter=mi3");
 	QFileInfo f(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
 	if (f.exists())
 	{
@@ -1772,8 +1774,9 @@ bool MainWindow::handleSequencePoints(GdbMiParser::RESULT_CLASS_ENUM parseResult
 		updateSymbolViews();
 		QStringList breakpointList = settings->value(SETTINGS_BREAKPOINT_LIST, QString("")).toString().split(SETTINGS_BREAKPOINT_LIST_SEPARATOR);
 		qDebug() << "saved breakpoint count:" << breakpointList.count() << breakpointList;
-		for (const auto b : breakpointList)
-			sendDataToGdbProcess(QString("b %1\n").arg(escapeString(b)));
+		for (const auto & b : breakpointList)
+			if (!b.isEmpty())
+				sendDataToGdbProcess(QString("b %1\n").arg(escapeString(b)));
 
 		break;
 	}
