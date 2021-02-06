@@ -47,6 +47,10 @@ MainWindow::MainWindow(QWidget *parent) :
 	restoreState(settings->value(SETTINGS_MAINWINDOW_STATE, QByteArray()).toByteArray());
 	restoreGeometry(settings->value(SETTINGS_MAINWINDOW_GEOMETRY, QByteArray()).toByteArray());
 
+	connect(ui->pushButtonTrigger, & QPushButton::clicked, [&] { navigationStack.dump(); });
+	connect(ui->pushButtonNavigateForward, & QPushButton::clicked, [&] { if (navigationStack.canNavigateForward()) displaySourceCodeFile(navigationStack.following(), false); });
+	connect(ui->pushButtonNavigateBack, & QPushButton::clicked, [&] { if (navigationStack.canNavigateBack()) displaySourceCodeFile(navigationStack.previous(), false); });
+
 	/*****************************************
 	 * Settings.
 	 *****************************************/
@@ -107,7 +111,6 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(gdbProcess.get(), & QProcess::readyReadStandardOutput, [&] { emit readyReadGdbProcess(gdbProcess->readAll()); });
 	connect(this, SIGNAL(readyReadGdbProcess(QByteArray)), gdbMiReceiver, SLOT(gdbInputAvailable(QByteArray)));
 
-	connect(ui->pushButtonNavigateBack, &QPushButton::clicked, [&] { navigateBack(); });
 	connect(ui->pushButtonShowWindow, & QPushButton::clicked, [&]
 		{ QContextMenuEvent event(QContextMenuEvent::Other, QPoint(0, 0)); QApplication::sendEvent(ui->mainToolBar, & event); });
 
@@ -756,7 +759,14 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 		case Qt::Key_Left:
 			if (e->modifiers() & Qt::AltModifier)
 			{
-				navigateBack();
+				ui->pushButtonNavigateBack->click();
+				result = true;
+			}
+			break;
+		case Qt::Key_Right:
+			if (e->modifiers() & Qt::AltModifier)
+			{
+				ui->pushButtonNavigateForward->click();
 				result = true;
 			}
 			break;
@@ -1983,7 +1993,7 @@ void MainWindow::showSourceCode(const QTreeWidgetItem *item)
 		lineNumber = 1;
 	if (lineNumber == -1 || sourceFileName.isEmpty())
 		return;
-	displaySourceCodeFile(SourceCodeLocation(sourceFileName, lineNumber));
+	displaySourceCodeFile(SourceCodeLocation(sourceFileName, lineNumber), true, true);
 }
 
 void MainWindow::breakpointsContextMenuRequested(QPoint p)
@@ -2383,16 +2393,7 @@ void MainWindow::navigateToSymbolAtCursor(void)
 		QMessageBox::information(0, "Multiple symbols found", "Multiple symbols found for id: " + symbolName + "\nNavigating to the first item in the list");
 	QString sourceFileName = symbols.at(0)->data(0, SourceFileData::FILE_NAME).toString();
 	int lineNumber = symbols.at(0)->data(0, SourceFileData::LINE_NUMBER).toInt();
-	displaySourceCodeFile(SourceCodeLocation(sourceFileName, lineNumber));
-}
-
-void MainWindow::navigateBack()
-{
-	if (navigationStack.size() > 1)
-	{
-		navigationStack.drop();
-		displaySourceCodeFile(navigationStack.back(), false);
-	}
+	displaySourceCodeFile(SourceCodeLocation(sourceFileName, lineNumber), true, true);
 }
 
 void MainWindow::searchCurrentSourceText(const QString & pattern)
@@ -2539,7 +2540,8 @@ void MainWindow::flashHighlightDockWidget(QDockWidget *w)
 	widgetFlashHighlighterData.timer.start(widgetFlashHighlighterData.flashIntervalMs);
 }
 
-void MainWindow::displaySourceCodeFile(const SourceCodeLocation &sourceCodeLocation, bool saveCurrentLocationToNavigationStack)
+void MainWindow::displaySourceCodeFile(const SourceCodeLocation &sourceCodeLocation, bool saveCurrentLocationToNavigationStack,
+				       bool saveNewLocationToNavigationStack)
 {
 QFile f(sourceCodeLocation.fullFileName);
 QFileInfo fi(sourceCodeLocation.fullFileName);
@@ -2564,10 +2566,35 @@ int currentBlockNumber = ui->plainTextEditSourceView->textCursor().blockNumber()
 		ui->plainTextEditSourceView->appendPlainText(QString("Cannot find file \"%1\"").arg(sourceCodeLocation.fullFileName));
 	else if (!f.open(QFile::ReadOnly))
 		ui->plainTextEditSourceView->appendPlainText(QString("Failed to open file \"%1\"").arg(sourceCodeLocation.fullFileName));
+	else if (sourceCodeLocation.fullFileName == internalHelpFileName)
+	{
+		/* Special case for the internal help file - do not attempt to apply syntax highlighting on it. */
+		ui->plainTextEditSourceView->clear();
+		sourceCodeViewHighlights.navigatedSourceCodeLine.clear();
+		ui->plainTextEditSourceView->setCurrentCharFormat(QTextCharFormat());
+		ui->plainTextEditSourceView->appendPlainText(f.readAll());
+		ui->plainTextEditSourceView->appendPlainText("xxx");
+		QTextCursor c = ui->plainTextEditSourceView->textCursor();
+		c.movePosition(QTextCursor::Start);
+		if (sourceCodeLocation.lineNumber > 0)
+			c.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, sourceCodeLocation.lineNumber - 1);
+		ui->plainTextEditSourceView->setTextCursor(c);
+		ui->plainTextEditSourceView->centerCursor();
+		if (sourceCodeLocation.lineNumber > 0)
+		{
+			/* Highlight current line. */
+			c.movePosition(QTextCursor::NextBlock, QTextCursor::KeepAnchor);
+			QTextEdit::ExtraSelection selection;
+			selection.cursor = c;
+			selection.format = sourceCodeViewHighlightFormats.navigatedLine;
+			sourceCodeViewHighlights.navigatedSourceCodeLine << selection;
+		}
+		displayedSourceCodeFile = sourceCodeLocation.fullFileName;
+		refreshSourceCodeView();
+	}
 	else
 	{
-		/*! \todo Wrap this as a function (along with an example in the 'clex.y' scanner), and simply
-		 * call that function. */
+		/*! \todo Wrap this as a function (along with an example in the 'clex.y' scanner), and simply call that function. */
 		yyscan_t scanner;
 		std::string s;
 		yylex_init_extra(& s, &scanner);
@@ -2638,13 +2665,17 @@ int currentBlockNumber = ui->plainTextEditSourceView->textCursor().blockNumber()
 		}
 		displayedSourceCodeFile = sourceCodeLocation.fullFileName;
 		searchCurrentSourceText(searchData.lastSearchedText);
-		navigationStack.push(sourceCodeLocation);
+		if (saveNewLocationToNavigationStack)
+			navigationStack.push(sourceCodeLocation);
 	}
-	setWindowTitle(QString(windowTitle()) + ": " + displayedSourceCodeFile);
+	setWindowTitle("turbo: " + displayedSourceCodeFile);
 	ui->plainTextEditSourceView->blockSignals(false);
 	sourceFileWatcher.removePaths(sourceFileWatcher.files());
 	qDebug() << "Watching file: " << fi.absoluteFilePath();
 	sourceFileWatcher.addPath(fi.absoluteFilePath());
+	/* Update navigation buttons. */
+	ui->pushButtonNavigateBack->setEnabled(navigationStack.canNavigateBack());
+	ui->pushButtonNavigateForward->setEnabled(navigationStack.canNavigateForward());
 }
 
 class xbtn : public QPushButton
@@ -3039,10 +3070,10 @@ void MainWindow::on_pushButtonXmlTest_clicked()
 
 void MainWindow::displayHelp()
 {
-	QFile f(":/resources/init.txt");
-	f.open(QFile::ReadOnly);
-	navigationStack.push(SourceCodeLocation(f.fileName()));
-	ui->plainTextEditSourceView->setPlainText(f.readAll());
+	displaySourceCodeFile(SourceCodeLocation(internalHelpFileName));
+	QString plainText = ui->plainTextEditSourceView->toPlainText();
+	ui->plainTextEditSourceView->clear();
+	ui->plainTextEditSourceView->setPlainText(plainText);
 }
 
 void MainWindow::on_pushButtonSendScratchpadToGdb_clicked()

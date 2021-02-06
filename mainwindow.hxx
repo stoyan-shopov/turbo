@@ -680,6 +680,8 @@ private:
 
 	std::shared_ptr<QSettings> settings;
 
+	const QString internalHelpFileName = ":/resources/init.txt";
+
 	Ui::DialogSettings settingsUi;
 	QDialog * dialogEditSettings;
 
@@ -749,20 +751,28 @@ private:
 	{
 	private:
 		std::vector<SourceCodeLocation> locations;
+		int index = -1;
 	public:
-		int size(void) const { return locations.size(); }
-		const SourceCodeLocation & back(void) const { return locations.back(); }
-		void drop() { if (locations.size()) locations.pop_back(); }
-		void dump(void) {
-			qDebug() << "navigation stack dump:";
+		bool canNavigateBack(void) const { return index > 0; }
+		bool canNavigateForward(void) const { return index < locations.size() - 1; }
+		const SourceCodeLocation & previous(void) { return locations.at(-- index); }
+		const SourceCodeLocation & following(void) { return locations.at(++ index); }
+		const SourceCodeLocation & current(void) { return locations.at(index); }
+		void dump(void) const {
+			qDebug() << "navigation stack dump, index" << index << "size" << locations.size();
 			for (const auto & l : locations)
 				qDebug() << l.fullFileName << l.lineNumber;
 			qDebug() << "------------- navigation stack dump end";
 		}
 		void push(const struct SourceCodeLocation & location)
 		{
-			if (locations.size() == 0 || locations.back() != location)
+			locations.erase(locations.begin() + index + 1, locations.end());
+			index = locations.size() - 1;
+			if (locations.size() == 0 || locations.at(index) != location)
+			{
 				locations.push_back(location);
+				index ++;
+			}
 		}
 	}
 	navigationStack;
@@ -1055,10 +1065,9 @@ private:
 	void highlightBreakpointedLines(void);
 	void highlightBookmarks(void);
 	void refreshSourceCodeView(void);
-	void displaySourceCodeFile(const SourceCodeLocation & sourceCodeLocation, bool saveCurrentLocationToNavigationStack = true);
+	void displaySourceCodeFile(const SourceCodeLocation & sourceCodeLocation, bool saveCurrentLocationToNavigationStack = true, bool saveNewLocationToNavigationStack = false);
 	void parseGdbCreateVarObjectResponse(const QString & variableExpression, const QString response, struct GdbVarObjectTreeItem & node);
 	void navigateToSymbolAtCursor(void);
-	void navigateBack(void);
 	QString escapeString(const QString & s) { QString t = s; return t.replace('\\', "\\\\").replace('\"', "\\\""); }
 	void sourceItemContextMenuRequested(const QTreeWidget * treeWidget, QPoint p);
 

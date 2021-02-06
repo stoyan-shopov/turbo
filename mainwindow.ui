@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1346</width>
+    <width>1513</width>
     <height>708</height>
    </rect>
   </property>
@@ -381,6 +381,21 @@ back</string>
              </property>
             </widget>
            </item>
+           <item>
+            <widget class="QPushButton" name="pushButtonNavigateForward">
+             <property name="text">
+              <string>Navigate
+forward</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="pushButtonTrigger">
+             <property name="text">
+              <string>Trigger</string>
+             </property>
+            </widget>
+           </item>
           </layout>
          </item>
          <item>
@@ -548,7 +563,7 @@ back</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1346</width>
+     <width>1513</width>
      <height>21</height>
     </rect>
    </property>
