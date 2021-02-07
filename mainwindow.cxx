@@ -1863,7 +1863,7 @@ bool MainWindow::handleVerifyTargetMemoryContentsSeqPoint(GdbMiParser::RESULT_CL
 						      "%1\n\nwhen verifying target memory contents").arg(f));
 			break;
 		}
-		if (tf.readAll() != QByteArray(elfReader->segments[i]->get_data(), elfReader->segments[i]->get_file_size()));
+		if (tf.readAll() != QByteArray(elfReader->segments[i]->get_data(), elfReader->segments[i]->get_file_size()))
 		{
 			match = false;
 			QMessageBox::critical(0, "Target memory contents mismatch",
@@ -1871,6 +1871,7 @@ bool MainWindow::handleVerifyTargetMemoryContentsSeqPoint(GdbMiParser::RESULT_CL
 						      "%1").arg(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, "???").toString()));
 			break;
 		}
+		i ++;
 	}
 	for (const auto & f : targetMemorySectionsTempFileNames)
 	{
