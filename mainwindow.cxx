@@ -54,6 +54,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	/*****************************************
 	 * Settings.
 	 *****************************************/
+	loadSessions();
 	dialogEditSettings = new QDialog(this);
 	settingsUi.setupUi(dialogEditSettings);
 	connect(ui->pushButtonSettings, & QPushButton::clicked, [&](){
@@ -472,17 +473,6 @@ reopen_last_file:
 					    targetFilesBaseDirectory + "registers.bin");
 	////gdbserver = new GdbServer(targetCorefile);
 
-	/* Load bookmarks. */
-	QStringList bookmarkStrings = settings->value(SETTINGS_BOOKMARKS, QStringList()).toStringList();
-	for (const auto & bookmark : bookmarkStrings)
-	{
-		QStringList bookmarkData = bookmark.split('\n');
-		if (bookmarkData.size() != 2)
-			continue;
-		bookmarks << SourceCodeLocation(bookmarkData.at(0), bookmarkData.at(1).toInt());
-	}
-	updateBookmarksView();
-
 	QStringList traceLog = settings->value(SETTINGS_TRACE_LOG, QStringList()).toStringList();
 	for (const auto & l : traceLog)
 	{
@@ -650,6 +640,63 @@ reopen_last_file:
 	connect(ui->lineEditGdbCommand2, & QLineEdit::returnPressed, [&] { sendCommandsToGdb(ui->lineEditGdbCommand2); });
 }
 
+void MainWindow::loadSessions()
+{
+	QList<QVariant> v = settings->value(SETTINGS_SAVED_SESSIONS, QList<QVariant>()).toList();
+	for (const auto & s : v)
+		sessions << SessionState::fromQVariant(s);
+}
+
+void MainWindow::restoreSession(const QString &executableFileName)
+{
+	for (const auto & session : sessions)
+	{
+		if (session.executableFileName != executableFileName)
+			continue;
+		/* Load bookmarks. */
+		for (const auto & bookmark : session.bookmarks)
+		{
+			QStringList bookmarkData = bookmark.split('\n');
+			if (bookmarkData.size() != 2)
+				continue;
+			bookmarks << SourceCodeLocation(bookmarkData.at(0), bookmarkData.at(1).toInt());
+		}
+		updateBookmarksView();
+		/* Attempt to restore breakpoints. */
+		for (const auto & b : session.breakpoints)
+			if (!b.isEmpty())
+				sendDataToGdbProcess(QString("b %1\n").arg(b));
+
+		break;
+	}
+	isSessionRestored = true;
+}
+
+void MainWindow::saveSessions()
+{
+	if (!isSessionRestored)
+		/* Only update the list of sessions if a session has been previoulsly restored. Otherwise, sessions may get wiped out. */
+		return;
+	/* Maintain the list of sessions in a least-recently-used order. */
+	struct SessionState s;
+	s.executableFileName = settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString();
+	int i;
+	for (i = 0; i < ui->treeWidgetBreakpoints->topLevelItemCount(); i ++)
+		s.breakpoints << ui->treeWidgetBreakpoints->topLevelItem(i)->text(5);
+	for (const auto & bookmark : bookmarks)
+		s.bookmarks << QString("%1\n%2").arg(bookmark.fullFileName).arg(bookmark.lineNumber);
+	/* Override the session information for the currently loaded executable file, if it exists in the list of saved sessions. */
+	sessions.removeAll(s);
+	sessions.prepend(s);
+	/* Trim the oldest sessions in the list, if too many sessions are already in the session list. */
+	while (sessions.length() > MAX_KEPT_SESSIONS)
+		sessions.removeLast();
+	QList<QVariant> v;
+	for (const auto & s : sessions)
+		v << s.toVariant();
+	settings->setValue(SETTINGS_SAVED_SESSIONS, v);
+}
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
 	if (navigatorModeActivated)
@@ -658,6 +705,9 @@ void MainWindow::closeEvent(QCloseEvent *event)
 		/*! \todo	This should not be needed, remove it after checking. */
 		return;
 	}
+
+	saveSessions();
+
 	settings->setValue(SETTINGS_MAINWINDOW_STATE, saveState());
 	settings->setValue(SETTINGS_MAINWINDOW_GEOMETRY, saveGeometry());
 	settings->setValue(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_STATE, ui->checkBoxShowFullFileNames->isChecked());
@@ -665,17 +715,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	settings->setValue(SETTINGS_CHECKBOX_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE, ui->checkBoxShowOnlySourcesWithMachineCode->isChecked());
 	settings->setValue(SETTINGS_CHECKBOX_SHOW_ONLY_EXISTING_SOURCE_FILES, ui->checkBoxShowOnlyExistingSourceFiles->isChecked());
 	settings->setValue(SETTINGS_SCRATCHPAD_TEXT_CONTENTS, ui->plainTextEditScratchpad->document()->toPlainText());
-
-	/* Save bookmarks. */
-	QStringList bookmarkStrings;
-	for (const auto & bookmark : bookmarks)
-		bookmarkStrings << QString("%1\n%2").arg(bookmark.fullFileName).arg(bookmark.lineNumber);
-	settings->setValue(SETTINGS_BOOKMARKS, bookmarkStrings);
-	/* Save breakpoints. This is evil... */
-	QStringList breakpointList;
-	for (int i = 0; i < ui->treeWidgetBreakpoints->topLevelItemCount(); i ++)
-		breakpointList << ui->treeWidgetBreakpoints->topLevelItem(i)->text(5);
-	settings->setValue(SETTINGS_BREAKPOINT_LIST, breakpointList.join(SETTINGS_BREAKPOINT_LIST_SEPARATOR));
 
 	settings->setValue(SETTINGS_SPLITTER_VERTICAL_SOURCE_VIEW_STATE, ui->splitterVerticalSourceView->saveState());
 	settings->setValue(SETTINGS_SPLITTER_HORIZONTAL_GDB_CONSOLES_STATE, ui->splitterHorizontalGdbConsoles->saveState());
@@ -1371,10 +1410,11 @@ bool MainWindow::handleFileExecAndSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM
 		return true;
 	}
 
-	settings->setValue(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, loadedExecutableFileName = context.s);
+	settings->setValue(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, context.s);
 	elfReader = std::make_shared<elfio>();
-	if (!elfReader->load(loadedExecutableFileName.toStdString()))
+	if (!elfReader->load(context.s.toStdString()))
 		elfReader.reset();
+	restoreSession(context.s);
 	sendDataToGdbProcess("-file-list-exec-source-files\n");
 	return true;
 }
@@ -1782,12 +1822,6 @@ bool MainWindow::handleSequencePoints(GdbMiParser::RESULT_CLASS_ENUM parseResult
 	case GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_SOURCE_CODE_ADDRESSES_RETRIEVED:
 		updateSourceListView();
 		updateSymbolViews();
-		QStringList breakpointList = settings->value(SETTINGS_BREAKPOINT_LIST, QString("")).toString().split(SETTINGS_BREAKPOINT_LIST_SEPARATOR);
-		qDebug() << "saved breakpoint count:" << breakpointList.count() << breakpointList;
-		for (const auto & b : breakpointList)
-			if (!b.isEmpty())
-				sendDataToGdbProcess(QString("b %1\n").arg(b));
-
 		break;
 	}
 	if (response_handled)

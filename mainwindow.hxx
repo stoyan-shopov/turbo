@@ -649,6 +649,9 @@ private:
 	const int MAX_LINE_LENGTH_IN_GDB_LOG_LIMITING_MODE = 1 * 1024;
 	const int MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE = 1 * 1024;
 
+	/* This is the number of maximum kept sessions, saved in the frontend settings file. */
+	const int MAX_KEPT_SESSIONS	= 10;
+
 	/* Settings-related data. */
 	const QString SETTINGS_FILE_NAME					= "turbo.rc";
 
@@ -668,17 +671,50 @@ private:
 
 	const QString SETTINGS_SCRATCHPAD_TEXT_CONTENTS				= "scratchpad-text-contents";
 
-	const QString SETTINGS_BOOKMARKS					= "bookmarks";
-	const QString SETTINGS_BREAKPOINT_LIST					= "breakpoint-list";
-	const QString SETTINGS_BREAKPOINT_LIST_SEPARATOR			= "<>";
-
 	const QString SETTINGS_TRACE_LOG					= "trace-log";
 	const QString SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE	= "checkbox-show-full-file-name-in-trace-log-state";
 
 	const QString SETTINGS_LAST_LOADED_EXECUTABLE_FILE			= "last-loaded-executable-file";
 	const QString SETTINGS_GDB_EXECUTABLE_FILENAME				= "gdb-executable-filename";
 
+	const QString SETTINGS_SAVED_SESSIONS					= "saved-sessions";
+
 	std::shared_ptr<QSettings> settings;
+
+	struct SessionState
+	{
+		QString		executableFileName;
+		QStringList	breakpoints;
+		QStringList	bookmarks;
+		static SessionState fromQVariant(const QVariant & v)
+		{
+			struct SessionState s;
+			QList<QVariant> l = v.toList();
+			if (l.size() > 0)
+				s.executableFileName = l.at(0).toString();
+			if (l.size() > 1)
+				s.breakpoints = l.at(1).toStringList();
+			if (l.size() > 2)
+				s.bookmarks = l.at(2).toStringList();
+			return s;
+		}
+		QVariant toVariant(void) const
+		{
+			QList<QVariant> v;
+			v << executableFileName;
+			v << breakpoints;
+			v << bookmarks;
+			return v;
+		}
+		const bool operator ==(const struct SessionState & rhs) const { return executableFileName == rhs.executableFileName; }
+	};
+	QList<struct SessionState> sessions;
+	/* This flag is used to know if a session has been restored, and only later save this session if it has been previously restored.
+	 * Otherwise, sessions may get wiped out. */
+	bool isSessionRestored = false;
+	void loadSessions(void);
+	void restoreSession(const QString & executableFileName);
+	void saveSessions(void);
 
 	const QString internalHelpFileName = ":/resources/init.txt";
 
@@ -1048,7 +1084,6 @@ private:
 		}
 	}
 	targetStateDependentWidgets;
-	QString loadedExecutableFileName;
 
 	std::shared_ptr<ELFIO::elfio> elfReader;
 	/* This list contains the set of temporary file names used when verifying target memory area
