@@ -158,6 +158,7 @@ private slots:
 	{
 		if (error != QSerialPort::NoError)
 		{
+			QMessageBox::critical(0, "Blackmagic serial port error", QString("Blackmagic serial port error:\n%1").arg(bmport.errorString()));
 			qDebug() << "blackmagic probe error occurred, error code:" << error;
 			shutdown();
 		}
@@ -755,8 +756,6 @@ private slots:
 
 	void on_pushButtonDeleteAllBookmarks_clicked();
 
-	void on_pushButtonConnectToBlackmagic_clicked();
-
 	void on_pushButtonDisconnectGdbServer_clicked();
 
 	void on_lineEditFindText_returnPressed();
@@ -1248,7 +1247,7 @@ private slots:
 
 	void on_pushButtonConnectGdbToGdbServer_clicked();
 
-	void on_pushButtonVerifyTargetMemory_clicked();
+	void compareTargetMemory();
 
 	void gdbStarted(void);
 

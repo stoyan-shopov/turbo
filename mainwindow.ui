@@ -163,6 +163,13 @@
              <number>0</number>
             </property>
             <item>
+             <widget class="QPushButton" name="pushButtonVerifyTargetMemory">
+              <property name="text">
+               <string>Verify flash</string>
+              </property>
+             </widget>
+            </item>
+            <item>
              <widget class="QPushButton" name="pushButtonLoadProgramToTarget">
               <property name="text">
                <string>Load program
@@ -1006,13 +1013,6 @@ forward</string>
              <widget class="QPushButton" name="pushButtonScanForTargets">
               <property name="text">
                <string>Scan</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="pushButtonVerifyTargetMemory">
-              <property name="text">
-               <string>Verify flash</string>
               </property>
              </widget>
             </item>

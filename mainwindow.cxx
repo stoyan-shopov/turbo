@@ -51,6 +51,8 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->pushButtonNavigateForward, & QPushButton::clicked, [&] { if (navigationStack.canNavigateForward()) displaySourceCodeFile(navigationStack.following(), false); });
 	connect(ui->pushButtonNavigateBack, & QPushButton::clicked, [&] { if (navigationStack.canNavigateBack()) displaySourceCodeFile(navigationStack.previous(), false); });
 
+	connect(ui->pushButtonVerifyTargetMemory, & QPushButton::clicked, [&] { compareTargetMemory(); });
+
 	/*****************************************
 	 * Settings.
 	 *****************************************/
@@ -512,9 +514,11 @@ reopen_last_file:
 			ui->pushButtonConnectToBlackmagic->setText(tr("Connect to blackmagic"));
 			ui->groupBoxBlackMagicDisconnectedWidgets->setEnabled(true);
 			ui->groupBoxBlackMagicConnectedWidgets->setEnabled(false);
-			sendDataToGdbProcess("-target-disconnect\n");
+			if (target_state != GDBSERVER_DISCONNECTED)
+				sendDataToGdbProcess("-target-disconnect\n");
 			});
 	ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: yellow");
+	connect(ui->pushButtonConnectToBlackmagic, & QPushButton::clicked, [&] { blackMagicProbeServer.connectToProbe(); });
 
 	connect(ui->pushButtonDisplayHelp, SIGNAL(clicked(bool)), this, SLOT(displayHelp()));
 	displayHelp();
@@ -537,6 +541,8 @@ reopen_last_file:
 	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->groupBoxTargetHalted << ui->groupBoxTargetConnected;
 	targetStateDependentWidgets.disabledWidgetsWhenTargetStopped << ui->groupBoxTargetRunning;
 	connect(this, &MainWindow::targetStopped, [&] {
+		if (target_state == GDBSERVER_DISCONNECTED || target_state == TARGET_DETACHED)
+			compareTargetMemory();
 		targetStateDependentWidgets.enterTargetState(target_state = TARGET_STOPPED);
 		/*! \todo Make the frame limits configurable. */
 		sendDataToGdbProcess("-stack-list-frames 0 100\n");
@@ -1861,8 +1867,8 @@ bool MainWindow::handleVerifyTargetMemoryContentsSeqPoint(GdbMiParser::RESULT_CL
 		{
 			match = false;
 			QMessageBox::critical(0, "Target memory contents mismatch",
-					      QString("The target memory contents are different from the memory contents of file\n\n"
-						      "%1").arg("xxx"));
+					      QString("The target memory contents are different from the memory contents of file:\n\n"
+						      "%1").arg(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, "???").toString()));
 			break;
 		}
 	}
@@ -2900,11 +2906,6 @@ void MainWindow::on_pushButtonDeleteAllBookmarks_clicked()
 	refreshSourceCodeView();
 }
 
-void MainWindow::on_pushButtonConnectToBlackmagic_clicked()
-{
-	blackMagicProbeServer.connectToProbe();
-}
-
 void MainWindow::on_pushButtonDisconnectGdbServer_clicked()
 {
 	blackMagicProbeServer.closeConnections();
@@ -3128,7 +3129,7 @@ void MainWindow::on_pushButtonConnectGdbToGdbServer_clicked()
 	sendDataToGdbProcess("-target-select extended-remote :1122\n");
 }
 
-void MainWindow::on_pushButtonVerifyTargetMemory_clicked()
+void MainWindow::compareTargetMemory()
 {
 	targetMemorySectionsTempFileNames.clear();
 	if (!elfReader)
