@@ -75,6 +75,19 @@
     <string>Select file</string>
    </property>
   </widget>
+  <widget class="QCheckBox" name="checkBoxenableNativeDebugging">
+   <property name="geometry">
+    <rect>
+     <x>50</x>
+     <y>100</y>
+     <width>121</width>
+     <height>17</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Native debugging</string>
+   </property>
+  </widget>
  </widget>
  <resources/>
  <connections/>

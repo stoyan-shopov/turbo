@@ -52,6 +52,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->pushButtonNavigateBack, & QPushButton::clicked, [&] { if (navigationStack.canNavigateBack()) displaySourceCodeFile(navigationStack.previous(), false); });
 
 	connect(ui->pushButtonVerifyTargetMemory, & QPushButton::clicked, [&] { compareTargetMemory(); });
+	connect(ui->pushButtonRequestGdbHalt, & QPushButton::clicked, [&]{ requestTargetHalt(); });
 
 	/*****************************************
 	 * Settings.
@@ -61,6 +62,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	settingsUi.setupUi(dialogEditSettings);
 	connect(ui->pushButtonSettings, & QPushButton::clicked, [&](){
 		settingsUi.lineEditGdbExecutable->setText(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString());
+		settingsUi.checkBoxenableNativeDebugging->setChecked(settings->value(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, false).toBool());
 		dialogEditSettings->open();
 	});
 	connect(settingsUi.pushButtonSelectGdbExecutableFile, & QPushButton::clicked, [&](){
@@ -70,6 +72,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	});
 	connect(settingsUi.pushButtonSettingsOk, & QPushButton::clicked, [&](){
 		settings->setValue(SETTINGS_GDB_EXECUTABLE_FILENAME, settingsUi.lineEditGdbExecutable->text());
+		settings->setValue(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, settingsUi.checkBoxenableNativeDebugging->isChecked());
 		dialogEditSettings->hide();
 	});
 	connect(settingsUi.pushButtonSettingsCancel, & QPushButton::clicked, [&](){ dialogEditSettings->hide(); });
@@ -558,7 +561,7 @@ reopen_last_file:
 	} );
 
 
-	targetStateDependentWidgets.enabledWidgetsWhenTargetRunning << ui->groupBoxTargetRunning;
+	targetStateDependentWidgets.enabledWidgetsWhenTargetRunning << ui->groupBoxTargetRunning << ui->groupBoxTargetConnected;
 	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->groupBoxTargetHalted;
 	connect(this, &MainWindow::targetRunning, [&] {
 		targetStateDependentWidgets.enterTargetState(target_state = TARGET_RUNNING);
@@ -900,27 +903,10 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 			if (target_state == TARGET_STOPPED)
 				sendDataToGdbProcess("c\n");
 			else if (e->modifiers() == Qt::ControlModifier)
-				blackMagicProbeServer.sendRawGdbPacket("\x3");
+				requestTargetHalt();
 			result = true;
 			break;
 		case Qt::Key_Space:
-#if 0
-		{
-	QPixmap * pixmap = new QPixmap(ui->treeWidgetSubprograms->viewport()->size());
-	QPainter painter(pixmap);
-	painter.fillRect(0, 0, pixmap->width(), pixmap->height(), QBrush(Qt::yellow));
-	painter.drawLine(0, 0, pixmap->width(), pixmap->height());
-	painter.drawText(pixmap->rect(), Qt::AlignCenter, "Subprograms");
-	QPalette p(Qt::yellow);
-	//p.setBrush(QPalette::Window, QBrush(Qt::cyan));
-	p.setBrush(QPalette::Window, QBrush(* pixmap));
-	//ui->treeWidgetSubprograms->setPalette(p);
-	//ui->treeWidgetSubprograms->setBackgroundRole(QPalette::Window);
-	ui->treeWidgetSubprograms->viewport()->setPalette(p);
-	ui->treeWidgetSubprograms->viewport()->setBackgroundRole(QPalette::Window);
-	ui->treeWidgetSubprograms->viewport()->setAutoFillBackground(true);
-		}
-#endif
 			/* Toggle breakpoint at current source code line number, if a source code line number is active.
 			 * If there is no breakpoint on the current source code line - insert a breakpoint.
 			 * If there are breakpoints on the current source code line - remove them. */
@@ -2926,19 +2912,22 @@ void MainWindow::on_lineEditFindText_returnPressed()
 #include <wincon.h>
 #include <debugapi.h>
 #endif
-void MainWindow::on_pushButtonRequestGdbHalt_clicked()
+void MainWindow::requestTargetHalt(void)
 {
 	blackMagicProbeServer.sendRawGdbPacket("\x3");
-#ifdef Q_OS_WINDOWS
-	if (debugProcessId != -1)
+	if (settings->value(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, false).toBool())
 	{
-		HANDLE process = OpenProcess(PROCESS_ALL_ACCESS, FALSE, debugProcessId);
-		if (!DebugBreakProcess(process))
-			QMessageBox::critical(0, "Error interrupting the debugged process",
-					      "Failed to interrupt the process that is debugged");
-		CloseHandle(process);
-	}
+#ifdef Q_OS_WINDOWS
+		if (debugProcessId != -1)
+		{
+			HANDLE process = OpenProcess(PROCESS_ALL_ACCESS, FALSE, debugProcessId);
+			if (!DebugBreakProcess(process))
+				QMessageBox::critical(0, "Error interrupting the debugged process",
+						      "Failed to interrupt the process that is debugged");
+			CloseHandle(process);
+		}
 #endif
+	}
 }
 
 void MainWindow::on_pushButtonDumpVarObjects_clicked()

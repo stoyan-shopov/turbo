@@ -669,6 +669,7 @@ private:
 	const QString SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_STATE		= "checkbox-show-full-file-name-state";
 	const QString SETTINGS_CHECKBOX_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE		= "checkbox-show-only-sources-with-machine-code-state";
 	const QString SETTINGS_CHECKBOX_SHOW_ONLY_EXISTING_SOURCE_FILES		= "checkbox-show-only-existing-source-files";
+	const QString SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE		= "checkbox-enable-native-debugging";
 
 	const QString SETTINGS_SCRATCHPAD_TEXT_CONTENTS				= "scratchpad-text-contents";
 
@@ -760,7 +761,7 @@ private slots:
 
 	void on_lineEditFindText_returnPressed();
 
-	void on_pushButtonRequestGdbHalt_clicked();
+	void requestTargetHalt(void);
 
 	void on_pushButtonDumpVarObjects_clicked();
 
@@ -1051,6 +1052,7 @@ private:
 
 		void enterTargetState(enum TARGET_STATE target_state)
 		{
+			qDebug() << "Entering new target state:" << target_state;
 			switch (target_state)
 			{
 			default:
@@ -1060,13 +1062,13 @@ private:
 					w->setEnabled(false);
 				for (const auto & w : enabledWidgetsWhenTargetDetached)
 					w->setEnabled(true);
-				break;
+				return;
 			case GDBSERVER_DISCONNECTED:
 				for (const auto & w : disabledWidgetsWhenGdbServerDisconnected)
 					w->setEnabled(false);
 				for (const auto & w : enabledWidgetsWhenGdbServerDisconnected)
 					w->setEnabled(true);
-				break;
+				return;
 			case TARGET_RUNNING:
 				for (const auto & w : disabledWidgetsWhenTargetRunning)
 					w->setEnabled(false);
