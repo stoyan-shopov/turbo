@@ -72,7 +72,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Select file</string>
+    <string>Select File</string>
    </property>
   </widget>
   <widget class="QCheckBox" name="checkBoxenableNativeDebugging">
@@ -86,6 +86,42 @@
    </property>
    <property name="text">
     <string>Native debugging</string>
+   </property>
+  </widget>
+  <widget class="QLineEdit" name="lineEditTargetSVDFileName">
+   <property name="geometry">
+    <rect>
+     <x>170</x>
+     <y>160</y>
+     <width>113</width>
+     <height>20</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_2">
+   <property name="geometry">
+    <rect>
+     <x>60</x>
+     <y>170</y>
+     <width>47</width>
+     <height>13</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>SVD file</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="pushButtonSelectTargetSVDFile">
+   <property name="geometry">
+    <rect>
+     <x>300</x>
+     <y>160</y>
+     <width>75</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Select File</string>
    </property>
   </widget>
  </widget>

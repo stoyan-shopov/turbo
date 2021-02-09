@@ -682,10 +682,12 @@ private:
 	const QString SETTINGS_SAVED_SESSIONS					= "saved-sessions";
 
 	std::shared_ptr<QSettings> settings;
+	QString targetSVDFileName;
 
 	struct SessionState
 	{
 		QString		executableFileName;
+		QString		targetSVDFileName;
 		QStringList	breakpoints;
 		QStringList	bookmarks;
 		static SessionState fromQVariant(const QVariant & v)
@@ -695,15 +697,18 @@ private:
 			if (l.size() > 0)
 				s.executableFileName = l.at(0).toString();
 			if (l.size() > 1)
-				s.breakpoints = l.at(1).toStringList();
+				s.targetSVDFileName = l.at(1).toString();
 			if (l.size() > 2)
-				s.bookmarks = l.at(2).toStringList();
+				s.breakpoints = l.at(2).toStringList();
+			if (l.size() > 3)
+				s.bookmarks = l.at(3).toStringList();
 			return s;
 		}
 		QVariant toVariant(void) const
 		{
 			QList<QVariant> v;
 			v << executableFileName;
+			v << targetSVDFileName;
 			v << breakpoints;
 			v << bookmarks;
 			return v;
@@ -769,7 +774,7 @@ private slots:
 
 	void on_comboBoxSelectLayout_activated(int index);
 
-	void on_pushButtonXmlTest_clicked();
+	void loadSVDFile(void);
 
 private:
 	struct SourceCodeLocation

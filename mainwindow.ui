@@ -83,13 +83,6 @@
        </layout>
       </item>
       <item>
-       <widget class="QPushButton" name="pushButtonXmlTest">
-        <property name="text">
-         <string>xml test</string>
-        </property>
-       </widget>
-      </item>
-      <item>
        <widget class="QGroupBox" name="groupBoxTargetConnected">
         <property name="title">
          <string>GroupBox - target connected</string>
@@ -1253,6 +1246,24 @@ forward</string>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_16">
     <layout class="QVBoxLayout" name="verticalLayout_21">
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_6">
+       <item>
+        <widget class="QLabel" name="label_6">
+         <property name="text">
+          <string>Lorem ipsum</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="pushButtonLoadSVDFile">
+         <property name="text">
+          <string>Load SVD File</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
      <item>
       <widget class="QTreeWidget" name="treeWidgetSvd">
        <attribute name="headerStretchLastSection">

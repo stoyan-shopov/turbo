@@ -53,6 +53,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
 	connect(ui->pushButtonVerifyTargetMemory, & QPushButton::clicked, [&] { compareTargetMemory(); });
 	connect(ui->pushButtonRequestGdbHalt, & QPushButton::clicked, [&]{ requestTargetHalt(); });
+	connect(ui->pushButtonLoadSVDFile, & QPushButton::clicked, [&]{ loadSVDFile(); });
 
 	/*****************************************
 	 * Settings.
@@ -62,6 +63,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	settingsUi.setupUi(dialogEditSettings);
 	connect(ui->pushButtonSettings, & QPushButton::clicked, [&](){
 		settingsUi.lineEditGdbExecutable->setText(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString());
+		settingsUi.lineEditTargetSVDFileName->setText(targetSVDFileName);
 		settingsUi.checkBoxenableNativeDebugging->setChecked(settings->value(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, false).toBool());
 		dialogEditSettings->open();
 	});
@@ -70,8 +72,14 @@ MainWindow::MainWindow(QWidget *parent) :
 		if (!s.isEmpty())
 			settingsUi.lineEditGdbExecutable->setText(s);
 	});
+	connect(settingsUi.pushButtonSelectTargetSVDFile, & QPushButton::clicked, [&](){
+		QString s = QFileDialog::getOpenFileName(0, "Select target SVD file", QFileInfo(settingsUi.lineEditTargetSVDFileName->text()).absoluteFilePath());
+		if (!s.isEmpty())
+			settingsUi.lineEditTargetSVDFileName->setText(s);
+	});
 	connect(settingsUi.pushButtonSettingsOk, & QPushButton::clicked, [&](){
 		settings->setValue(SETTINGS_GDB_EXECUTABLE_FILENAME, settingsUi.lineEditGdbExecutable->text());
+		targetSVDFileName = settingsUi.lineEditTargetSVDFileName->text();
 		settings->setValue(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, settingsUi.checkBoxenableNativeDebugging->isChecked());
 		dialogEditSettings->hide();
 	});
@@ -662,6 +670,7 @@ void MainWindow::restoreSession(const QString &executableFileName)
 	{
 		if (session.executableFileName != executableFileName)
 			continue;
+		targetSVDFileName = session.targetSVDFileName;
 		/* Load bookmarks. */
 		for (const auto & bookmark : session.bookmarks)
 		{
@@ -689,6 +698,7 @@ void MainWindow::saveSessions()
 	/* Maintain the list of sessions in a least-recently-used order. */
 	struct SessionState s;
 	s.executableFileName = settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString();
+	s.targetSVDFileName = targetSVDFileName;
 	int i;
 	for (i = 0; i < ui->treeWidgetBreakpoints->topLevelItemCount(); i ++)
 		s.breakpoints << ui->treeWidgetBreakpoints->topLevelItem(i)->text(5);
@@ -3007,11 +3017,15 @@ void MainWindow::on_comboBoxSelectLayout_activated(int index)
 	ui->comboBoxSelectLayout->setCurrentIndex(0);
 }
 
-void MainWindow::on_pushButtonXmlTest_clicked()
+void MainWindow::loadSVDFile(void)
 {
+	if (!QFileInfo(targetSVDFileName).exists())
+	{
+		QMessageBox::critical(0, "Target SVD file not found", "No valid SVD file specified.\nYou can specify the target SVD file in the settings.");
+		ui->pushButtonSettings->click();
+		return;
+	}
 	svdParser.parse("C:/src1/cmsis-svd/data/Atmel/ATSAMD21E15L.svd");
-	//svdParser.parse("C:/src1/cmsis-svd/data/Atmel/ATSAM3N2A.svd");
-	//svdParser.parse("C:/src1/cmsis-svd/data/Spansion/MB9AFA4xM.svd");
 	ui->treeWidgetSvd->clear();
 
 	/* Note: if the device tree node is not added to the tree widget here, but at a later time instead, the
