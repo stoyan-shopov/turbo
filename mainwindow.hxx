@@ -740,7 +740,8 @@ private slots:
 	void gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
 	void sendDataToGdbProcess(const QString &data);
 	void readGdbVarObjectChildren(const QString varObjectName);
-	void showSourceCode(const QTreeWidgetItem * item);
+	/* Returns true, if the source code file was successfully displayed, false otherwise. */
+	bool showSourceCode(const QTreeWidgetItem * item);
 	void breakpointsContextMenuRequested(QPoint p);
 	void svdContextMenuRequested(QPoint p);
 	void bookmarksContextMenuRequested(QPoint p);
@@ -1057,7 +1058,6 @@ private:
 
 		void enterTargetState(enum TARGET_STATE target_state)
 		{
-			qDebug() << "Entering new target state:" << target_state;
 			switch (target_state)
 			{
 			default:
@@ -1106,13 +1106,13 @@ private:
 	void highlightBreakpointedLines(void);
 	void highlightBookmarks(void);
 	void refreshSourceCodeView(void);
-	void displaySourceCodeFile(const SourceCodeLocation & sourceCodeLocation, bool saveCurrentLocationToNavigationStack = true, bool saveNewLocationToNavigationStack = false);
+	/* Returns true, if the source code file was successfully displayed, false otherwise. */
+	bool displaySourceCodeFile(const SourceCodeLocation & sourceCodeLocation, bool saveCurrentLocationToNavigationStack = true, bool saveNewLocationToNavigationStack = false);
 	void parseGdbCreateVarObjectResponse(const QString & variableExpression, const QString response, struct GdbVarObjectTreeItem & node);
 	void navigateToSymbolAtCursor(void);
 	QString escapeString(const QString & s) { QString t = s; return t.replace('\\', "\\\\").replace('\"', "\\\""); }
 	void sourceItemContextMenuRequested(const QTreeWidget * treeWidget, QPoint p);
 
-	/* Returns true, if the source view was refreshed, false otherwise. */
 	void searchCurrentSourceText(const QString &pattern);
 	void moveCursorToNextMatch(void);
 	void moveCursorToPreviousMatch(void);

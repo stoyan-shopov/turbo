@@ -1765,7 +1765,13 @@ bool MainWindow::handleFrameResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 			ui->treeWidgetBacktrace->blockSignals(true);
 			ui->treeWidgetBacktrace->setItemSelected(frameItem, true);
 			ui->treeWidgetBacktrace->blockSignals(false);
-			showSourceCode(frameItem);
+			if (!showSourceCode(frameItem))
+			{
+				ui->plainTextEditSourceView->clear();
+				ui->plainTextEditSourceView->setPlainText(QString("Cannot show source code file containing function '%1()' at address 0x%2")
+									  .arg(frameItem->text(1))
+									  .arg(frameItem->text(4)));
+			}
 			emit targetCallStackFrameChanged();
 		}
 	}
@@ -2013,24 +2019,19 @@ void MainWindow::readGdbVarObjectChildren(const QString varObjectName)
 	sendDataToGdbProcess((QString("%1-var-list-children --all-values ").arg(n) + varObjectName + "\n"));
 }
 
-void MainWindow::showSourceCode(const QTreeWidgetItem *item)
+bool MainWindow::showSourceCode(const QTreeWidgetItem *item)
 {
-	/* If the source code location details seem to be not set for this tree widget item
-	 * do not attempt to navigate to a source code location */
-
 	QVariant v = item->data(0, SourceFileData::FILE_NAME);
 	bool ok;
 	if (v.type() != QMetaType::QString)
-		return;
+		return false;
 	QString sourceFileName = item->data(0, SourceFileData::FILE_NAME).toString();
 	int lineNumber = item->data(0, SourceFileData::LINE_NUMBER).toInt(& ok);
 	if (!ok)
-		return;
+		return false;
 	if (lineNumber == 0)
 		lineNumber = 1;
-	if (lineNumber == -1 || sourceFileName.isEmpty())
-		return;
-	displaySourceCodeFile(SourceCodeLocation(sourceFileName, lineNumber), true, true);
+	return displaySourceCodeFile(SourceCodeLocation(sourceFileName, lineNumber), true, true);
 }
 
 void MainWindow::breakpointsContextMenuRequested(QPoint p)
@@ -2577,15 +2578,18 @@ void MainWindow::flashHighlightDockWidget(QDockWidget *w)
 	widgetFlashHighlighterData.timer.start(widgetFlashHighlighterData.flashIntervalMs);
 }
 
-void MainWindow::displaySourceCodeFile(const SourceCodeLocation &sourceCodeLocation, bool saveCurrentLocationToNavigationStack,
+bool MainWindow::displaySourceCodeFile(const SourceCodeLocation &sourceCodeLocation, bool saveCurrentLocationToNavigationStack,
 				       bool saveNewLocationToNavigationStack)
 {
 QFile f(sourceCodeLocation.fullFileName);
 QFileInfo fi(sourceCodeLocation.fullFileName);
 int currentBlockNumber = ui->plainTextEditSourceView->textCursor().blockNumber();
+bool result = false;
 
+	/*! \todo	Check if this is still needed. */
 	ui->plainTextEditSourceView->blockSignals(true);
 	ui->plainTextEditSourceView->clear();
+	ui->plainTextEditSourceView->setCurrentCharFormat(QTextCharFormat());
 
 	/* Save the current source code view location in the navigation stack, if valid. */
 	if (saveCurrentLocationToNavigationStack && !displayedSourceCodeFile.isEmpty())
@@ -2606,11 +2610,8 @@ int currentBlockNumber = ui->plainTextEditSourceView->textCursor().blockNumber()
 	else if (sourceCodeLocation.fullFileName == internalHelpFileName)
 	{
 		/* Special case for the internal help file - do not attempt to apply syntax highlighting on it. */
-		ui->plainTextEditSourceView->clear();
 		sourceCodeViewHighlights.navigatedSourceCodeLine.clear();
-		ui->plainTextEditSourceView->setCurrentCharFormat(QTextCharFormat());
 		ui->plainTextEditSourceView->appendPlainText(f.readAll());
-		ui->plainTextEditSourceView->appendPlainText("xxx");
 		QTextCursor c = ui->plainTextEditSourceView->textCursor();
 		c.movePosition(QTextCursor::Start);
 		if (sourceCodeLocation.lineNumber > 0)
@@ -2704,15 +2705,20 @@ int currentBlockNumber = ui->plainTextEditSourceView->textCursor().blockNumber()
 		searchCurrentSourceText(searchData.lastSearchedText);
 		if (saveNewLocationToNavigationStack)
 			navigationStack.push(sourceCodeLocation);
+
+		result = true;
 	}
 	setWindowTitle("turbo: " + displayedSourceCodeFile);
 	ui->plainTextEditSourceView->blockSignals(false);
-	sourceFileWatcher.removePaths(sourceFileWatcher.files());
-	qDebug() << "Watching file: " << fi.absoluteFilePath();
-	sourceFileWatcher.addPath(fi.absoluteFilePath());
+	if (!sourceFileWatcher.files().isEmpty())
+		sourceFileWatcher.removePaths(sourceFileWatcher.files());
+	if (!fi.absoluteFilePath().isEmpty())
+		sourceFileWatcher.addPath(fi.absoluteFilePath());
 	/* Update navigation buttons. */
 	ui->pushButtonNavigateBack->setEnabled(navigationStack.canNavigateBack());
 	ui->pushButtonNavigateForward->setEnabled(navigationStack.canNavigateForward());
+
+	return result;
 }
 
 class xbtn : public QPushButton
@@ -3025,7 +3031,7 @@ void MainWindow::loadSVDFile(void)
 		ui->pushButtonSettings->click();
 		return;
 	}
-	svdParser.parse("C:/src1/cmsis-svd/data/Atmel/ATSAMD21E15L.svd");
+	svdParser.parse(targetSVDFileName);
 	ui->treeWidgetSvd->clear();
 
 	/* Note: if the device tree node is not added to the tree widget here, but at a later time instead, the
