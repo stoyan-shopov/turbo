@@ -266,6 +266,35 @@ void SvdFileParser::parseRegisterField(SvdRegisterFieldNode & field)
 			if (ok)
 				field.bitWidth = t;
 		}
+		else if (xml.name() == "bitRange")
+		{
+			QRegularExpression rx("\\[(\\d)+:(\\d+)\\]");
+			QRegularExpressionMatch match = rx.match(xml.readElementText());
+			if (match.hasMatch()) do
+			{
+				unsigned start = match.captured(1).toULong(& ok, 0);
+				if (!ok)
+					break;
+				unsigned end = match.captured(2).toULong(& ok, 0);
+				if (!ok)
+					break;
+				field.bitOffset = start;
+				field.bitWidth = end - start + 1;
+			}
+			while (0);
+		}
+		else if (xml.name() == "lsb")
+		{
+			unsigned t = xml.readElementText().toULong(& ok, 0);
+			if (ok)
+				field.bitOffset = t;
+		}
+		else if (xml.name() == "msb")
+		{
+			unsigned t = xml.readElementText().toULong(& ok, 0);
+			if (ok && field.bitOffset != -1)
+				field.bitWidth = t - field.bitOffset + 1;
+		}
 		else
 		{
 			qDebug() << "unhandled register field element: " << xml.name();
