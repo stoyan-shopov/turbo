@@ -54,22 +54,15 @@ void SvdFileParser::parse(const QString & svdFileName)
 		for (const auto & t : l)
 			if (t.name.contains("%s"))
 			{
-				if (t.name.endsWith("[%s]"))
-					qDebug() << "array detected";
-				else
-					qDebug() << "list detected";
-				qDebug() << t.dim.dimIncrement;
-				qDebug() << "dimIndex" << t.dim.dimIndex;
-
 				if (t.dim.dim == -1 || t.dim.dimIncrement == -1)
 				{
-					qDebug() << "Could not expand array element" << t.name << ", skipping";
+					qDebug() << "Could not expand array/list element" << t.name << ", skipping";
 					rc.push_back(t);
 					continue;
 				}
 				if (t.dim.dimName.length() || t.dim.dimArrayIndex.length())
 				{
-					qDebug() << "Could not expand array element, case not supported, '" << t.name << "', please report this case!";
+					qDebug() << "Could not expand array/list element, case not supported, '" << t.name << "', please report this case!";
 					rc.push_back(t);
 					continue;
 				}
@@ -127,7 +120,6 @@ there:
 				}
 				while (0);
 
-				qDebug() << "dimIncrement" <<  t.dim.dimIncrement;
 				for (int i = 0; i < indices.size(); i ++)
 				{
 					rc.push_back(t);
