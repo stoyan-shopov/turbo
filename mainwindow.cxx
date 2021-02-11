@@ -1768,7 +1768,7 @@ bool MainWindow::handleFrameResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 			if (!showSourceCode(frameItem))
 			{
 				ui->plainTextEditSourceView->clear();
-				ui->plainTextEditSourceView->setPlainText(QString("Cannot show source code file containing function '%1()' at address 0x%2")
+				ui->plainTextEditSourceView->setPlainText(QString("Cannot show source code file containing function '%1()' at address %2")
 									  .arg(frameItem->text(1))
 									  .arg(frameItem->text(4)));
 			}
@@ -3088,7 +3088,7 @@ void MainWindow::loadSVDFile(void)
 	auto populatePeripheral = [&] (QTreeWidgetItem * parent, const SvdFileParser::SvdPeripheralNode * peripheral) -> void
 	{
 		QTreeWidgetItem * p = new QTreeWidgetItem(parent, QStringList() << peripheral->name << QString("0x%1").arg(peripheral->baseAddress, 8, 16, QChar('0')) << peripheral->description);
-		const std::vector<SvdFileParser::SvdRegisterOrClusterNode> & registers = peripheral->registersAndClusters;
+		const std::list<SvdFileParser::SvdRegisterOrClusterNode> & registers = peripheral->registersAndClusters;
 
 		for (const auto & r : registers)
 			populateRegisterOrCluster(p, r, peripheral->baseAddress);

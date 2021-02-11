@@ -39,7 +39,9 @@ public:
 	 * but have currently been observed only for registers and fields. */
 	struct SvdDimElementGroup
 	{
+		/* The 'dim' element is of type 'scaledNonNegativeInteger' */
 		int		dim = -1;
+		/* The 'dimIncrement' element is of type 'scaledNonNegativeInteger' */
 		int		dimIncrement = -1;
 		/* The 'dimIndex' element is of type 'dimIndexType', and is used for substitution, to define a list (sequence)
 		 * of elements.
@@ -84,6 +86,19 @@ public:
 			The example above generates the array: => MyArr[4]
 		 */
 		QString		dimIndex;
+		/* The 'dimName' element is of type 'identifierType' */
+		/*! \todo	This is currently not used, because there are no known samples using it. Fix this if this changes in the future. */
+		QString		dimName;
+		/* The 'dimArrayIndex' element is of type 'dimArrayIndexType':
+		  <xs:complexType name="dimArrayIndexType">
+		    <xs:sequence>
+		      <xs:element name="headerEnumName" type="identifierType" minOccurs="0"/>
+		      <xs:element name="enumeratedValue" type="enumeratedValueType" minOccurs="1" maxOccurs="unbounded"/>
+		    </xs:sequence>
+		  </xs:complexType>
+		 */
+		/*! \todo	This is currently not used, because there are no known samples using it. Fix this if this changes in the future. */
+		QString		dimArrayIndex;
 	};
 	struct SvdRegisterFieldNode
 	{
@@ -92,6 +107,8 @@ public:
 		QString		access;
 		unsigned	bitOffset = -1;
 		unsigned	bitWidth = -1;
+		/*! \todo	This is currently not used, because there are no known samples using it. Fix this if this changes in the future. */
+		struct SvdDimElementGroup dim;
 	};
 	struct SvdRegisterOrClusterNode
 	{
@@ -105,8 +122,9 @@ public:
 		unsigned	addressOffset = -1;
 		unsigned	size = -1;
 		unsigned	resetValue = -1;
-		std::vector<SvdRegisterFieldNode>	fields;
-		std::vector<SvdRegisterOrClusterNode>	children;
+		std::list<SvdRegisterFieldNode>	fields;
+		std::list<SvdRegisterOrClusterNode>	children;
+		struct SvdDimElementGroup dim;
 	};
 	struct SvdAddressBlockNode
 	{
@@ -129,7 +147,9 @@ public:
 		unsigned	baseAddress = -1;
 		std::vector<SvdInterruptNode>		interrupts;
 		std::vector<SvdAddressBlockNode>	addressBlocks;
-		std::vector<SvdRegisterOrClusterNode>	registersAndClusters;
+		std::list<SvdRegisterOrClusterNode>	registersAndClusters;
+		/*! \todo	This is currently not used, because there are no known samples using it. Fix this if this changes in the future. */
+		struct SvdDimElementGroup dim;
 	};
 	struct SvdCpuNode
 	{
@@ -146,7 +166,7 @@ public:
 		QString		version;
 		QString		description = "Unknown";
 		SvdCpuNode	cpu;
-		std::vector<SvdPeripheralNode>	peripherals;
+		std::list<SvdPeripheralNode>	peripherals;
 		unsigned	addressUnitBits	= -1;
 		unsigned	width		= -1;
 		unsigned	size		= -1;
@@ -158,6 +178,9 @@ private:
 
 	QXmlStreamReader xml;
 	const SvdPeripheralNode * findPeripheral(const QString & peripheralName);
+
+	/* Returns true, if a 'dim' element was successfully parsed, false otherwise. */
+	bool parseDimElement(SvdDimElementGroup & dim);
 
 	void parseRegisterField(SvdRegisterFieldNode & field);
 	void parseRegisterOrCluster(SvdRegisterOrClusterNode & registerOrCluster);

@@ -22,6 +22,7 @@
 
 /*! \todo	This is getting unnecessarily complicated. Rework the parser. */
 
+#include <QRegularExpression>
 #include "svdfileparser.hxx"
 
 void SvdFileParser::parse(const QString & svdFileName)
@@ -44,7 +45,104 @@ void SvdFileParser::parse(const QString & svdFileName)
 			qDebug() << "unhandled top level element: " << xml.name();
 			xml.skipCurrentElement();
 		}
-	/* Process and resolve any 'derivedFrom' fields. */
+	/* Process and expand any 'dim' elements. */
+	/*! \todo	This is incomplete, as no examples for testing all cases were available when writing this code. */
+	std::function<void(std::list<SvdRegisterOrClusterNode> & rc)> expand = [&](std::list<SvdRegisterOrClusterNode> & rc) -> void
+	{
+		std::list<SvdRegisterOrClusterNode> l{std::move(rc)};
+		rc.clear();
+		for (const auto & t : l)
+			if (t.name.contains("%s"))
+			{
+				if (t.name.endsWith("[%s]"))
+					qDebug() << "array detected";
+				else
+					qDebug() << "list detected";
+				qDebug() << t.dim.dimIncrement;
+				qDebug() << "dimIndex" << t.dim.dimIndex;
+
+				if (t.dim.dim == -1 || t.dim.dimIncrement == -1)
+				{
+					qDebug() << "Could not expand array element" << t.name << ", skipping";
+					rc.push_back(t);
+					continue;
+				}
+				if (t.dim.dimName.length() || t.dim.dimArrayIndex.length())
+				{
+					qDebug() << "Could not expand array element, case not supported, '" << t.name << "', please report this case!";
+					rc.push_back(t);
+					continue;
+				}
+				QStringList indices;
+				do
+				{
+					/* If this is an array, ignore the 'dimIndex' field, even though
+					 * many SVD files do make use of it. The CMSIS-SVD documentation explicitly
+					 * states that 'dimIndex' should not be used in this case. */
+					if (t.name.endsWith("[%s]") || t.dim.dimIndex.isEmpty())
+					{
+						for (int i = 0; i < t.dim.dim; i ++)
+							indices.push_back(QString("%1").arg(i));
+						break;
+					}
+					/* Try to parse a comma delimited list of indices. */
+					QStringList l = t.dim.dimIndex.split(",");
+					if (l.length() == t.dim.dim)
+					{
+						indices = l;
+						break;
+					}
+					/* Try to parse a numeric range of the form '[0-9]+\-[0-9]+'. */
+					QRegularExpression rx("(\\d+)-(\\d+)");
+					QRegularExpressionMatch match = rx.match(t.dim.dimIndex);
+					if (match.hasMatch())
+					{
+						unsigned l = match.captured(1).toUInt(), h = match.captured(2).toUInt();
+						if (l > h || h - l + 1 != t.dim.dim)
+						{
+							qDebug() << "Bad numeric range for svd 'dim' element, skipping.";
+							goto there;
+						}
+						do indices.push_back(QString("%1").arg(l)); while (++l <= h);
+						break;
+					}
+					/* Try to parse an alphabetical range of the form '[A-Z]-[A-Z]'. */
+					/*! \todo	This case has not been tested, as there are no samples using it. */
+					rx.setPattern("([A-Z])-([A-Z])");
+					match = rx.match(t.dim.dimIndex);
+					if (match.hasMatch())
+					{
+						char l = match.captured(1).at(0).toLatin1(), h = match.captured(2).at(0).toLatin1();
+						if (l > h || h - l + 1 != t.dim.dim)
+						{
+							qDebug() << "Bad numeric range for svd 'dim' element, skipping.";
+							goto there;
+						}
+						do indices.push_back(QString("%1").arg(l)); while (++l <= h);
+						break;
+					}
+there:
+					qDebug() << "Failed to expand array/list element '" << t.name << "'. Please, report this case!";
+					rc.push_back(t);
+				}
+				while (0);
+
+				qDebug() << "dimIncrement" <<  t.dim.dimIncrement;
+				for (int i = 0; i < indices.size(); i ++)
+				{
+					rc.push_back(t);
+					rc.back().name.replace("%s", indices.at(i));
+					rc.back().addressOffset += i * t.dim.dimIncrement;
+				}
+			}
+			else
+				rc.push_back(t);
+		for (auto & t : rc)
+			expand(t.children);
+	};
+	for (auto & p : device.peripherals)
+		expand(p.registersAndClusters);
+	/* Process and resolve any 'derivedFrom' elements. */
 	/*! \todo	This is incomplete. For more complicated samples, see, e.g., file ATSAMD21E15L.svd. */
 	for (auto & p : device.peripherals)
 	{
@@ -68,8 +166,8 @@ void SvdFileParser::parse(const QString & svdFileName)
 		}
 
 		qDebug() << "descending in peripheral:" << p.name;
-		std::function<void(SvdRegisterOrClusterNode & registerOrCluster, const std::vector<SvdRegisterOrClusterNode> & siblings)>
-			resolveRegistersAndClusters = [&](SvdRegisterOrClusterNode & registerOrCluster, const std::vector<SvdRegisterOrClusterNode> & siblings) -> void
+		std::function<void(SvdRegisterOrClusterNode & registerOrCluster, const std::list<SvdRegisterOrClusterNode> & siblings)>
+			resolveRegistersAndClusters = [&](SvdRegisterOrClusterNode & registerOrCluster, const std::list<SvdRegisterOrClusterNode> & siblings) -> void
 		{
 			QString originName;
 			if (!(originName = registerOrCluster.derivedFrom).isEmpty())
@@ -134,6 +232,22 @@ const SvdFileParser::SvdPeripheralNode *SvdFileParser::findPeripheral(const QStr
 		if (p.name == peripheralName)
 			return & p;
 	return 0;
+}
+
+bool SvdFileParser::parseDimElement(SvdFileParser::SvdDimElementGroup &dim)
+{
+	Q_ASSERT(xml.isStartElement() && xml.name().startsWith("dim"));
+	bool result = false;
+
+	if (xml.name() == "dim")
+		dim.dim = xml.readElementText().toUInt(), result = true;
+	else if (xml.name() == "dimIncrement")
+		dim.dimIncrement = xml.readElementText().toUInt(0, 0), result = true;
+	else if (xml.name() == "dimIndex")
+		dim.dimIndex = xml.readElementText(), result = true;
+	else if (xml.name() == "dimName" || xml.name() == "dimArrayIndex")
+		qDebug() << xml.name() << "element not handled! Please, report this, so that it is properly handled!";
+	return result;
 }
 
 void SvdFileParser::parseRegisterField(SvdRegisterFieldNode & field)
@@ -219,6 +333,14 @@ void SvdFileParser::parseRegisterOrCluster(SvdRegisterOrClusterNode & registerOr
 			unsigned t = xml.readElementText().toULong(& ok, 0);
 			if (ok)
 				r.resetValue = t;
+		}
+		else if (xml.name().startsWith("dim"))
+		{
+			if (!parseDimElement(r.dim))
+			{
+				qDebug() << "Failed to parse 'dim' element" << xml.name();
+				xml.skipCurrentElement();
+			}
 		}
 		else
 		{
