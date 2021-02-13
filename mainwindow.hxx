@@ -1351,6 +1351,8 @@ private:
 	bool handleBreakpointUpdateResponses(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 	/* Handle target scan ('monitor swdp_scan' and 'monitor jtag_scan') response. */
 	bool handleTargetScanResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
+	/* Handle the response to the "-data-read-memory-bytes" machine interface gdb command. */
+	bool handleMemoryResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 
 protected:
 	void closeEvent(QCloseEvent *event) override;
@@ -1361,6 +1363,7 @@ signals:
 	void findString(const QString & str, unsigned flags);
 	void targetCallStackFrameChanged(void);
 	void addFilesToSearchSet(const QStringList sourceCodeFiles);
+	void targetMemoryReadComplete(int tokenNumber, uint32_t address, const QByteArray & data);
 
 signals:
 	/* Gdb and target state change signals. */

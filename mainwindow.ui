@@ -1256,6 +1256,9 @@ forward</string>
         </widget>
        </item>
        <item>
+        <widget class="QLineEdit" name="lineEditSearchSVDTree"/>
+       </item>
+       <item>
         <widget class="QPushButton" name="pushButtonLoadSVDFile">
          <property name="text">
           <string>Load SVD File</string>

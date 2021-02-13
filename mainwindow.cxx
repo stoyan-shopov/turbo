@@ -55,6 +55,33 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->pushButtonRequestGdbHalt, & QPushButton::clicked, [&]{ requestTargetHalt(); });
 	connect(ui->pushButtonLoadSVDFile, & QPushButton::clicked, [&]{ loadSVDFile(); });
 
+	connect(ui->lineEditSearchSVDTree, & QLineEdit::returnPressed, [&]
+	{
+		QString text = ui->lineEditSearchSVDTree->text();
+		/* Special case for the empty string - show all items in the tree. */
+		if (!text.length())
+		{
+		}
+		std::vector<QTreeWidgetItem *> matchingItems, nonMatchingItems;
+		std::function<void(QTreeWidgetItem * item)> scan = [&](QTreeWidgetItem * item) -> void
+		{
+			item->setHidden(true);
+			if (item->text(0).contains(text, Qt::CaseInsensitive))
+				matchingItems.push_back(item);
+			else
+				nonMatchingItems.push_back(item);
+			for (int i = 0; i < item->childCount(); scan(item->child(i ++)))
+			     ;
+		};
+		for (int i = 0; i < ui->treeWidgetSvd->topLevelItemCount(); scan(ui->treeWidgetSvd->topLevelItem(i ++)))
+		     ;
+		for (auto & i : matchingItems)
+		{
+			QTreeWidgetItem * w = i;
+			do w->setHidden(false), w = w->parent(); while (w);
+		}
+	});
+
 	/*****************************************
 	 * Settings.
 	 *****************************************/
@@ -725,6 +752,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
 		return;
 	}
 
+	/* Close any svd register view dialogs. */
+	for (const auto & v : svdViews)
+		v.dialog->done(QDialog::Accepted);
+
 	saveSessions();
 
 	settings->setValue(SETTINGS_MAINWINDOW_STATE, saveState());
@@ -1035,6 +1066,8 @@ void MainWindow::gdbMiLineAvailable(QString line)
 				if (handleDisassemblyResponse(result, results, tokenNumber))
 					break;
 				if (handleVerifyTargetMemoryContentsSeqPoint(result, results, tokenNumber))
+					break;
+				if (handleMemoryResponse(result, results, tokenNumber))
 					break;
 				switch (result)
 				{
@@ -1953,6 +1986,38 @@ bool MainWindow::handleTargetScanResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 	return false;
 }
 
+bool MainWindow::handleMemoryResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
+{
+	const GdbMiParser::MIList * l;
+	const GdbMiParser::MITuple * t;
+	if (parseResult != GdbMiParser::DONE || !results.size() || results.at(0).variable != "memory"
+		|| !results.at(0).value || !(l = results.at(0).value->asList()) || !l->values.size() || !(t = l->values.at(0)->asTuple()))
+		return false;
+	uint32_t address = 0;
+	QByteArray data;
+	for (const auto & x : t->map)
+	{
+		if (x.first == "begin")
+			address += QString::fromStdString(x.second->asConstant()->constant()).toUInt(0, 0);
+		if (x.first == "offset")
+			address += QString::fromStdString(x.second->asConstant()->constant()).toUInt(0, 0);
+		if (x.first == "contents")
+			data += QByteArray::fromHex(QString::fromStdString(x.second->asConstant()->constant()).toLocal8Bit());
+	}
+	emit targetMemoryReadComplete(tokenNumber, address, data);
+	if (data.length() == 4)
+	{
+		uint32_t d = data.at(0) | (data.at(1) << 8) | (data.at(2) << 16) | (data.at(3) << 24);
+		/* Update any svd register views. */
+		for (const auto & r : svdViews)
+			if (r.address == address)
+				for (auto & f : r.fields)
+					f.spinbox->setValue((d >> f.bitoffset) & ((1 << f.bitwidth) - 1));
+	}
+
+	return true;
+}
+
 void MainWindow::gdbProcessError(QProcess::ProcessError error)
 {
 	switch (error)
@@ -2734,7 +2799,7 @@ void MainWindow::createSvdRegisterView(QTreeWidgetItem *item, int column)
 		return;
 	SvdFileParser::SvdRegisterOrClusterNode * svdRegister = static_cast<SvdFileParser::SvdRegisterOrClusterNode *>(item->data(0, SVD_REGISTER_POINTER).value<void *>());
 
-	QDialog * dialog = new QDialog();
+	QDialog * dialog = new QDialog(0, Qt::WindowTitleHint | Qt::WindowMinimizeButtonHint);
 	QGroupBox * fieldsGroupBox = new QGroupBox();
 	SvdRegisterViewData view(dialog, item->data(0, SVD_REGISTER_ADDRESS).toUInt());
 	view.fieldsGroupBox = fieldsGroupBox;
@@ -2753,7 +2818,7 @@ void MainWindow::createSvdRegisterView(QTreeWidgetItem *item, int column)
 		if (field.access == "read-only" || svdRegister->access == "read-only")
 			s->setEnabled(false);
 		h->addWidget(s);
-		view.fields << SvdRegisterViewData::RegField(field.bitWidth, field.bitOffset, s);
+		view.fields << SvdRegisterViewData::RegField(field.bitOffset, field.bitWidth, s);
 		fieldsLayout->addLayout(h);
 
 	}
@@ -2768,8 +2833,13 @@ void MainWindow::createSvdRegisterView(QTreeWidgetItem *item, int column)
 		for (const auto & view : svdViews)
 			if (view.dialog == dialog)
 			{
-				QMessageBox::information(0, "", QString("read reg @$%1").arg(view.address, 8, 16, QChar('0')));
-				view.fieldsGroupBox->setEnabled(true);
+				if (target_state == TARGET_STOPPED)
+				{
+					sendDataToGdbProcess(QString("-data-read-memory-bytes 0x%1 4\n").arg(view.address, 8, 16, QChar('0')));
+					view.fieldsGroupBox->setEnabled(true);
+				}
+				else
+					QMessageBox::information(0, "", QString("Cannot read register @$%1,\ntarget must be connected and halted.").arg(view.address, 8, 16, QChar('0')));
 			}
 	});
 	hbox->addWidget(b = new QPushButton("Close"));
