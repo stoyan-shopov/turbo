@@ -82,6 +82,19 @@ MainWindow::MainWindow(QWidget *parent) :
 		}
 	});
 
+	connect(ui->pushButtonReadMemory, & QPushButton::clicked, [&] {
+		unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
+								   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_DATA_READ_MEMORY));
+		sendDataToGdbProcess(QString("%1-data-read-memory-bytes %2 %3\n")
+				     .arg(t)
+				     .arg(ui->lineEditMemoryReadAddress->text())
+				     .arg(ui->lineEditMemoryReadLength->text()));
+	});
+	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->dockWidgetContentsMemoryDump;
+	targetStateDependentWidgets.disabledWidgetsWhenGdbServerDisconnected << ui->dockWidgetContentsMemoryDump;
+	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << ui->dockWidgetContentsMemoryDump;
+	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->dockWidgetContentsMemoryDump;
+
 	/*****************************************
 	 * Settings.
 	 *****************************************/
@@ -2013,6 +2026,14 @@ bool MainWindow::handleMemoryResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult
 			if (r.address == address)
 				for (auto & f : r.fields)
 					f.spinbox->setValue((d >> f.bitoffset) & ((1 << f.bitwidth) - 1));
+	}
+	/* Check if the memory dump view should be updated. */
+	if (gdbTokenContext.hasContextForToken(tokenNumber) && gdbTokenContext.contextForTokenNumber(tokenNumber)
+			.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_DATA_READ_MEMORY)
+	{
+		gdbTokenContext.readAndRemoveContext(tokenNumber);
+		ui->plainTextEditMemoryDump->clear();
+		ui->plainTextEditMemoryDump->appendPlainText(data.toHex());
 	}
 
 	return true;

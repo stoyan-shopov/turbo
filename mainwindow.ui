@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1513</width>
-    <height>708</height>
+    <width>1619</width>
+    <height>710</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -563,7 +563,7 @@ forward</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1513</width>
+     <width>1619</width>
      <height>21</height>
     </rect>
    </property>
@@ -1288,6 +1288,52 @@ forward</string>
         </property>
        </column>
       </widget>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QDockWidget" name="dockWidgetMemoryDump">
+   <property name="windowTitle">
+    <string>Memory Dump</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>8</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContentsMemoryDump">
+    <layout class="QVBoxLayout" name="verticalLayout_29">
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_7">
+       <item>
+        <widget class="QLabel" name="label_7">
+         <property name="text">
+          <string>Address</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="lineEditMemoryReadAddress"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_13">
+         <property name="text">
+          <string>Length</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="lineEditMemoryReadLength"/>
+       </item>
+       <item>
+        <widget class="QPushButton" name="pushButtonReadMemory">
+         <property name="text">
+          <string>Read</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <widget class="QPlainTextEdit" name="plainTextEditMemoryDump"/>
      </item>
     </layout>
    </widget>

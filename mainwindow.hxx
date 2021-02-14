@@ -845,6 +845,8 @@ private:
 				 * 'monitor jtag_scan' commands. This is a somewhat special case, because there is
 				 * no machine interface command corresponding to the 'monitor' command. */
 				GDB_RESPONSE_TARGET_SCAN_COMPLETE,
+				/* Response to the '-data-read-memory-bytes', used to know when to update the memory dump view. */
+				GDB_RESPONSE_DATA_READ_MEMORY,
 
 				/*******************************************************
 				 * The codes below are not really responses from gdb.
