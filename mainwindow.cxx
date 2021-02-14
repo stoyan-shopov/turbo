@@ -89,6 +89,8 @@ MainWindow::MainWindow(QWidget *parent) :
 				     .arg(t)
 				     .arg(ui->lineEditMemoryReadAddress->text())
 				     .arg(ui->lineEditMemoryReadLength->text()));
+		/* By default, enable target memory view auto update. */
+		ui->checkBoxMemoryDumpAutoUpdate->setChecked(false);
 	});
 	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->dockWidgetContentsMemoryDump;
 	targetStateDependentWidgets.disabledWidgetsWhenGdbServerDisconnected << ui->dockWidgetContentsMemoryDump;
@@ -606,8 +608,7 @@ reopen_last_file:
 		sendDataToGdbProcess("-data-list-register-values x\n");
 		sendDataToGdbProcess("-var-update --all-values *\n");
 		sendDataToGdbProcess("-stack-list-variables --all-values\n");
-	} );
-
+	});
 
 	targetStateDependentWidgets.enabledWidgetsWhenTargetRunning << ui->groupBoxTargetRunning << ui->groupBoxTargetConnected;
 	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->groupBoxTargetHalted;
@@ -2001,6 +2002,17 @@ bool MainWindow::handleTargetScanResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 
 bool MainWindow::handleMemoryResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
 {
+	if (parseResult == GdbMiParser::ERROR)
+	{
+		/* If there is an error reading the target memory, disable the auto update of the memory view. */
+		if (gdbTokenContext.hasContextForToken(tokenNumber) && gdbTokenContext.contextForTokenNumber(tokenNumber)
+				.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_DATA_READ_MEMORY)
+		{
+			gdbTokenContext.readAndRemoveContext(tokenNumber);
+			ui->checkBoxMemoryDumpAutoUpdate->setChecked(false);
+		}
+		return false;
+	}
 	const GdbMiParser::MIList * l;
 	const GdbMiParser::MITuple * t;
 	if (parseResult != GdbMiParser::DONE || !results.size() || results.at(0).variable != "memory"

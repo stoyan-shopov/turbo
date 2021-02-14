@@ -1324,6 +1324,16 @@ forward</string>
         <widget class="QLineEdit" name="lineEditMemoryReadLength"/>
        </item>
        <item>
+        <widget class="QCheckBox" name="checkBoxMemoryDumpAutoUpdate">
+         <property name="text">
+          <string>Auto update</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QPushButton" name="pushButtonReadMemory">
          <property name="text">
           <string>Read</string>
