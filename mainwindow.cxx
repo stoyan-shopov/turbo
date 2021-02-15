@@ -604,7 +604,7 @@ reopen_last_file:
 		targetStateDependentWidgets.enterTargetState(target_state = TARGET_STOPPED);
 		/*! \todo Make the frame limits configurable. */
 		sendDataToGdbProcess("-stack-list-frames 0 100\n");
-		if (!targetRegisterNames.size())
+		if (!targetRegisterIndices.size())
 			sendDataToGdbProcess("-data-list-register-names\n");
 		sendDataToGdbProcess("-stack-info-frame\n");
 	});
@@ -1628,15 +1628,20 @@ bool MainWindow::handleRegisterNamesResponse(GdbMiParser::RESULT_CLASS_ENUM pars
 	const GdbMiParser::MIList * registerNames;
 	if (parseResult != GdbMiParser::DONE || results.size() != 1 || results.at(0).variable != "register-names" || !(registerNames = results.at(0).value->asList()))
 		return false;
-	targetRegisterNames.clear();
+	targetRegisterIndices.clear();
 	ui->treeWidgetRegisters->clear();
+	int index = 0;
 	for (const auto & r : registerNames->values)
 	{
 		const GdbMiParser::MIConstant * t;
 		if ((t = r->asConstant()))
 		{
-			targetRegisterNames << QString::fromStdString(t->constant());
-			ui->treeWidgetRegisters->addTopLevelItem(new QTreeWidgetItem(QStringList() << targetRegisterNames.back()));
+			targetRegisterIndices << index;
+			if (t->constant().length())
+			{
+				ui->treeWidgetRegisters->addTopLevelItem(new QTreeWidgetItem(QStringList() << QString::fromStdString(t->constant())));
+				index ++;
+			}
 		}
 	}
 	return true;
@@ -1659,8 +1664,16 @@ bool MainWindow::handleRegisterValuesResponse(GdbMiParser::RESULT_CLASS_ENUM par
 				registerNumber = QString::fromStdString(r.second->asConstant()->constant()).toUInt();
 			else if (r.first == "value")
 				registerValue = QString::fromStdString(r.second->asConstant()->constant());
-		if (registerNumber < ui->treeWidgetRegisters->topLevelItemCount())
-			ui->treeWidgetRegisters->topLevelItem(registerNumber)->setText(1, registerValue);
+		if (registerNumber < targetRegisterIndices.length())
+		{
+			int index = targetRegisterIndices.at(registerNumber);
+			enum Qt::GlobalColor foregroundColor = Qt::black;
+			/* Highlight registers whose value changed since they were last updated. */
+			if (ui->treeWidgetRegisters->topLevelItem(index)->text(1) != registerValue)
+				foregroundColor = Qt::red;
+			ui->treeWidgetRegisters->topLevelItem(index)->setText(1, registerValue);
+			ui->treeWidgetRegisters->topLevelItem(index)->setForeground(1, foregroundColor);
+		}
 	}
 	return false;
 }

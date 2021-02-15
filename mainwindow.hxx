@@ -1292,7 +1292,8 @@ private:
 	QThread fileSearchThread;
 	StringFinder * stringFinder;
 	GdbMiReceiver			* gdbMiReceiver;
-	QStringList targetRegisterNames;
+	/* This vector contains the mapping between gdb register number, and register indices in the register view widget. */
+	QVector<int> targetRegisterIndices;
 
 	/* Attempts to build an error strings out of a gdb result response. */
 	QString gdbErrorString(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results)
