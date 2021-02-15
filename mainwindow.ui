@@ -439,6 +439,13 @@ forward</string>
               </widget>
              </item>
              <item>
+              <widget class="QPushButton" name="pushButtonShowCurrentDisassembly">
+               <property name="text">
+                <string>Sync</string>
+               </property>
+              </widget>
+             </item>
+             <item>
               <widget class="QLineEdit" name="lineEdit"/>
              </item>
              <item>

@@ -55,6 +55,11 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->pushButtonRequestGdbHalt, & QPushButton::clicked, [&]{ requestTargetHalt(); });
 	connect(ui->pushButtonLoadSVDFile, & QPushButton::clicked, [&]{ loadSVDFile(); });
 
+	connect(ui->pushButtonShowCurrentDisassembly, & QPushButton::clicked, [&]
+	{
+		sendDataToGdbProcess(QString("-data-disassemble -a $pc -- 5\n"));
+	});
+
 	connect(ui->lineEditSearchSVDTree, & QLineEdit::returnPressed, [&]
 	{
 		QString text = ui->lineEditSearchSVDTree->text();
@@ -1831,37 +1836,38 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 	if (parseResult != GdbMiParser::DONE || results.size() != 1 || results.at(0).variable != "asm_insns" || !(disassembly = results.at(0).value->asList()))
 		return false;
 	ui->plainTextEditDisassembly->setPlainText("Disassembly:");
+	std::function<void(const GdbMiParser::MITuple & asmRecord)> processAsmRecord = [&](const GdbMiParser::MITuple & asmRecord) -> void
+	{
+		std::string address, opcodes, mnemonics;
+		for (const auto & line_details : asmRecord.map)
+		{
+			if (line_details.first == "address")
+				address = line_details.second->asConstant()->constant();
+			else if (line_details.first == "opcodes")
+				opcodes = line_details.second->asConstant()->constant();
+			else if (line_details.first == "inst")
+				mnemonics = line_details.second->asConstant()->constant();
+		}
+		ui->plainTextEditDisassembly->appendPlainText(QString::fromStdString(address + '\t' + opcodes + '\t' + mnemonics));
+	};
 	for (const auto & d : disassembly->results)
 	{
 		if (d.variable == "src_and_asm_line")
 		{
 			const GdbMiParser::MITuple * t = d.value->asTuple();
 			for (const auto & details : t->map)
-			{
 				if (details.first == "line_asm_insn")
-				{
-					for (const auto & line : details.second->asList()->values)
-					{
-						std::string address, opcodes, mnemonics;
-						for (const auto & line_details : line->asTuple()->map)
-						{
-							if (line_details.first == "address")
-								address = line_details.second->asConstant()->constant();
-							else if (line_details.first == "opcodes")
-								opcodes = line_details.second->asConstant()->constant();
-							else if (line_details.first == "inst")
-								mnemonics = line_details.second->asConstant()->constant();
-						}
-						ui->plainTextEditDisassembly->appendPlainText(QString::fromStdString(address + '\t' + opcodes + '\t' + mnemonics));
-
-					}
-
-				}
-			}
+					for (const auto & asmRecord : details.second->asList()->values)
+						processAsmRecord(* asmRecord->asTuple());
 		}
 		else
 			*(int*)0=0;
 	}
+	/* If this is a disassmebly of code, for which there is no debug information available, the reply from
+	 * gdb will be a list of tuples, which will be stored as a list of values, not as a list of results, as handled above. */
+	for (const auto & d : disassembly->values)
+		if (d->asTuple())
+			processAsmRecord(* d->asTuple());
 	return true;
 }
 
