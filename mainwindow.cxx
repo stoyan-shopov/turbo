@@ -613,6 +613,8 @@ reopen_last_file:
 		sendDataToGdbProcess("-data-list-register-values x\n");
 		sendDataToGdbProcess("-var-update --all-values *\n");
 		sendDataToGdbProcess("-stack-list-variables --all-values\n");
+		if (ui->checkBoxAutoUpdateDisassembly->isChecked())
+			ui->pushButtonShowCurrentDisassembly->click();
 	});
 
 	targetStateDependentWidgets.enabledWidgetsWhenTargetRunning << ui->groupBoxTargetRunning << ui->groupBoxTargetConnected;
@@ -1164,6 +1166,19 @@ QString s = miString;
 	return s;
 }
 
+uint64_t MainWindow::lastKnownProgramCounter()
+{
+	int i;
+	if (programCounterRegisterIndex == -1 || targetRegisterIndices.length() < programCounterRegisterIndex
+			|| (i = targetRegisterIndices.at(programCounterRegisterIndex)) >= ui->treeWidgetRegisters->topLevelItemCount())
+		return -1;
+
+	bool ok;
+	uint64_t pc;
+	pc = ui->treeWidgetRegisters->topLevelItem(i)->text(1).toULongLong(& ok, 0);
+	return ok ? pc : -1;
+}
+
 void MainWindow::appendLineToGdbLog(const QString &data)
 {
 	if (ui->checkBoxLimitGdbLog->isChecked() && data.length() > (MAX_LINE_LENGTH_IN_GDB_LOG_LIMITING_MODE << 1))
@@ -1637,9 +1652,13 @@ bool MainWindow::handleRegisterNamesResponse(GdbMiParser::RESULT_CLASS_ENUM pars
 		if ((t = r->asConstant()))
 		{
 			targetRegisterIndices << index;
-			if (t->constant().length())
+			QString registerName = QString::fromStdString(t->constant());
+			if (registerName.length())
 			{
-				ui->treeWidgetRegisters->addTopLevelItem(new QTreeWidgetItem(QStringList() << QString::fromStdString(t->constant())));
+				ui->treeWidgetRegisters->addTopLevelItem(new QTreeWidgetItem(QStringList() << registerName));
+				/*! \todo	HACK - this is a very quick and dirty way to locate the program counter, and it may get broken. */
+				if (registerName == "pc")
+					programCounterRegisterIndex = index;
 				index ++;
 			}
 		}
@@ -1848,39 +1867,81 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 	const GdbMiParser::MIList * disassembly;
 	if (parseResult != GdbMiParser::DONE || results.size() != 1 || results.at(0).variable != "asm_insns" || !(disassembly = results.at(0).value->asList()))
 		return false;
+	uint64_t pc = lastKnownProgramCounter();
+	int currentPCLineNumber = -1;
 	ui->plainTextEditDisassembly->setPlainText("Disassembly:");
 	std::function<void(const GdbMiParser::MITuple & asmRecord)> processAsmRecord = [&](const GdbMiParser::MITuple & asmRecord) -> void
 	{
-		std::string address, opcodes, mnemonics;
+		std::string address, opcodes, mnemonics, funcName, offset;
 		for (const auto & line_details : asmRecord.map)
 		{
 			if (line_details.first == "address")
 				address = line_details.second->asConstant()->constant();
+			else if (line_details.first == "func-name")
+				funcName = line_details.second->asConstant()->constant();
+			else if (line_details.first == "offset")
+				offset = line_details.second->asConstant()->constant();
 			else if (line_details.first == "opcodes")
 				opcodes = line_details.second->asConstant()->constant();
 			else if (line_details.first == "inst")
 				mnemonics = line_details.second->asConstant()->constant();
 		}
-		ui->plainTextEditDisassembly->appendPlainText(QString::fromStdString(address + '\t' + opcodes + '\t' + mnemonics));
+		QString s = QString::fromStdString(address + '\t' + opcodes + '\t' + mnemonics);
+		if (funcName.length() && offset.length())
+			s += QString::fromStdString("\t; " + funcName + "+" + offset);
+		ui->plainTextEditDisassembly->appendPlainText(s);
+		bool ok;
+		uint64_t t;
+		t = QString::fromStdString(address).toULongLong(& ok, 0);
+		if (ok && t == pc)
+			currentPCLineNumber = ui->plainTextEditDisassembly->blockCount() - 1;
 	};
 	for (const auto & d : disassembly->results)
 	{
 		if (d.variable == "src_and_asm_line")
 		{
 			const GdbMiParser::MITuple * t = d.value->asTuple();
-			for (const auto & details : t->map)
-				if (details.first == "line_asm_insn")
-					for (const auto & asmRecord : details.second->asList()->values)
-						processAsmRecord(* asmRecord->asTuple());
+			bool ok = false;
+			int lineNumber = -1;
+			QString fullFileName;
+			auto i = t->map.find("line");
+			if (i != t->map.cend())
+				lineNumber = QString::fromStdString(i->second->asConstant()->constant()).toInt(& ok, 0);
+			i = t->map.find("fullname");
+			if (i != t->map.cend())
+				fullFileName = QString::fromStdString(i->second->asConstant()->constant());
+			i = t->map.find("line_asm_insn");
+			{
+				qDebug() << ok << lineNumber << fullFileName;
+				if (ok && lineNumber != -1 && !fullFileName.isEmpty())
+					/*! \todo	Fetch and print the source code line here. */
+					ui->plainTextEditDisassembly->appendPlainText(QString("%1: %2").arg(lineNumber).arg(fullFileName));
+				for (const auto & asmRecord : i->second->asList()->values)
+					processAsmRecord(* asmRecord->asTuple());
+			}
 		}
 		else
 			*(int*)0=0;
 	}
-	/* If this is a disassmebly of code, for which there is no debug information available, the reply from
+	/* If this is a disassembly of code, for which there is no debug information available, the reply from
 	 * gdb will be a list of tuples, which will be stored as a list of values, not as a list of results, as handled above. */
 	for (const auto & d : disassembly->values)
 		if (d->asTuple())
 			processAsmRecord(* d->asTuple());
+	/* Highlight the current program counter line, if detected. */
+	if (currentPCLineNumber != -1)
+	{
+		QTextCursor c(ui->plainTextEditDisassembly->textCursor());
+		c.movePosition(QTextCursor::Start);
+		c.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, currentPCLineNumber);
+
+		QTextEdit::ExtraSelection s;
+		s.cursor = c;
+		s.format = sourceCodeViewHighlightFormats.currentLine;
+		ui->plainTextEditDisassembly->setExtraSelections(QList<QTextEdit::ExtraSelection>() << s);
+		ui->plainTextEditDisassembly->setTextCursor(c);
+		ui->plainTextEditDisassembly->centerCursor();
+	}
 	return true;
 }
 

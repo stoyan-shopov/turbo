@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1619</width>
+    <width>1666</width>
     <height>710</height>
    </rect>
   </property>
@@ -446,6 +446,13 @@ forward</string>
               </widget>
              </item>
              <item>
+              <widget class="QCheckBox" name="checkBoxAutoUpdateDisassembly">
+               <property name="text">
+                <string>Auto sync</string>
+               </property>
+              </widget>
+             </item>
+             <item>
               <widget class="QLineEdit" name="lineEdit"/>
              </item>
              <item>
@@ -570,7 +577,7 @@ forward</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1619</width>
+     <width>1666</width>
      <height>21</height>
     </rect>
    </property>

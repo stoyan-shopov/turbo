@@ -1294,6 +1294,9 @@ private:
 	GdbMiReceiver			* gdbMiReceiver;
 	/* This vector contains the mapping between gdb register number, and register indices in the register view widget. */
 	QVector<int> targetRegisterIndices;
+	/* This is the index of the program counter register in the register view. */
+	int programCounterRegisterIndex = -1;
+	uint64_t lastKnownProgramCounter(void);
 
 	/* Attempts to build an error strings out of a gdb result response. */
 	QString gdbErrorString(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results)
