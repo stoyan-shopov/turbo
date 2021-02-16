@@ -39,8 +39,9 @@ public:
 		QString				filesystemFileName;
 		QDateTime			lastModifiedDateTime;
 		std::shared_ptr<const QString>	htmlDocument;
+		QStringList			sourceCodeTextlines;
 	};
-	std::shared_ptr<const SourceFileData> htmlDocumentForSourceFile(const QString & sourceFileName, QString &errorMessage);
+	std::shared_ptr<const SourceFileData> getSourceFileData(const QString & sourceFileName, QString &errorMessage);
 private:
 	QHash<QString /* source file name */, std::shared_ptr<const struct SourceFileData> /* source file data */> sourceFileData;
 };

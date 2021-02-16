@@ -1902,10 +1902,18 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 				fullFileName = QString::fromStdString(i->second->asConstant()->constant());
 			i = t->map.find("line_asm_insn");
 			{
-				qDebug() << ok << lineNumber << fullFileName;
-				if (ok && lineNumber != -1 && !fullFileName.isEmpty())
-					/*! \todo	Fetch and print the source code line here. */
-					ui->plainTextEditDisassembly->appendPlainText(QString("%1: %2").arg(lineNumber).arg(fullFileName));
+				if (ok && lineNumber > 0 && !fullFileName.isEmpty())
+				{
+					QString errorMessage;
+					auto sourceData = sourceFilesCache.getSourceFileData(fullFileName, errorMessage);
+					if (sourceData && lineNumber - 1 < sourceData->sourceCodeTextlines.length())
+					{
+						ui->plainTextEditDisassembly->appendPlainText(QString("%1: %2")
+						      .arg(lineNumber - 1).arg(sourceData->sourceCodeTextlines.at(lineNumber)));
+					}
+					else
+						ui->plainTextEditDisassembly->appendPlainText(QString("%1: %2").arg(lineNumber).arg(fullFileName));
+				}
 				for (const auto & asmRecord : i->second->asList()->values)
 					processAsmRecord(* asmRecord->asTuple());
 			}
@@ -2951,7 +2959,7 @@ bool result = false;
 	else
 	{
 		QString errorMessage;
-		auto sourceData = sourceFilesCache.htmlDocumentForSourceFile(sourceCodeLocation.fullFileName, errorMessage);
+		auto sourceData = sourceFilesCache.getSourceFileData(sourceCodeLocation.fullFileName, errorMessage);
 		if (!sourceData)
 		{
 			ui->plainTextEditSourceView->setPlainText(errorMessage);

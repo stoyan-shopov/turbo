@@ -24,7 +24,7 @@
 #include "utils.hxx"
 #include "cscanner.hxx"
 
-std::shared_ptr<const struct SourceFilesCache::SourceFileData> SourceFilesCache::htmlDocumentForSourceFile(const QString &sourceFileName, QString & errorMessage)
+std::shared_ptr<const struct SourceFilesCache::SourceFileData> SourceFilesCache::getSourceFileData(const QString &sourceFileName, QString & errorMessage)
 {
 	errorMessage.clear();
 	QFileInfo fi(sourceFileName);
@@ -97,6 +97,7 @@ std::shared_ptr<const struct SourceFilesCache::SourceFileData> SourceFilesCache:
 	sourceData->filesystemFileName = f.fileName();
 	sourceData->lastModifiedDateTime = fi.lastModified();
 	sourceData->htmlDocument = std::make_shared<const QString>(source);
+	sourceData->sourceCodeTextlines = QString((f.seek(0), f.readAll())).split('\n');
 	sourceFileData.operator [](sourceFileName) = sourceData;
 	return sourceData;
 }

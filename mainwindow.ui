@@ -461,7 +461,11 @@ forward</string>
             </layout>
            </item>
            <item>
-            <widget class="QPlainTextEdit" name="plainTextEditDisassembly"/>
+            <widget class="QPlainTextEdit" name="plainTextEditDisassembly">
+             <property name="lineWrapMode">
+              <enum>QPlainTextEdit::NoWrap</enum>
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
