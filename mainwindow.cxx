@@ -55,6 +55,11 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->pushButtonRequestGdbHalt, & QPushButton::clicked, [&]{ requestTargetHalt(); });
 	connect(ui->pushButtonLoadSVDFile, & QPushButton::clicked, [&]{ loadSVDFile(); });
 
+	connect(ui->pushButtonRESTART, & QPushButton::clicked, [&]{
+		QApplication::quit();
+		QProcess::startDetached(QApplication::arguments()[0], QApplication::arguments());
+	});
+
 	connect(ui->pushButtonShowCurrentDisassembly, & QPushButton::clicked, [&]
 	{
 		sendDataToGdbProcess(QString("-data-disassemble -a $pc -- 5\n"));
