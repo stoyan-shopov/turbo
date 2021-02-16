@@ -56,7 +56,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->pushButtonLoadSVDFile, & QPushButton::clicked, [&]{ loadSVDFile(); });
 
 	connect(ui->pushButtonRESTART, & QPushButton::clicked, [&]{
-		QApplication::quit();
+		QApplication::closeAllWindows();
 		QProcess::startDetached(QApplication::arguments()[0], QApplication::arguments());
 	});
 
