@@ -613,6 +613,11 @@ reopen_last_file:
 		sendDataToGdbProcess("-data-list-register-values x\n");
 		sendDataToGdbProcess("-var-update --all-values *\n");
 		sendDataToGdbProcess("-stack-list-variables --all-values\n");
+
+		unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
+								   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_UPDATE_LAST_KNOWN_PROGRAM_COUNTER));
+
+		sendDataToGdbProcess(QString("%1-data-evaluate-expression \"(unsigned) $pc\"\n").arg(t));
 		if (ui->checkBoxAutoUpdateDisassembly->isChecked())
 			ui->pushButtonShowCurrentDisassembly->click();
 	});
@@ -1086,6 +1091,8 @@ void MainWindow::gdbMiLineAvailable(QString line)
 					break;
 				if (handleDisassemblyResponse(result, results, tokenNumber))
 					break;
+				if (handleValueResponse(result, results, tokenNumber))
+					break;
 				if (handleVerifyTargetMemoryContentsSeqPoint(result, results, tokenNumber))
 					break;
 				if (handleMemoryResponse(result, results, tokenNumber))
@@ -1164,19 +1171,6 @@ QString s = miString;
 	while (s.endsWith('\n'))
 		s.truncate(s.length() - 1);
 	return s;
-}
-
-uint64_t MainWindow::lastKnownProgramCounter()
-{
-	int i;
-	if (programCounterRegisterIndex == -1 || targetRegisterIndices.length() < programCounterRegisterIndex
-			|| (i = targetRegisterIndices.at(programCounterRegisterIndex)) >= ui->treeWidgetRegisters->topLevelItemCount())
-		return -1;
-
-	bool ok;
-	uint64_t pc;
-	pc = ui->treeWidgetRegisters->topLevelItem(i)->text(1).toULongLong(& ok, 0);
-	return ok ? pc : -1;
 }
 
 void MainWindow::appendLineToGdbLog(const QString &data)
@@ -1656,9 +1650,6 @@ bool MainWindow::handleRegisterNamesResponse(GdbMiParser::RESULT_CLASS_ENUM pars
 			if (registerName.length())
 			{
 				ui->treeWidgetRegisters->addTopLevelItem(new QTreeWidgetItem(QStringList() << registerName));
-				/*! \todo	HACK - this is a very quick and dirty way to locate the program counter, and it may get broken. */
-				if (registerName == "pc")
-					programCounterRegisterIndex = index;
 				index ++;
 			}
 		}
@@ -1867,7 +1858,6 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 	const GdbMiParser::MIList * disassembly;
 	if (parseResult != GdbMiParser::DONE || results.size() != 1 || results.at(0).variable != "asm_insns" || !(disassembly = results.at(0).value->asList()))
 		return false;
-	uint64_t pc = lastKnownProgramCounter();
 	int currentPCLineNumber = -1;
 	ui->plainTextEditDisassembly->setPlainText("Disassembly:");
 	std::function<void(const GdbMiParser::MITuple & asmRecord)> processAsmRecord = [&](const GdbMiParser::MITuple & asmRecord) -> void
@@ -1893,7 +1883,7 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 		bool ok;
 		uint64_t t;
 		t = QString::fromStdString(address).toULongLong(& ok, 0);
-		if (ok && t == pc)
+		if (ok && t == lastKnownProgramCounter)
 			currentPCLineNumber = ui->plainTextEditDisassembly->blockCount() - 1;
 	};
 	for (const auto & d : disassembly->results)
@@ -1941,6 +1931,23 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 		ui->plainTextEditDisassembly->setExtraSelections(QList<QTextEdit::ExtraSelection>() << s);
 		ui->plainTextEditDisassembly->setTextCursor(c);
 		ui->plainTextEditDisassembly->centerCursor();
+	}
+	return true;
+}
+
+bool MainWindow::handleValueResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
+{
+	if (parseResult != GdbMiParser::DONE || results.size() != 1 || results.at(0).variable != "value" || !results.at(0).value->asConstant())
+		return false;
+	if (gdbTokenContext.hasContextForToken(tokenNumber))
+	if (gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode
+		&& gdbTokenContext.readAndRemoveContext(tokenNumber).gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_UPDATE_LAST_KNOWN_PROGRAM_COUNTER)
+	{
+		bool ok;
+		uint64_t pc;
+		pc = QString::fromStdString(results.at(0).value->asConstant()->constant()).toULongLong(& ok, 0);
+		if (ok)
+			lastKnownProgramCounter = pc;
 	}
 	return true;
 }

@@ -845,8 +845,11 @@ private:
 				 * 'monitor jtag_scan' commands. This is a somewhat special case, because there is
 				 * no machine interface command corresponding to the 'monitor' command. */
 				GDB_RESPONSE_TARGET_SCAN_COMPLETE,
-				/* Response to the '-data-read-memory-bytes', used to know when to update the memory dump view. */
+				/* Response to the '-data-read-memory-bytes' command, used to know when to update the memory dump view. */
 				GDB_RESPONSE_DATA_READ_MEMORY,
+				/* Response to the '-data-evaluate-expression' command, used to know when to update the value of the
+				 * last known program counter. */
+				GDB_RESPONSE_UPDATE_LAST_KNOWN_PROGRAM_COUNTER,
 
 				/*******************************************************
 				 * The codes below are not really responses from gdb.
@@ -1294,9 +1297,7 @@ private:
 	GdbMiReceiver			* gdbMiReceiver;
 	/* This vector contains the mapping between gdb register number, and register indices in the register view widget. */
 	QVector<int> targetRegisterIndices;
-	/* This is the index of the program counter register in the register view. */
-	int programCounterRegisterIndex = -1;
-	uint64_t lastKnownProgramCounter(void);
+	uint64_t lastKnownProgramCounter;
 
 	/* Attempts to build an error strings out of a gdb result response. */
 	QString gdbErrorString(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results)
@@ -1347,6 +1348,8 @@ private:
 	bool handleFrameResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 	/* Handle the response to the "-data-disassemble" machine interface gdb command. */
 	bool handleDisassemblyResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
+	/* Handle the response to the "-data-evaluate-expression" machine interface gdb command. */
+	bool handleValueResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 
 	/* Sequence point handling. Also see comments about 'sequence points' for 'enum GDB_RESPONSE_ENUM' */
 	/*! \todo	Handle sequence points in separate functions. Rework and rename this function. */
