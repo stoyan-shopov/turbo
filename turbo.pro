@@ -36,6 +36,7 @@ SOURCES += \
 	   main.cxx \
 	   ./troll/gdbserver.cxx \
 	   ./troll/target-corefile.cxx \
+	   sourcefilescache.cxx \
 	   svdfileparser.cxx
 
 HEADERS += \
@@ -47,8 +48,10 @@ HEADERS += \
 	   ./troll/gdbserver.hxx \
 	   ./troll/target-corefile.hxx \
 	   ./troll/target.hxx \
+	   sourcefilescache.hxx \
 	   svdfileparser.hxx \
-	   troll/gdb-remote.hxx
+	   troll/gdb-remote.hxx \
+	   utils.hxx
 
 FORMS += \
         mainwindow.ui \

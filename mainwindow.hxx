@@ -64,7 +64,11 @@
 
 #include <functional>
 
+#include <unistd.h>
+
 #include "bmpdetect.hxx"
+#include "sourcefilescache.hxx"
+#include "utils.hxx"
 #include "ui_settings-dialog.h"
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
@@ -86,24 +90,6 @@ template<> struct hash<QString>
 namespace Ui {
 class MainWindow;
 }
-
-/*! \todo	Merge this, and the `Util` class, this one got misnamed. */
-class Utils
-{
-public:
-static QString filenameToWindowsFilename(const QString & filename)
-{
-/* A regular expression used for detecting msys paths, that need to be adjusted on windows systems.
- * This is not really exact... */
-QRegularExpression rx("^/(\\w)/");
-
-	QRegularExpressionMatch match = rx.match(filename);
-	if (match.hasMatch())
-		return QString(filename).replace(rx, match.captured(1) + ":/");
-	return filename;
-}
-
-};
 
 
 class BlackMagicProbeServer : public QObject
@@ -1108,6 +1094,8 @@ private:
 
 	QFileSystemWatcher sourceFileWatcher;
 	QString displayedSourceCodeFile;
+	SourceFilesCache	sourceFilesCache;
+
 	void highlightBreakpointedLines(void);
 	void highlightBookmarks(void);
 	void refreshSourceCodeView(void);

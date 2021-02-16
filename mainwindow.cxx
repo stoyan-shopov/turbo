@@ -32,7 +32,7 @@
 
 #include <set>
 
-#include "cscanner.hxx"
+#include "clex/cscanner.hxx"
 
 using namespace ELFIO;
 
@@ -2766,6 +2766,9 @@ void MainWindow::flashHighlightDockWidget(QDockWidget *w)
 bool MainWindow::displaySourceCodeFile(const SourceCodeLocation &sourceCodeLocation, bool saveCurrentLocationToNavigationStack,
 				       bool saveNewLocationToNavigationStack)
 {
+QTime ttt;
+ttt.start();
+#if KEEP_THIS_FOR_BENCHMARKING_PURPOSES
 QFile f(sourceCodeLocation.fullFileName);
 QFileInfo fi(sourceCodeLocation.fullFileName);
 int currentBlockNumber = ui->plainTextEditSourceView->textCursor().blockNumber();
@@ -2903,7 +2906,138 @@ bool result = false;
 	ui->pushButtonNavigateBack->setEnabled(navigationStack.canNavigateBack());
 	ui->pushButtonNavigateForward->setEnabled(navigationStack.canNavigateForward());
 
+	qDebug() << "Source file render time:" << ttt.elapsed();
 	return result;
+#else
+int currentBlockNumber = ui->plainTextEditSourceView->textCursor().blockNumber();
+bool result = false;
+
+	/*! \todo	Check if this is still needed. */
+	ui->plainTextEditSourceView->blockSignals(true);
+	ui->plainTextEditSourceView->clear();
+	ui->plainTextEditSourceView->setCurrentCharFormat(QTextCharFormat());
+
+	/* Save the current source code view location in the navigation stack, if valid. */
+	if (saveCurrentLocationToNavigationStack && !displayedSourceCodeFile.isEmpty())
+		navigationStack.push(SourceCodeLocation(displayedSourceCodeFile, currentBlockNumber + 1));
+
+	displayedSourceCodeFile.clear();
+
+	/* Special case for the internal help file - do not attempt to apply syntax highlighting on it. */
+	if (sourceCodeLocation.fullFileName == internalHelpFileName)
+	{
+		QFile f(internalHelpFileName);
+		f.open(QFile::ReadOnly);
+		sourceCodeViewHighlights.navigatedSourceCodeLine.clear();
+		ui->plainTextEditSourceView->appendPlainText(f.readAll());
+		QTextCursor c = ui->plainTextEditSourceView->textCursor();
+		c.movePosition(QTextCursor::Start);
+		if (sourceCodeLocation.lineNumber > 0)
+			c.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, sourceCodeLocation.lineNumber - 1);
+		ui->plainTextEditSourceView->setTextCursor(c);
+		ui->plainTextEditSourceView->centerCursor();
+		if (sourceCodeLocation.lineNumber > 0)
+		{
+			/* Highlight current line. */
+			c.movePosition(QTextCursor::NextBlock, QTextCursor::KeepAnchor);
+			QTextEdit::ExtraSelection selection;
+			selection.cursor = c;
+			selection.format = sourceCodeViewHighlightFormats.navigatedLine;
+			sourceCodeViewHighlights.navigatedSourceCodeLine << selection;
+		}
+		displayedSourceCodeFile = sourceCodeLocation.fullFileName;
+		refreshSourceCodeView();
+	}
+	else
+	{
+		QString errorMessage;
+		auto sourceData = sourceFilesCache.htmlDocumentForSourceFile(sourceCodeLocation.fullFileName, errorMessage);
+		if (!sourceData)
+		{
+			ui->plainTextEditSourceView->setPlainText(errorMessage);
+			goto out;
+		}
+
+		ui->plainTextEditSourceView->appendHtml(sourceData.operator *().htmlDocument.operator *());
+
+		/* Mark which source code lines have corresponding machine code generated for them,
+		 * and so can be used for setting breakpoints. */
+		/*! \todo	WARNING: tHIS TOTALLY DEFEATS HAVING A CACHE FOR THE SOURCE CODE FILES.
+		 * 		This actually dominates the rendering time for the source code view.
+		 *		It is best that this marking is done when generating the html document
+		 *		for the source code file, instead of doing it here. */
+		const auto & f = sourceFiles.find(sourceCodeLocation.fullFileName);
+		if (f != sourceFiles.cend() && f->machineCodeLineNumbers.size())
+		{
+			QTextCursor c(ui->plainTextEditSourceView->textCursor());
+			c.movePosition(QTextCursor::Start);
+			c.beginEditBlock();
+			while (1)
+			{
+				if (f->machineCodeLineNumbers.count(c.blockNumber() + 1))
+					c.insertText("*");
+				else
+					c.insertText(" ");
+				if (!c.movePosition(QTextCursor::NextBlock))
+					break;
+			}
+			c.endEditBlock();
+		}
+#if 0
+		for (const auto & l : lines)
+		{
+			QString n(QString("%1").arg(++ i));
+			source += QString(numFieldWidth - n.size(), QChar(' ')) + n + (machineCodeLineNumbers->count(i) ? '*':' ') + '|' + l + '\n';
+		}
+#endif
+
+		QTextCursor c(ui->plainTextEditSourceView->textCursor());
+		c.movePosition(QTextCursor::Start);
+		if (sourceCodeLocation.lineNumber > 0)
+		{
+			/* Check if the source code line number is available in the displayed file,
+			 * as a crude measure to detect out-of-sync source code files. */
+			if (sourceCodeLocation.lineNumber - 1 >= ui->plainTextEditSourceView->document()->blockCount())
+				QMessageBox::warning(0, "Source code line number is out of range", QString("Source code line number %1 is out of range.\n"
+													"Please, make sure that the source code files match the debug executable.\n"
+													"A clean build of the debug executable may be able to fix this warning.").arg(sourceCodeLocation.lineNumber));
+			else
+				c.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, sourceCodeLocation.lineNumber - 1);
+		}
+		ui->plainTextEditSourceView->setTextCursor(c);
+		ui->plainTextEditSourceView->centerCursor();
+
+		sourceCodeViewHighlights.navigatedSourceCodeLine.clear();
+		if (sourceCodeLocation.lineNumber > 0)
+		{
+			/* Highlight current line. */
+			c.movePosition(QTextCursor::NextBlock, QTextCursor::KeepAnchor);
+			QTextEdit::ExtraSelection selection;
+			selection.cursor = c;
+			selection.format = sourceCodeViewHighlightFormats.navigatedLine;
+			sourceCodeViewHighlights.navigatedSourceCodeLine << selection;
+		}
+		displayedSourceCodeFile = sourceCodeLocation.fullFileName;
+		searchCurrentSourceText(searchData.lastSearchedText);
+		if (saveNewLocationToNavigationStack)
+			navigationStack.push(sourceCodeLocation);
+
+		if (!sourceFileWatcher.files().isEmpty())
+			sourceFileWatcher.removePaths(sourceFileWatcher.files());
+		sourceFileWatcher.addPath(sourceData.operator *().filesystemFileName);
+
+		result = true;
+	}
+out:
+	setWindowTitle("turbo: " + displayedSourceCodeFile);
+	ui->plainTextEditSourceView->blockSignals(false);
+	/* Update navigation buttons. */
+	ui->pushButtonNavigateBack->setEnabled(navigationStack.canNavigateBack());
+	ui->pushButtonNavigateForward->setEnabled(navigationStack.canNavigateForward());
+
+	qDebug() << "Source file render time:" << ttt.elapsed();
+	return result;
+#endif
 }
 
 class xbtn : public QPushButton
