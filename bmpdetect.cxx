@@ -25,10 +25,12 @@
  * It is platform dependent, and best kept separately.
  */
 
-#define _WIN32_WINNT	0x0600
 
 #include "bmpdetect.hxx"
 #include <QRegularExpression>
+
+#ifdef Q_OS_WINDOWS
+#define _WIN32_WINNT	0x0600
 
 /* This source has been used as an example:
  * https://stackoverflow.com/questions/3438366/setupdigetdeviceproperty-usage-example
@@ -131,3 +133,5 @@ void findConnectedProbes(std::vector<BmpProbeData> &probeData)
 							 portName));
 	}
 }
+
+#endif /* Q_OS_WINDOWS */

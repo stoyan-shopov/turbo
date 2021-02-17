@@ -1864,7 +1864,15 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 	if (parseResult != GdbMiParser::DONE || results.size() != 1 || results.at(0).variable != "asm_insns" || !(disassembly = results.at(0).value->asList()))
 		return false;
 	int currentPCLineNumber = -1;
-	ui->plainTextEditDisassembly->setPlainText("Disassembly:");
+
+	ui->plainTextEditDisassembly->clear();
+	QTextCursor cursor(ui->plainTextEditDisassembly->textCursor());
+	cursor.movePosition(QTextCursor::Start);
+	QTextCharFormat sourceFormat, disassemblyFormat;
+	sourceFormat.setBackground(Qt::cyan);
+	disassemblyFormat.setBackground(Qt::lightGray);
+
+	cursor.insertText("Disassembly:\n");
 	std::function<void(const GdbMiParser::MITuple & asmRecord)> processAsmRecord = [&](const GdbMiParser::MITuple & asmRecord) -> void
 	{
 		std::string address, opcodes, mnemonics, funcName, offset;
@@ -1884,7 +1892,7 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 		QString s = QString::fromStdString(address + '\t' + opcodes + '\t' + mnemonics);
 		if (funcName.length() && offset.length())
 			s += QString::fromStdString("\t; " + funcName + "+" + offset);
-		ui->plainTextEditDisassembly->appendPlainText(s);
+		cursor.insertText("xxx" + s + '\n', disassemblyFormat);
 		bool ok;
 		uint64_t t;
 		t = QString::fromStdString(address).toULongLong(& ok, 0);
@@ -1913,11 +1921,12 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 					auto sourceData = sourceFilesCache.getSourceFileData(fullFileName, errorMessage);
 					if (sourceData && lineNumber - 1 < sourceData->sourceCodeTextlines.length())
 					{
-						ui->plainTextEditDisassembly->appendPlainText(QString("%1: %2")
-						      .arg(lineNumber - 1).arg(sourceData->sourceCodeTextlines.at(lineNumber)));
+						cursor.insertText(QString("%1: %2\n")
+						      .arg(lineNumber - 1).arg(sourceData->sourceCodeTextlines.at(lineNumber)),
+								  sourceFormat);
 					}
 					else
-						ui->plainTextEditDisassembly->appendPlainText(QString("%1: %2").arg(lineNumber).arg(fullFileName));
+						cursor.insertText(QString("%1: %2\n").arg(lineNumber).arg(fullFileName), sourceFormat);
 				}
 				for (const auto & asmRecord : i->second->asList()->values)
 					processAsmRecord(* asmRecord->asTuple());
