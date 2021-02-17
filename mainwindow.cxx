@@ -1892,7 +1892,7 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 		QString s = QString::fromStdString(address + '\t' + opcodes + '\t' + mnemonics);
 		if (funcName.length() && offset.length())
 			s += QString::fromStdString("\t; " + funcName + "+" + offset);
-		cursor.insertText("xxx" + s + '\n', disassemblyFormat);
+		cursor.insertText(s + '\n', disassemblyFormat);
 		bool ok;
 		uint64_t t;
 		t = QString::fromStdString(address).toULongLong(& ok, 0);
