@@ -28,6 +28,7 @@
 
 #include "bmpdetect.hxx"
 #include <QRegularExpression>
+#include <QDir>
 
 #ifdef Q_OS_WINDOWS
 #define _WIN32_WINNT	0x0600
@@ -134,4 +135,28 @@ void findConnectedProbes(std::vector<BmpProbeData> &probeData)
 	}
 }
 
-#endif /* Q_OS_WINDOWS */
+#elif defined Q_OS_LINUX
+
+void findConnectedProbes(std::vector<BmpProbeData> &probeData)
+{
+	QDir d("/dev/serial/by-id");
+	QStringList fileNames = d.entryList();
+	/* Filenames are of this kind:
+	 * usb-Black_Sphere_Technologies_Black_Magic_Probe__STLINK____Firmware_v1.6-rc0-955-ge3fd12eb__E3C89DF4-if00 */
+	QRegularExpression rx("usb-Black_Sphere_Technologies_Black_Magic_Probe_+([^_]+)[^v]*([^_]+)_+([^-]+)-if00");
+	for (const auto & f : fileNames)
+	{
+		QRegularExpressionMatch match = rx.match(f);
+		if (match.hasMatch())
+		{
+			probeData.push_back(BmpProbeData("BMP probe, " + match.captured(2) + ", host " + match.captured(1),
+							 match.captured(3),
+							 d.absolutePath() + '/' + f));
+		}
+	}
+
+}
+
+#else
+#error Unsupported environment.
+#endif /* Q_OS_LINUX */
