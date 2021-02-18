@@ -501,7 +501,7 @@ reopen_last_file:
 	ui->treeWidgetSubprograms->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(ui->treeWidgetSubprograms, &QTreeWidget::customContextMenuRequested, [=] (QPoint p) -> void { sourceItemContextMenuRequested(ui->treeWidgetSubprograms, p); });
 	ui->treeWidgetSourceFiles->setContextMenuPolicy(Qt::CustomContextMenu);
-	connect(ui->treeWidgetSourceFiles, &QTreeWidget::customContextMenuRequested, [=] (QPoint p) -> void { sourceItemContextMenuRequested(ui->treeWidgetSourceFiles, p); });
+	connect(ui->treeWidgetSourceFiles, &QTreeWidget::customContextMenuRequested, [&] (QPoint p) -> void { sourceItemContextMenuRequested(ui->treeWidgetSourceFiles, p); });
 
 	/* Use this for handling changes to the breakpoint enable/disable checkbox modifications. */
 	connect(ui->treeWidgetBreakpoints, SIGNAL(itemChanged(QTreeWidgetItem*,int)), this, SLOT(breakpointViewItemChanged(QTreeWidgetItem*,int)));
