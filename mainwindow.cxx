@@ -2740,7 +2740,7 @@ void MainWindow::moveCursorToPreviousMatch()
 	ui->plainTextEditSourceView->ensureCursorVisible();
 }
 
-QTreeWidgetItem * MainWindow::createNavigationWidgetItem(const QStringList &columnTexts, const QString fullFileName, int lineNumber, MainWindow::SourceFileData::SymbolData::SymbolKind itemKind)
+QTreeWidgetItem * MainWindow::createNavigationWidgetItem(const QStringList &columnTexts, const QString & fullFileName, int lineNumber, MainWindow::SourceFileData::SymbolData::SymbolKind itemKind)
 {
 	QTreeWidgetItem * item = new QTreeWidgetItem(columnTexts);
 	item->setData(0, SourceFileData::FILE_NAME, fullFileName);

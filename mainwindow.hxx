@@ -1126,7 +1126,7 @@ private:
 			/*! \todo	It may be simpler to add here all 'source location'-related objects,
 			 * i.e., bookmarks, breakpoints, stack frames, etc., and handle their context menus depending on
 			 * the item types. */
-			/* The values for this role are from the SymbolData:SymbolKind enumeration. */
+			/* The values for this role are from the SymbolData::SymbolKind enumeration. */
 			ITEM_KIND,
 			/* The data contents are a 'void' pointer that can be cast to a 'GdbBreakpointData' data structure. */
 			BREAKPOINT_DATA_POINTER,
@@ -1182,7 +1182,7 @@ private:
 		std::unordered_set<struct SymbolData, SymbolHash> dataTypes;
 	};
 
-	QTreeWidgetItem * createNavigationWidgetItem(const QStringList & columnTexts, const QString fullFileName = QString(), int lineNumber = -1,
+	QTreeWidgetItem * createNavigationWidgetItem(const QStringList & columnTexts, const QString & fullFileName = QString(), int lineNumber = -1,
 						     enum SourceFileData::SymbolData::SymbolKind itemKind = SourceFileData::SymbolData::INVALID);
 	struct StackFrameData
 	{
