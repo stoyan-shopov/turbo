@@ -507,17 +507,19 @@ reopen_last_file:
 	/* Use this for handling changes to the breakpoint enable/disable checkbox modifications. */
 	connect(ui->treeWidgetBreakpoints, SIGNAL(itemChanged(QTreeWidgetItem*,int)), this, SLOT(breakpointViewItemChanged(QTreeWidgetItem*,int)));
 
-	sourceCodeViewHighlightFormats.navigatedLine.setProperty(QTextFormat::FullWidthSelection, true);
-	sourceCodeViewHighlightFormats.navigatedLine.setBackground(QBrush(Qt::gray));
-	sourceCodeViewHighlightFormats.enabledBreakpoint.setProperty(QTextFormat::FullWidthSelection, true);
-	sourceCodeViewHighlightFormats.enabledBreakpoint.setBackground(QBrush(Qt::red));
-	sourceCodeViewHighlightFormats.disabledBreakpoint.setProperty(QTextFormat::FullWidthSelection, true);
-	sourceCodeViewHighlightFormats.disabledBreakpoint.setBackground(QBrush(Qt::darkRed));
-	sourceCodeViewHighlightFormats.currentLine.setProperty(QTextFormat::FullWidthSelection, true);
-	sourceCodeViewHighlightFormats.currentLine.setBackground(QBrush(Qt::lightGray));
-	sourceCodeViewHighlightFormats.bookmark.setProperty(QTextFormat::FullWidthSelection, true);
-	sourceCodeViewHighlightFormats.bookmark.setBackground(QBrush(Qt::darkCyan));
-	sourceCodeViewHighlightFormats.searchedText.setBackground(QBrush(Qt::yellow));
+	highlightFormats.navigatedLine.setProperty(QTextFormat::FullWidthSelection, true);
+	highlightFormats.navigatedLine.setBackground(QBrush(Qt::gray));
+	highlightFormats.enabledBreakpoint.setProperty(QTextFormat::FullWidthSelection, true);
+	highlightFormats.enabledBreakpoint.setBackground(QBrush(Qt::red));
+	highlightFormats.disabledBreakpoint.setProperty(QTextFormat::FullWidthSelection, true);
+	highlightFormats.disabledBreakpoint.setBackground(QBrush(Qt::darkRed));
+	highlightFormats.currentLine.setProperty(QTextFormat::FullWidthSelection, true);
+	highlightFormats.currentLine.setBackground(QBrush(Qt::lightGray));
+	highlightFormats.bookmark.setProperty(QTextFormat::FullWidthSelection, true);
+	highlightFormats.bookmark.setBackground(QBrush(Qt::darkCyan));
+	highlightFormats.currentDisassemblyLine.setProperty(QTextFormat::FullWidthSelection, true);
+	highlightFormats.currentDisassemblyLine.setBackground(QBrush(Qt::cyan));
+	highlightFormats.searchedText.setBackground(QBrush(Qt::yellow));
 
 	connect(ui->plainTextEditSourceView, &QPlainTextEdit::cursorPositionChanged, [=]()
 		{
@@ -527,7 +529,7 @@ reopen_last_file:
 			sourceCodeViewHighlights.currentSourceCodeLine.clear();
 			QTextEdit::ExtraSelection s;
 			s.cursor = c;
-			s.format = sourceCodeViewHighlightFormats.currentLine;
+			s.format = highlightFormats.currentLine;
 			sourceCodeViewHighlights.currentSourceCodeLine << s;
 			refreshSourceCodeView();
 		});
@@ -1861,19 +1863,17 @@ bool MainWindow::handleFrameResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 
 bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
 {
+	/*! \todo	Make the format of the source code and disassembly lines parameterizable. */
 	const GdbMiParser::MIList * disassembly;
 	if (parseResult != GdbMiParser::DONE || results.size() != 1 || results.at(0).variable != "asm_insns" || !(disassembly = results.at(0).value->asList()))
 		return false;
-	int currentPCLineNumber = -1;
+	int currentPCLineNumber = -1, currentLine = 0;
 
-	ui->plainTextEditDisassembly->clear();
-	QTextCursor cursor(ui->plainTextEditDisassembly->textCursor());
-	cursor.movePosition(QTextCursor::Start);
-	QTextCharFormat sourceFormat, disassemblyFormat;
-	sourceFormat.setBackground(Qt::cyan);
-	disassemblyFormat.setBackground(Qt::lightGray);
+	QString html;
 
-	cursor.insertText("Disassembly:\n");
+	html += ("<!DOCTYPE html>"
+			  "<html>"
+			  "<body>");
 	std::function<void(const GdbMiParser::MITuple & asmRecord)> processAsmRecord = [&](const GdbMiParser::MITuple & asmRecord) -> void
 	{
 		std::string address, opcodes, mnemonics, funcName, offset;
@@ -1893,12 +1893,13 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 		QString s = QString::fromStdString(address + '\t' + opcodes + '\t' + mnemonics);
 		if (funcName.length() && offset.length())
 			s += QString::fromStdString("\t; " + funcName + "+" + offset);
-		cursor.insertText(s + '\n', disassemblyFormat);
+		html += "<p style=\"background-color:Silver;\"><pre>" + s + "</pre></p>";
+		currentLine ++;
 		bool ok;
 		uint64_t t;
 		t = QString::fromStdString(address).toULongLong(& ok, 0);
 		if (ok && t == lastKnownProgramCounter)
-			currentPCLineNumber = ui->plainTextEditDisassembly->blockCount() - 1;
+			currentPCLineNumber = currentLine - 1;
 	};
 	for (const auto & d : disassembly->results)
 	{
@@ -1922,12 +1923,16 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 					auto sourceData = sourceFilesCache.getSourceFileData(fullFileName, errorMessage);
 					if (sourceData && lineNumber - 1 < sourceData->sourceCodeTextlines.length())
 					{
-						cursor.insertText(QString("%1: %2\n")
-						      .arg(lineNumber - 1).arg(sourceData->sourceCodeTextlines.at(lineNumber)),
-								  sourceFormat);
+						html += QString("<p style=\"background-color:Olive;\"><pre>%1: %2</pre></p>")
+						      .arg(lineNumber - 1).arg(sourceData->sourceCodeTextlines.at(lineNumber));
+						currentLine ++;
 					}
 					else
-						cursor.insertText(QString("%1: %2\n").arg(lineNumber).arg(fullFileName), sourceFormat);
+					{
+						html += QString("<p style=\"background-color:Olive;\"><pre>%1: %2</pre></p>")
+								  .arg(lineNumber).arg(fullFileName);
+						currentLine ++;
+					}
 				}
 				for (const auto & asmRecord : i->second->asList()->values)
 					processAsmRecord(* asmRecord->asTuple());
@@ -1941,6 +1946,11 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 	for (const auto & d : disassembly->values)
 		if (d->asTuple())
 			processAsmRecord(* d->asTuple());
+	html += ("</body></html>");
+	/*! \todo	Only update the disassembly view document if it is different than the currently generated one. Otherwise
+	 * 		it feels unnatural and irritating to re-center the disassembly view after each stepping operation. */
+	ui->plainTextEditDisassembly->clear();
+	ui->plainTextEditDisassembly->appendHtml(html);
 	/* Highlight the current program counter line, if detected. */
 	if (currentPCLineNumber != -1)
 	{
@@ -1950,7 +1960,7 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 
 		QTextEdit::ExtraSelection s;
 		s.cursor = c;
-		s.format = sourceCodeViewHighlightFormats.currentLine;
+		s.format = highlightFormats.currentDisassemblyLine;
 		ui->plainTextEditDisassembly->setExtraSelections(QList<QTextEdit::ExtraSelection>() << s);
 		ui->plainTextEditDisassembly->setTextCursor(c);
 		ui->plainTextEditDisassembly->centerCursor();
@@ -2579,12 +2589,12 @@ void MainWindow::highlightBreakpointedLines()
 		selection.cursor = c;
 		if (b.second->enabled)
 		{
-			selection.format = sourceCodeViewHighlightFormats.enabledBreakpoint;
+			selection.format = highlightFormats.enabledBreakpoint;
 			sourceCodeViewHighlights.enabledBreakpointedLines << selection;
 		}
 		else
 		{
-			selection.format = sourceCodeViewHighlightFormats.disabledBreakpoint;
+			selection.format = highlightFormats.disabledBreakpoint;
 			sourceCodeViewHighlights.disabledBreakpointedLines << selection;
 		}
 	}
@@ -2595,7 +2605,7 @@ void MainWindow::highlightBookmarks()
 	QTextCursor c(ui->plainTextEditSourceView->textCursor());
 	sourceCodeViewHighlights.bookmarkedLines.clear();
 	QTextEdit::ExtraSelection selection;
-	selection.format = sourceCodeViewHighlightFormats.bookmark;
+	selection.format = highlightFormats.bookmark;
 	for (const auto & bookmark : bookmarks)
 	{
 		if (bookmark.fullFileName != displayedSourceCodeFile)
@@ -2663,7 +2673,7 @@ void MainWindow::searchCurrentSourceText(const QString & pattern)
 			c.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor, matchLength);
 			QTextEdit::ExtraSelection s;
 			s.cursor = c;
-			s.format = sourceCodeViewHighlightFormats.searchedText;
+			s.format = highlightFormats.searchedText;
 			sourceCodeViewHighlights.searchedTextMatches << s;
 		}
 	}
@@ -2966,7 +2976,7 @@ bool result = false;
 			c.movePosition(QTextCursor::NextBlock, QTextCursor::KeepAnchor);
 			QTextEdit::ExtraSelection selection;
 			selection.cursor = c;
-			selection.format = sourceCodeViewHighlightFormats.navigatedLine;
+			selection.format = highlightFormats.navigatedLine;
 			sourceCodeViewHighlights.navigatedSourceCodeLine << selection;
 		}
 		displayedSourceCodeFile = sourceCodeLocation.fullFileName;
@@ -3038,7 +3048,7 @@ bool result = false;
 			c.movePosition(QTextCursor::NextBlock, QTextCursor::KeepAnchor);
 			QTextEdit::ExtraSelection selection;
 			selection.cursor = c;
-			selection.format = sourceCodeViewHighlightFormats.navigatedLine;
+			selection.format = highlightFormats.navigatedLine;
 			sourceCodeViewHighlights.navigatedSourceCodeLine << selection;
 		}
 		displayedSourceCodeFile = sourceCodeLocation.fullFileName;

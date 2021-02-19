@@ -986,8 +986,9 @@ private:
 		QTextCharFormat disabledBreakpoint;
 		QTextCharFormat bookmark;
 		QTextCharFormat searchedText;
+		QTextCharFormat currentDisassemblyLine;
 	}
-	sourceCodeViewHighlightFormats;
+	highlightFormats;
 	struct
 	{
 		QList<QTextEdit::ExtraSelection> navigatedSourceCodeLine;
