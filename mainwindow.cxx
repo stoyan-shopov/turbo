@@ -186,7 +186,6 @@ MainWindow::MainWindow(QWidget *parent) :
 	/* It is possible that the user presses quickly the button for starting gdb, before the gdb process is started and the
 	 * button is disabled, so only start the gdb process here if it is not already started or running. */
 	connect(ui->pushButtonStartGdb, & QPushButton::clicked, [&] {
-		qDebug() << "gdb state" << gdbProcess->state();
 		if (gdbProcess->state() == QProcess::NotRunning)
 		{
 			gdbProcess->setProgram(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString());
@@ -446,41 +445,43 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->plainTextEditSourceView->installEventFilter(this);
 	ui->plainTextEditSourceView->viewport()->installEventFilter(this);
 	/*! \todo	Only execute the code below after gdb has been successfully started. */
-	gdbProcess->start(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString(), QStringList() << "--interpreter=mi3");
-	QFileInfo f(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
-	if (f.exists())
-	{
-		int choice = QMessageBox::question(0, "Reopen last executable for debugging",
-				      QString("Last opened executable file for debugging is:\n")
-				      + f.canonicalFilePath() + "\n\n"
-				      "Do you want to reopen it, or load a new file?",
-				      "Reopen last file", "Select new file", "Cancel");
-		if (choice == 0)
-			/* Reopen last file. */
-			goto reopen_last_file;
-		else if (choice == 1)
-			/* Select new file. */
-			goto select_new_file;
-		/* Otherwise, do not load anything. */
-	}
-	else
-	{
-select_new_file:
-		f = QFileInfo(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
-		f = QFileInfo(QFileDialog::getOpenFileName(0, "Load executable for debugging", f.canonicalPath()));
-		if (!f.canonicalFilePath().isEmpty())
+	connect(gdbProcess.get(), & QProcess::started, [&] {
+		QFileInfo f(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
+		if (f.exists())
 		{
-reopen_last_file:
-			unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
-									   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_EXECUTABLE_SYMBOL_FILE_LOADED,
-									   f.canonicalFilePath())
-								   );
-			sendDataToGdbProcess("-gdb-set tcp auto-retry off\n");
-			sendDataToGdbProcess("-gdb-set mem inaccessible-by-default off\n");
-			sendDataToGdbProcess("-gdb-set print elements unlimited\n");
-			sendDataToGdbProcess(QString("%1-file-exec-and-symbols \"%2\"\n").arg(t).arg(f.canonicalFilePath()));
+			int choice = QMessageBox::question(0, "Reopen last executable for debugging",
+							   QString("Last opened executable file for debugging is:\n")
+							   + f.canonicalFilePath() + "\n\n"
+										     "Do you want to reopen it, or load a new file?",
+							   "Reopen last file", "Select new file", "Cancel");
+			if (choice == 0)
+				/* Reopen last file. */
+				goto reopen_last_file;
+			else if (choice == 1)
+				/* Select new file. */
+				goto select_new_file;
+			/* Otherwise, do not load anything. */
 		}
-	}
+		else
+		{
+select_new_file:
+			f = QFileInfo(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
+			f = QFileInfo(QFileDialog::getOpenFileName(0, "Load executable for debugging", f.canonicalPath()));
+			if (!f.canonicalFilePath().isEmpty())
+			{
+reopen_last_file:
+				unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
+										   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_EXECUTABLE_SYMBOL_FILE_LOADED,
+										   f.canonicalFilePath())
+									   );
+				sendDataToGdbProcess("-gdb-set tcp auto-retry off\n");
+				sendDataToGdbProcess("-gdb-set mem inaccessible-by-default off\n");
+				sendDataToGdbProcess("-gdb-set print elements unlimited\n");
+				sendDataToGdbProcess(QString("%1-file-exec-and-symbols \"%2\"\n").arg(t).arg(f.canonicalFilePath()));
+			}
+		}
+	});
+	gdbProcess->start(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString(), QStringList() << "--interpreter=mi3");
 
 	ui->treeWidgetBreakpoints->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(ui->treeWidgetBreakpoints, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(breakpointsContextMenuRequested(QPoint)));
@@ -2193,6 +2194,7 @@ void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
 	qDebug() << gdbProcess->readAllStandardError();
 	qDebug() << gdbProcess->readAllStandardOutput();
 	qDebug() << "gdb process finished";
+	ui->pushButtonStartGdb->setEnabled(true);
 	if (exitStatus == QProcess::CrashExit)
 	{
 		if (QMessageBox::critical(0, "The gdb process crashed", "Gdb crashed\n\nDo you want to restart the gdb process?", "Restart gdb", "Abort")
