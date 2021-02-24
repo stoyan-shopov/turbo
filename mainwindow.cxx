@@ -319,9 +319,9 @@ MainWindow::MainWindow(QWidget *parent) :
 		} );
 
 	connect(ui->treeWidgetBreakpoints, & QTreeWidget::itemActivated, [=] (QTreeWidgetItem * item, int column)
-		{ if (column != GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER) showSourceCode(item); } );
+		{ if (column != TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER) showSourceCode(item); } );
 	connect(ui->treeWidgetBreakpoints, & QTreeWidget::itemClicked, [=] (QTreeWidgetItem * item, int column)
-		{ if (column != GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER) showSourceCode(item); } );
+		{ if (column != TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER) showSourceCode(item); } );
 
 	QFontDatabase::addApplicationFont(":/fonts/resources/Hack-Regular.ttf");
 	setStyleSheet(QString(
@@ -1574,6 +1574,7 @@ bool MainWindow::handleBreakpointTableResponse(GdbMiParser::RESULT_CLASS_ENUM pa
 			}
 			breakpoints.push_back(breakpointDetails);
 		}
+		breakpointCache.rebuildCache(breakpoints);
 		updateBreakpointsView();
 		refreshSourceCodeView();
 	}
@@ -2394,10 +2395,10 @@ void MainWindow::bookmarksContextMenuRequested(QPoint p)
 
 void MainWindow::breakpointViewItemChanged(QTreeWidgetItem *item, int column)
 {
-	if (column != GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER)
+	if (column != TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER)
 		return;
 	GdbBreakpointData * breakpoint = static_cast<GdbBreakpointData *>(item->data(0, SourceFileData::BREAKPOINT_DATA_POINTER).value<void *>());
-	if (breakpoint->enabled == item->checkState(GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER))
+	if (breakpoint->enabled == item->checkState(TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER))
 		/* Nothing to do, return. */
 		return;
 	sendDataToGdbProcess(QString("-break-%2 %3\n")
@@ -2530,7 +2531,7 @@ void MainWindow::updateBreakpointsView()
 						disableNavigation
 						);
 		}
-		w->setCheckState(GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER, b.enabled ? Qt::Checked : Qt::Unchecked);
+		w->setCheckState(TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER, b.enabled ? Qt::Checked : Qt::Unchecked);
 		w->setData(0, SourceFileData::BREAKPOINT_DATA_POINTER, QVariant::fromValue((void *) & b));
 		for (const auto & m : b.multipleLocationBreakpoints)
 		{
@@ -2545,7 +2546,7 @@ void MainWindow::updateBreakpointsView()
 					m.sourceCodeLocation.fullFileName,
 					m.sourceCodeLocation.lineNumber
 					);
-			t->setCheckState(GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER, m.enabled ? Qt::Checked : Qt::Unchecked);
+			t->setCheckState(TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER, m.enabled ? Qt::Checked : Qt::Unchecked);
 			t->setData(0, SourceFileData::BREAKPOINT_DATA_POINTER, QVariant::fromValue((void *) & m));
 			w->addChild(t);
 		}
@@ -2587,36 +2588,34 @@ void MainWindow::on_lineEditVarObjectExpression_returnPressed()
 
 void MainWindow::highlightBreakpointedLines()
 {
+	/* Highlight lines with breakpoints, if any. */
+
 	QTextCursor c(ui->plainTextEditSourceView->textCursor());
 	sourceCodeViewHighlights.disabledBreakpointedLines.clear();
 	sourceCodeViewHighlights.enabledBreakpointedLines.clear();
-	/* Highlight lines with breakpoints, if any. */
-	std::multimap<int /* Source code line */, const GdbBreakpointData * /* Breakpoint details. */> breakpointedLines;
-	for (const auto & b : breakpoints)
-	{
-		if (b.sourceCodeLocation.fullFileName == displayedSourceCodeFile)
-			breakpointedLines.insert(std::pair<int /* Source code line */, const GdbBreakpointData * /* Breakpoint details. */>(b.sourceCodeLocation.lineNumber, &b));
-		for (const auto & t : b.multipleLocationBreakpoints)
-			if (t.sourceCodeLocation.fullFileName == displayedSourceCodeFile)
-				breakpointedLines.insert(std::pair<int /* Source code line */, const GdbBreakpointData * /* Breakpoint details. */>(t.sourceCodeLocation.lineNumber, &t));
-	}
+
+	const QSet<int /* line numbers */> & enabledLines = breakpointCache.enabledBreakpointLinesForFile(displayedSourceCodeFile);
+	const QSet<int /* line numbers */> & disabledLines = breakpointCache.disabledBreakpointLinesForFile(displayedSourceCodeFile);
+
 	QTextEdit::ExtraSelection selection;
-	for (const auto & b : breakpointedLines)
+
+	for (const auto & line : enabledLines)
 	{
 		c.movePosition(QTextCursor::Start);
-		c.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, b.first - 1);
+		c.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, line - 1);
 		c.movePosition(QTextCursor::NextBlock, QTextCursor::KeepAnchor);
 		selection.cursor = c;
-		if (b.second->enabled)
-		{
-			selection.format = highlightFormats.enabledBreakpoint;
-			sourceCodeViewHighlights.enabledBreakpointedLines << selection;
-		}
-		else
-		{
-			selection.format = highlightFormats.disabledBreakpoint;
-			sourceCodeViewHighlights.disabledBreakpointedLines << selection;
-		}
+		selection.format = highlightFormats.enabledBreakpoint;
+		sourceCodeViewHighlights.enabledBreakpointedLines << selection;
+	}
+	for (const auto & line : disabledLines)
+	{
+		c.movePosition(QTextCursor::Start);
+		c.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, line - 1);
+		c.movePosition(QTextCursor::NextBlock, QTextCursor::KeepAnchor);
+		selection.cursor = c;
+		selection.format = highlightFormats.disabledBreakpoint;
+		sourceCodeViewHighlights.disabledBreakpointedLines << selection;
 	}
 }
 

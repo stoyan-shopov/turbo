@@ -71,6 +71,8 @@
 #include "utils.hxx"
 #include "ui_settings-dialog.h"
 
+#include "breakpoint-cache.hxx"
+
 #if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
 /* It seems that prior to Qt version 5.14, Qt does not provide a specialization
  * for 'std::hash<QString>'. If this is the case, provide a specialization for
@@ -764,17 +766,6 @@ private slots:
 	void loadSVDFile(void);
 
 private:
-	struct SourceCodeLocation
-	{
-		QString	fullFileName;
-		int	lineNumber = -1;
-		SourceCodeLocation(const QString & fullFileName = QString(), int lineNumber = -1) :
-			fullFileName(fullFileName), lineNumber(lineNumber) {}
-		bool operator ==(const SourceCodeLocation & other) const
-			{ return other.lineNumber == lineNumber && other.fullFileName == fullFileName; }
-		bool operator !=(const SourceCodeLocation & other) const
-			{ return ! operator ==(other); }
-	};
 	struct
 	{
 	private:
@@ -937,41 +928,13 @@ private:
 		uint8_t gdbTokenPool[GDB_TOKEN_POOL_SIZE_BYTES] = { 1, };
 	}
 	gdbTokenContext;
-	struct GdbBreakpointData
+
+	enum
 	{
-		enum
-		{
-			TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER	= 3,
-		};
-		QString		gdbReportedNumberString = "???";
-		QString		type = "<<< unknown >>>", disposition = "<<< unknown >>>";
-		bool		enabled = false;
-		uint32_t	address = -1;
-		QString		subprogramName = "<<< unknown >>>";
-		QString		fileName = "<<< unknown >>>";
-		SourceCodeLocation	sourceCodeLocation;
-		QString		locationSpecifierString = "<<< unknown >>>";
-		std::vector<GdbBreakpointData>	multipleLocationBreakpoints;
-		static void breakpointsForSourceCodeLineNumber(
-				const SourceCodeLocation & sourceCodeLocation,
-				const std::vector<GdbBreakpointData> & breakpoints,
-				std::vector<const GdbBreakpointData *> & foundBreakpoints)
-		{
-			for (const auto & b : breakpoints)
-			{
-				if (b.sourceCodeLocation == sourceCodeLocation)
-					foundBreakpoints.push_back(& b);
-				/* Special case for breakpoints with multiple locations. Otherwise breakpoint deletion gets broken,
-				 * because sub-breakpoints of a multiple location breakpoint cannot be deleted - only enabled or disabled. */
-				if (b.multipleLocationBreakpoints.size() && b.multipleLocationBreakpoints.at(0).sourceCodeLocation == sourceCodeLocation)
-					foundBreakpoints.push_back(& b);
-				for (const auto & t : b.multipleLocationBreakpoints)
-					if (t.sourceCodeLocation == sourceCodeLocation)
-						foundBreakpoints.push_back(& t);
-			}
-		}
+		TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER	= 3,
 	};
 	std::vector<GdbBreakpointData>	breakpoints;
+	BreakpointCache			breakpointCache;
 
 	struct
 	{

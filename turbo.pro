@@ -43,6 +43,7 @@ SOURCES += \
 
 HEADERS += \
 	   bmpdetect.hxx \
+	   breakpoint-cache.hxx \
 	   clex/cscanner.hxx \
 	   gdb-mi-parser.hxx \
 	   mainwindow.hxx \
@@ -50,6 +51,7 @@ HEADERS += \
 	   ./troll/gdbserver.hxx \
 	   ./troll/target-corefile.hxx \
 	   ./troll/target.hxx \
+	   source-code-location.hxx \
 	   sourcefilescache.hxx \
 	   svdfileparser.hxx \
 	   troll/gdb-remote.hxx \
