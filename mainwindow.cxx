@@ -2240,6 +2240,8 @@ void MainWindow::readGdbVarObjectChildren(const QString varObjectName)
 
 bool MainWindow::showSourceCode(const QTreeWidgetItem *item)
 {
+	if (!item->data(0, SourceFileData::DISABLE_SOURCE_CODE_NAVIGATION).isNull() && item->data(0, SourceFileData::DISABLE_SOURCE_CODE_NAVIGATION).toBool())
+		return false;
 	QVariant v = item->data(0, SourceFileData::FILE_NAME);
 	bool ok;
 	if (v.type() != QMetaType::QString)
@@ -2330,6 +2332,8 @@ void MainWindow::sourceItemContextMenuRequested(const QTreeWidget *treeWidget, Q
 			qDebug() << "warning: unset source item type, aborting context menu request";
 			return;
 		}
+		if (!w->data(0, SourceFileData::DISABLE_CONTEXT_MENU).isNull() && w->data(0, SourceFileData::DISABLE_CONTEXT_MENU).toBool())
+			return;
 		QList<QTreeWidgetItem *> items = treeWidget->findItems(w->text(0), Qt::MatchExactly);
 		SourceFileData::SymbolData::SymbolKind itemKind = (SourceFileData::SymbolData::SymbolKind) w->data(0, SourceFileData::ITEM_KIND).toUInt();
 		/*! \todo	At this time, the case for multiple symbols of the same kind is not handled well.
@@ -2373,7 +2377,9 @@ void MainWindow::sourceItemContextMenuRequested(const QTreeWidget *treeWidget, Q
 		if (selection)
 		{
 			if (selection == disassembleFile)
-				sendDataToGdbProcess(QString("-data-disassemble -f \"%1\" -l 1 -n -1 -- 5\n").arg(w->text(0)));
+				/*! \todo	This does not work for disassembling whole files. It just disassembles the very first
+				 *		function in the file, if any. */
+				sendDataToGdbProcess(QString("-data-disassemble -f \"%1\" -l 1 -- 5\n").arg(w->text(0)));
 			else if (selection == disassembleSuprogram)
 				sendDataToGdbProcess(QString("-data-disassemble -a \"%1\" -- 5\n").arg(w->text(0)));
 		}
@@ -2459,7 +2465,8 @@ bool showOnlyExistingSourceFiles = ui->checkBoxShowOnlyExistingSourceFiles->isCh
 	for (const auto & f : sourceFiles)
 		if (shouldFileBeListed(f))
 		{
-			QTreeWidgetItem * t = createNavigationWidgetItem(QStringList() << f.fileName << f.fullFileName, f.fullFileName, 0, SourceFileData::SymbolData::SOURCE_FILE_NAME);
+			QTreeWidgetItem * t = createNavigationWidgetItem(QStringList() << f.fileName << f.fullFileName, f.fullFileName,
+									 0, SourceFileData::SymbolData::SOURCE_FILE_NAME, false, true);
 			ui->treeWidgetSourceFiles->addTopLevelItem(t);
 			for (const auto & s : f.subprograms)
 				t->addChild(createNavigationWidgetItem(QStringList() << s.description, f.fullFileName, s.line, SourceFileData::SymbolData::SUBPROGRAM));
@@ -2513,7 +2520,9 @@ void MainWindow::updateBreakpointsView()
 						<< QString("0x%1").arg(b.address, 8, 16, QChar('0'))
 						<< b.locationSpecifierString,
 					b.sourceCodeLocation.fullFileName,
-					b.sourceCodeLocation.lineNumber
+					b.sourceCodeLocation.lineNumber,
+					SourceFileData::SymbolData::INVALID,
+					b.multipleLocationBreakpoints.size() != 0
 					);
 		w->setCheckState(GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER, b.enabled ? Qt::Checked : Qt::Unchecked);
 		w->setData(0, SourceFileData::BREAKPOINT_DATA_POINTER, QVariant::fromValue((void *) & b));
@@ -2740,12 +2749,16 @@ void MainWindow::moveCursorToPreviousMatch()
 	ui->plainTextEditSourceView->ensureCursorVisible();
 }
 
-QTreeWidgetItem * MainWindow::createNavigationWidgetItem(const QStringList &columnTexts, const QString & fullFileName, int lineNumber, MainWindow::SourceFileData::SymbolData::SymbolKind itemKind)
+QTreeWidgetItem * MainWindow::createNavigationWidgetItem(const QStringList &columnTexts, const QString & fullFileName, int lineNumber, MainWindow::SourceFileData::SymbolData::SymbolKind itemKind, bool disableNavigation, bool disableContextMenu)
 {
 	QTreeWidgetItem * item = new QTreeWidgetItem(columnTexts);
 	item->setData(0, SourceFileData::FILE_NAME, fullFileName);
 	item->setData(0, SourceFileData::LINE_NUMBER, lineNumber);
 	item->setData(0, SourceFileData::ITEM_KIND, itemKind);
+	if (disableNavigation)
+		item->setData(0, SourceFileData::DISABLE_SOURCE_CODE_NAVIGATION, true);
+	if (disableContextMenu)
+		item->setData(0, SourceFileData::DISABLE_CONTEXT_MENU, true);
 	return item;
 }
 

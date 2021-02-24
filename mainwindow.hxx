@@ -1130,12 +1130,10 @@ private:
 			ITEM_KIND,
 			/* The data contents are a 'void' pointer that can be cast to a 'GdbBreakpointData' data structure. */
 			BREAKPOINT_DATA_POINTER,
-			/* Generic, 'void' pointer, used for referencing some data structures from a tree widget
-			 * item. The interpretation of this pointer depends on context. It is expected that,
-			 * depending on context, this pointer will be cast to the actual type that it points
-			 * to, before use. */
-			/*! \todo	This was once usedm but is currently unused. Maybe remove it altogether. */
-			GENERIC_DATA_POINTER,
+			/* If set, and set to true, then the context menu for this item is disabled. */
+			DISABLE_CONTEXT_MENU,
+			/* If set, and set to true, then navigating to source code for this item is disabled. */
+			DISABLE_SOURCE_CODE_NAVIGATION,
 		};
 		QString fileName, gdbReportedFileName, fullFileName;
 		bool isSourceLinesFetched = false;
@@ -1183,7 +1181,8 @@ private:
 	};
 
 	QTreeWidgetItem * createNavigationWidgetItem(const QStringList & columnTexts, const QString & fullFileName = QString(), int lineNumber = -1,
-						     enum SourceFileData::SymbolData::SymbolKind itemKind = SourceFileData::SymbolData::INVALID);
+						     enum SourceFileData::SymbolData::SymbolKind itemKind = SourceFileData::SymbolData::INVALID,
+						     bool disableNavigation = false, bool disableContextMenu = false);
 	struct StackFrameData
 	{
 		QString fileName, gdbReportedFileName, fullFileName, subprogramName;
