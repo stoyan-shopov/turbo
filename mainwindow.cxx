@@ -2240,7 +2240,10 @@ void MainWindow::breakpointsContextMenuRequested(QPoint p)
 		QMenu menu(this);
 		GdbBreakpointData * breakpoint = static_cast<GdbBreakpointData *>(w->data(0, SourceFileData::BREAKPOINT_DATA_POINTER).value<void *>());
 		QHash<void *, int> menuSelections;
-		menuSelections.operator [](menu.addAction("Delete breakpoint")) = 1;
+		/* Special case for breakpoints with multiple locations - only allow to delete the top level breakpoint,
+		 * because gdb does not allow derived breakpoints to be deleted. */
+		if (!w->parent())
+			menuSelections.operator [](menu.addAction("Delete breakpoint")) = 1;
 		menuSelections.operator [](menu.addAction(breakpoint->enabled ? "Disable breakpoint" : "Enable breakpoint")) = 2;
 		menu.addAction("Cancel");
 		/* Because of the header of the tree widget, it looks more natural to set the
@@ -2502,7 +2505,7 @@ void MainWindow::updateBreakpointsView()
 		}
 		else
 		{
-			/* Special case - for breakpoints with multiple location, gdb does not report a source code
+			/* Special case - for breakpoints with multiple locations, gdb does not report a source code
 			 * location for the primary breakpoints. Instead, source code locations are reported for
 			 * the list of derived breakpoints. Only enable navigation for this breakpoint if all of the
 			 * derived breakpoints have the same source code location. */
