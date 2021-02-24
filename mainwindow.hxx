@@ -865,19 +865,6 @@ private:
 				 * (of only those source files that actually contain any
 				 * machine code) can be built. */
 				GDB_SEQUENCE_POINT_SOURCE_CODE_ADDRESSES_RETRIEVED,
-				/* When receiving this response code, update the breakpoint information by
-				 * issuing a "-break-list" gdb machine interface command.
-				 * This may be needed when issuing breakpoint commands, such as
-				 * "-break-delete", "-break-enable", "-break-disable", etc., because
-				 * gdb answers to such commands with a "^done" response packet,
-				 * with no other details available. This is also used for
-				 * updating the breakpoint list after receiving 'notify-async-output'
-				 * records for breakpoint changes from gdb - these are sent to the
-				 * frontend when breakpoints are modified directly by the user, through
-				 * breakpoint commands. The 'notify-async-output' records in such cases
-				 * are '=breakpoint-created,bkpt={...}', '=breakpoint-modified,bkpt={...}',
-				 * '=breakpoint-deleted,id=number'. */
-				GDB_REQUEST_BREAKPOINT_LIST_UPDATE,
 				/* This response code is expected after the target non-volatile memory
 				 * contents have been retrieved, and a verification of the target memory
 				 * contents against the ELF file should be performed. */
@@ -970,10 +957,18 @@ private:
 				const std::vector<GdbBreakpointData> & breakpoints,
 				std::vector<const GdbBreakpointData *> & foundBreakpoints)
 		{
-			/*! \todo	Also handle multiple-location breakpoints here. */
 			for (const auto & b : breakpoints)
+			{
 				if (b.sourceCodeLocation == sourceCodeLocation)
 					foundBreakpoints.push_back(& b);
+				/* Special case for breakpoints with multiple locations. Otherwise breakpoint deletion gets broken,
+				 * because sub-breakpoints of a multiple location breakpoint cannot be deleted - only enabled or disabled. */
+				if (b.multipleLocationBreakpoints.size() && b.multipleLocationBreakpoints.at(0).sourceCodeLocation == sourceCodeLocation)
+					foundBreakpoints.push_back(& b);
+				for (const auto & t : b.multipleLocationBreakpoints)
+					if (t.sourceCodeLocation == sourceCodeLocation)
+						foundBreakpoints.push_back(& t);
+			}
 		}
 	};
 	std::vector<GdbBreakpointData>	breakpoints;
@@ -1344,8 +1339,6 @@ private:
 	bool handleSequencePoints(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 	/* Handle sequence point response for vrtifying target memory area contents. */
 	bool handleVerifyTargetMemoryContentsSeqPoint(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
-	/* Handle various responses from gdb that may lead to updating the breakpoint information. */
-	bool handleBreakpointUpdateResponses(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 	/* Handle target scan ('monitor swdp_scan' and 'monitor jtag_scan') response. */
 	bool handleTargetScanResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 	/* Handle the response to the "-data-read-memory-bytes" machine interface gdb command. */

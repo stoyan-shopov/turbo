@@ -1000,11 +1000,9 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 					/* Breakpoint(s) found at current source code line - remove them. */
 					for (const auto & t : b)
 						sendDataToGdbProcess(QString("-break-delete %1\n").arg(t->gdbReportedNumberString));
-					/* Insert a synchronization request for updating the breakpoint list. */
-					unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
-											   GdbTokenContext::GdbResponseContext::GDB_REQUEST_BREAKPOINT_LIST_UPDATE));
-					sendDataToGdbProcess(QString("%1\n").arg(t));
 				}
+				/* Reread the list of breakpoints. */
+				sendDataToGdbProcess("-break-list\n");
 			}
 			result = true;
 			break;
@@ -1076,8 +1074,6 @@ void MainWindow::gdbMiLineAvailable(QString line)
 				if (handleFileExecAndSymbolsResponse(result, results, tokenNumber))
 					break;
 				if (handleSequencePoints(result, results, tokenNumber))
-					break;
-				if (handleBreakpointUpdateResponses(result, results, tokenNumber))
 					break;
 				if (handleTargetScanResponse(result, results, tokenNumber))
 					break;
@@ -2052,25 +2048,6 @@ bool MainWindow::handleVerifyTargetMemoryContentsSeqPoint(GdbMiParser::RESULT_CL
 	return true;
 }
 
-bool MainWindow::handleBreakpointUpdateResponses(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
-{
-	if (parseResult != GdbMiParser::DONE)
-		return false;
-	if (results.size() && results.at(0).variable == "bkpt")
-	{
-update_breakpoint_data:
-		sendDataToGdbProcess("-break-list\n");
-		return true;
-	}
-	if (gdbTokenContext.hasContextForToken(tokenNumber)
-		&& gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_REQUEST_BREAKPOINT_LIST_UPDATE)
-	{
-		gdbTokenContext.readAndRemoveContext(tokenNumber);
-		goto update_breakpoint_data;
-	}
-	return false;
-}
-
 bool MainWindow::handleTargetScanResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
 {
 	if (gdbTokenContext.hasContextForToken(tokenNumber)
@@ -2279,11 +2256,9 @@ void MainWindow::breakpointsContextMenuRequested(QPoint p)
 		case 2:
 			/* Toggle breakpoint. */
 			breakpointMiCommand = (breakpoint->enabled ? "disable" : "enable");
-			{
-				unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
-										   GdbTokenContext::GdbResponseContext::GDB_REQUEST_BREAKPOINT_LIST_UPDATE));
-				sendDataToGdbProcess(QString("%1-break-%2 %3\n").arg(t).arg(breakpointMiCommand).arg(breakpoint->gdbReportedNumberString));
-			}
+			sendDataToGdbProcess(QString("-break-%2 %3\n").arg(breakpointMiCommand).arg(breakpoint->gdbReportedNumberString));
+			/* Reread the list of breakpoints. */
+			sendDataToGdbProcess("-break-list\n");
 			break;
 		default:
 			break;
@@ -2422,12 +2397,11 @@ void MainWindow::breakpointViewItemChanged(QTreeWidgetItem *item, int column)
 	if (breakpoint->enabled == item->checkState(GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER))
 		/* Nothing to do, return. */
 		return;
-	unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
-								   GdbTokenContext::GdbResponseContext::GDB_REQUEST_BREAKPOINT_LIST_UPDATE));
-	sendDataToGdbProcess(QString("%1-break-%2 %3\n")
-			     .arg(t)
+	sendDataToGdbProcess(QString("-break-%2 %3\n")
 			     .arg(breakpoint->enabled ? "disable" : "enable")
 			     .arg(breakpoint->gdbReportedNumberString));
+	/* Reread the list of breakpoints. */
+	sendDataToGdbProcess("-break-list\n");
 }
 
 void MainWindow::stringSearchReady(const QString pattern, QSharedPointer<QVector<StringFinder::SearchResult>> results, bool resultsTruncated)
@@ -2511,19 +2485,48 @@ void MainWindow::updateBreakpointsView()
 	ui->treeWidgetBreakpoints->clear();
 	for (const auto & b : breakpoints)
 	{
-		QTreeWidgetItem * w = createNavigationWidgetItem(
-					QStringList()
+		QTreeWidgetItem * w = 0;
+		if (!b.multipleLocationBreakpoints.size())
+		{
+			w = createNavigationWidgetItem(
+						QStringList()
 						<< b.gdbReportedNumberString
 						<< b.type
 						<< b.disposition
 						<< (b.enabled ? "yes" : "no")
 						<< QString("0x%1").arg(b.address, 8, 16, QChar('0'))
 						<< b.locationSpecifierString,
-					b.sourceCodeLocation.fullFileName,
-					b.sourceCodeLocation.lineNumber,
-					SourceFileData::SymbolData::INVALID,
-					b.multipleLocationBreakpoints.size() != 0
-					);
+						b.sourceCodeLocation.fullFileName,
+						b.sourceCodeLocation.lineNumber
+						);
+		}
+		else
+		{
+			/* Special case - for breakpoints with multiple location, gdb does not report a source code
+			 * location for the primary breakpoints. Instead, source code locations are reported for
+			 * the list of derived breakpoints. Only enable navigation for this breakpoint if all of the
+			 * derived breakpoints have the same source code location. */
+			bool disableNavigation = false;
+			for (int i = 0; i < b.multipleLocationBreakpoints.size() - 1; i ++)
+				if (b.multipleLocationBreakpoints.at(i + 1).sourceCodeLocation != b.multipleLocationBreakpoints.at(i).sourceCodeLocation)
+				{
+					disableNavigation = true;
+					break;
+				}
+			w = createNavigationWidgetItem(
+						QStringList()
+						<< b.gdbReportedNumberString
+						<< b.type
+						<< b.disposition
+						<< (b.enabled ? "yes" : "no")
+						<< QString("0x%1").arg(b.address, 8, 16, QChar('0'))
+						<< b.locationSpecifierString,
+						b.multipleLocationBreakpoints.at(0).sourceCodeLocation.fullFileName,
+						b.multipleLocationBreakpoints.at(0).sourceCodeLocation.lineNumber,
+						SourceFileData::SymbolData::INVALID,
+						disableNavigation
+						);
+		}
 		w->setCheckState(GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER, b.enabled ? Qt::Checked : Qt::Unchecked);
 		w->setData(0, SourceFileData::BREAKPOINT_DATA_POINTER, QVariant::fromValue((void *) & b));
 		for (const auto & m : b.multipleLocationBreakpoints)
@@ -2539,7 +2542,7 @@ void MainWindow::updateBreakpointsView()
 					m.sourceCodeLocation.fullFileName,
 					m.sourceCodeLocation.lineNumber
 					);
-			t->setCheckState(GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER, b.enabled ? Qt::Checked : Qt::Unchecked);
+			t->setCheckState(GdbBreakpointData::TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER, m.enabled ? Qt::Checked : Qt::Unchecked);
 			t->setData(0, SourceFileData::BREAKPOINT_DATA_POINTER, QVariant::fromValue((void *) & m));
 			w->addChild(t);
 		}
@@ -2587,8 +2590,13 @@ void MainWindow::highlightBreakpointedLines()
 	/* Highlight lines with breakpoints, if any. */
 	std::multimap<int /* Source code line */, const GdbBreakpointData * /* Breakpoint details. */> breakpointedLines;
 	for (const auto & b : breakpoints)
+	{
 		if (b.sourceCodeLocation.fullFileName == displayedSourceCodeFile)
 			breakpointedLines.insert(std::pair<int /* Source code line */, const GdbBreakpointData * /* Breakpoint details. */>(b.sourceCodeLocation.lineNumber, &b));
+		for (const auto & t : b.multipleLocationBreakpoints)
+			if (t.sourceCodeLocation.fullFileName == displayedSourceCodeFile)
+				breakpointedLines.insert(std::pair<int /* Source code line */, const GdbBreakpointData * /* Breakpoint details. */>(t.sourceCodeLocation.lineNumber, &t));
+	}
 	QTextEdit::ExtraSelection selection;
 	for (const auto & b : breakpointedLines)
 	{
