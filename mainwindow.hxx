@@ -1072,8 +1072,8 @@ private:
 	void sendCommandsToGdb(QLineEdit * lineEdit);
 
 	struct SourceFileData {
-		/* Enumeration constants used as a 'role' parameter in the treeview widget used for displaying
-		 * the list of source code files. */
+		/* Enumeration constants used as a 'role' parameter in treeview item widgets, contained in
+		 * the different treeview widgets (subprograms, data objects, breakpoints, bookmarks, etc.). */
 		enum
 		{
 			FILE_NAME = Qt::UserRole,
@@ -1092,6 +1092,10 @@ private:
 			DISABLE_CONTEXT_MENU,
 			/* If set, and set to true, then navigating to source code for this item is disabled. */
 			DISABLE_SOURCE_CODE_NAVIGATION,
+			/* If available, specifies the gdb string to use for setting a breakpoint. */
+			BREAKPOINT_TARGET_COORDINATES,
+			/* If available, specifies the gdb string to use for requesting a disassembly. */
+			DISASSEMBLY_TARGET_COORDINATES,
 		};
 		QString fileName, gdbReportedFileName, fullFileName;
 		bool isSourceLinesFetched = false;
@@ -1189,7 +1193,8 @@ private:
 	struct
 	{
 		QTimer timer;
-		const QString flashStyleSheets[2] = { "background-color: lightblue; color: black;", "background-color: white; color: black;", };
+		/*! \todo	!!! For largely populated widgets this is VERY SLOW !!! */
+		const QString flashStyleSheets[2] = { "background-color: lightblue;", "background-color: white;", };
 		const QString defaultStyleSheet = "";
 		const int flashIntervalMs = 70;
 		const int flashRepeatCount = 4;

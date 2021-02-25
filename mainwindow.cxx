@@ -2376,7 +2376,13 @@ void MainWindow::sourceItemContextMenuRequested(const QTreeWidget *treeWidget, Q
 				 *		function in the file, if any. */
 				sendDataToGdbProcess(QString("-data-disassemble -f \"%1\" -l 1 -- 5\n").arg(w->text(0)));
 			else if (selection == disassembleSuprogram)
-				sendDataToGdbProcess(QString("-data-disassemble -a \"%1\" -- 5\n").arg(w->text(0)));
+			{
+				QString breakpointTarget = QString(" -a \"%1\" -- 5").arg(w->text(0));
+				QVariant v = w->data(0, SourceFileData::DISASSEMBLY_TARGET_COORDINATES);
+				if (v.isValid())
+					breakpointTarget = v.toString();
+				sendDataToGdbProcess(QString("-data-disassemble %1\n").arg(breakpointTarget));
+			}
 		}
 	}
 }
@@ -2472,14 +2478,22 @@ void MainWindow::updateSymbolViews()
 {
 	ui->treeWidgetSubprograms->clear();
 	ui->treeWidgetStaticDataObjects->clear();
+	ui->treeWidgetDataTypes->clear();
 	for (const auto & f : sourceFiles)
 	{
 		for (const auto & s : f.subprograms)
-			ui->treeWidgetSubprograms->addTopLevelItem(createNavigationWidgetItem(
+		{
+			QTreeWidgetItem * w;
+			ui->treeWidgetSubprograms->addTopLevelItem(w = createNavigationWidgetItem(
 				   QStringList() << s.name << f.fileName << QString("%1").arg(s.line) << s.description,
 				   f.fullFileName,
 				   s.line,
 				   SourceFileData::SymbolData::SUBPROGRAM));
+			w->setData(0, SourceFileData::DISASSEMBLY_TARGET_COORDINATES, QString(" -f \"%1\" -l %2 -n -1 -- 5")
+				   .arg(escapeString(f.fullFileName)).arg(s.line));
+			w->setData(0, SourceFileData::BREAKPOINT_TARGET_COORDINATES, QString(" --source \"%1\" --function %2")
+				   .arg(escapeString(f.fullFileName)).arg(s.name));
+		}
 
 		for (const auto & s : f.variables)
 			ui->treeWidgetStaticDataObjects->addTopLevelItem(createNavigationWidgetItem(
