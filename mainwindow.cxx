@@ -2347,7 +2347,7 @@ void MainWindow::sourceItemContextMenuRequested(const QTreeWidget *treeWidget, Q
 						     "Be warned that this case is not handled properly at this time.\n"
 						     "You may experience incorrect behavior from the frontend!").arg(w->text(0)));
 		QMenu menu(this);
-		QAction * disassembleFile = 0, * disassembleSuprogram = 0;
+		QAction * disassembleFile = 0, * disassembleSuprogram = 0, * insertBreakpoint = 0;
 		/* Because of the header of the tree widget, it looks more natural to set the
 		 * menu position on the screen at point translated from the tree widget viewport,
 		 * not from the tree widget itself. */
@@ -2358,6 +2358,7 @@ void MainWindow::sourceItemContextMenuRequested(const QTreeWidget *treeWidget, Q
 				break;
 			case SourceFileData::SymbolData::SUBPROGRAM:
 				disassembleSuprogram = menu.addAction("Disassemble");
+				insertBreakpoint = menu.addAction("Insert breakpoint");
 				break;
 			case SourceFileData::SymbolData::DATA_OBJECT:
 			case SourceFileData::SymbolData::DATA_TYPE:
@@ -2377,11 +2378,20 @@ void MainWindow::sourceItemContextMenuRequested(const QTreeWidget *treeWidget, Q
 				sendDataToGdbProcess(QString("-data-disassemble -f \"%1\" -l 1 -- 5\n").arg(w->text(0)));
 			else if (selection == disassembleSuprogram)
 			{
-				QString breakpointTarget = QString(" -a \"%1\" -- 5").arg(w->text(0));
+				QString disassemblyTarget = QString("-a \"%1\" -- 5").arg(w->text(0));
 				QVariant v = w->data(0, SourceFileData::DISASSEMBLY_TARGET_COORDINATES);
 				if (v.isValid())
+					disassemblyTarget = v.toString();
+				sendDataToGdbProcess(QString("-data-disassemble %1\n").arg(disassemblyTarget));
+			}
+			else if (selection == insertBreakpoint)
+			{
+				QString breakpointTarget = QString("--function \"%1\"").arg(w->text(0));
+				QVariant v = w->data(0, SourceFileData::BREAKPOINT_TARGET_COORDINATES);
+				if (v.isValid())
 					breakpointTarget = v.toString();
-				sendDataToGdbProcess(QString("-data-disassemble %1\n").arg(breakpointTarget));
+				sendDataToGdbProcess(QString("-break-insert %1\n").arg(breakpointTarget));
+				sendDataToGdbProcess("-break-list\n");
 			}
 		}
 	}
@@ -2469,7 +2479,17 @@ bool showOnlyExistingSourceFiles = ui->checkBoxShowOnlyExistingSourceFiles->isCh
 									 0, SourceFileData::SymbolData::SOURCE_FILE_NAME, false, true);
 			ui->treeWidgetSourceFiles->addTopLevelItem(t);
 			for (const auto & s : f.subprograms)
-				t->addChild(createNavigationWidgetItem(QStringList() << s.description, f.fullFileName, s.line, SourceFileData::SymbolData::SUBPROGRAM));
+			{
+				QTreeWidgetItem * w;
+				t->addChild(w = createNavigationWidgetItem(QStringList() << s.description, f.fullFileName, s.line, SourceFileData::SymbolData::SUBPROGRAM));
+				/* Note - it is important that the '--function' argument is placed in quotation marks, because
+				 * gdb can report some function names as, e.g., 'foo(int, int)', and the spaces in such names
+				 * confuse gdb. */
+				w->setData(0, SourceFileData::DISASSEMBLY_TARGET_COORDINATES, QString(" -f \"%1\" -l %2 -n -1 -- 5")
+					   .arg(escapeString(f.fullFileName)).arg(s.line));
+				w->setData(0, SourceFileData::BREAKPOINT_TARGET_COORDINATES, QString(" --source \"%1\" --function \"%2\"")
+					   .arg(escapeString(f.fullFileName)).arg(s.name));
+			}
 		}
 	ui->treeWidgetSourceFiles->sortByColumn(0, Qt::AscendingOrder);
 }
@@ -2489,9 +2509,12 @@ void MainWindow::updateSymbolViews()
 				   f.fullFileName,
 				   s.line,
 				   SourceFileData::SymbolData::SUBPROGRAM));
+			/* Note - it is important that the '--function' argument is placed in quotation marks, because
+			 * gdb can report some function names as, e.g., 'foo(int, int)', and the spaces in such names
+			 * confuse gdb. */
 			w->setData(0, SourceFileData::DISASSEMBLY_TARGET_COORDINATES, QString(" -f \"%1\" -l %2 -n -1 -- 5")
 				   .arg(escapeString(f.fullFileName)).arg(s.line));
-			w->setData(0, SourceFileData::BREAKPOINT_TARGET_COORDINATES, QString(" --source \"%1\" --function %2")
+			w->setData(0, SourceFileData::BREAKPOINT_TARGET_COORDINATES, QString(" --source \"%1\" --function \"%2\"")
 				   .arg(escapeString(f.fullFileName)).arg(s.name));
 		}
 
