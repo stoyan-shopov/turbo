@@ -34,7 +34,7 @@ struct GdbBreakpointData
 	QString		gdbReportedNumberString = "???";
 	QString		type = "<<< unknown >>>", disposition = "<<< unknown >>>";
 	bool		enabled = false;
-	uint32_t	address = -1;
+	uint64_t	address = -1;
 	QString		subprogramName = "<<< unknown >>>";
 	QString		fileName = "<<< unknown >>>";
 	SourceCodeLocation	sourceCodeLocation;
@@ -65,8 +65,8 @@ class BreakpointCache
 private:
 	QMap<QString /* filename */, QSet<int /* line numbers */>> enabledSourceCodeBreakpoints;
 	QMap<QString /* filename */, QSet<int /* line numbers */>> disabledSourceCodeBreakpoints;
-	QSet<uint32_t /* address */> enabledBreakpointAddresses;
-	QSet<uint32_t /* address */> disabledBreakpointAddresses;
+	QSet<uint64_t /* address */> enabledBreakpointAddresses;
+	QSet<uint64_t /* address */> disabledBreakpointAddresses;
 	QSet<int /* line number */> emptySet;
 public:
 	void rebuildCache(const std::vector<struct GdbBreakpointData> & breakpoints)
@@ -92,8 +92,8 @@ public:
 				}
 		}
 	}
-	bool hasEnabledBreakpointAtAddress(uint32_t address) { return enabledBreakpointAddresses.contains(address); }
-	bool hasDisabledBreakpointAtAddress(uint32_t address) { return disabledBreakpointAddresses.contains(address); }
+	bool hasEnabledBreakpointAtAddress(uint64_t address) { return enabledBreakpointAddresses.contains(address); }
+	bool hasDisabledBreakpointAtAddress(uint64_t address) { return disabledBreakpointAddresses.contains(address); }
 	bool hasEnabledBreakpointAtLineNumber(const QString & fullFileName, int lineNumber)
 	{ return enabledSourceCodeBreakpoints.contains(fullFileName) && enabledSourceCodeBreakpoints.operator [](fullFileName).contains(lineNumber); }
 	bool hasDisabledBreakpointAtLineNumber(const QString & fullFileName, int lineNumber)

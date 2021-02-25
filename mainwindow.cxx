@@ -1890,11 +1890,21 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 		QString s = QString::fromStdString(address + '\t' + opcodes + '\t' + mnemonics);
 		if (funcName.length() && offset.length())
 			s += QString::fromStdString("\t; " + funcName + "+" + offset);
-		html += "<p style=\"background-color:Silver;\"><pre>" + s + "</pre></p>";
-		currentLine ++;
+		QString backgroundColor = "Silver";
 		bool ok;
 		uint64_t t;
 		t = QString::fromStdString(address).toULongLong(& ok, 0);
+		if (ok)
+		{
+			if (breakpointCache.hasDisabledBreakpointAtAddress(t))
+				backgroundColor = "MistyRose";
+			if (breakpointCache.hasEnabledBreakpointAtAddress(t))
+				backgroundColor = "Red";
+		}
+		html += QString("<p style=\"background-color:%1;\"><pre>%2</pre></p>")
+				.arg(backgroundColor)
+				.arg(s);
+		currentLine ++;
 		if (ok && t == lastKnownProgramCounter)
 			currentPCLineNumber = currentLine - 1;
 	};
@@ -1918,16 +1928,23 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 				{
 					QString errorMessage;
 					auto sourceData = sourceFilesCache.getSourceFileData(fullFileName, errorMessage);
+					QString backgroundColor = "Olive";
+					if (breakpointCache.hasDisabledBreakpointAtLineNumber(fullFileName, lineNumber))
+						backgroundColor = "MistyRose";
+					if (breakpointCache.hasEnabledBreakpointAtLineNumber(fullFileName, lineNumber))
+						backgroundColor = "Red";
 					if (sourceData && lineNumber - 1 < sourceData->sourceCodeTextlines.length())
 					{
-						html += QString("<p style=\"background-color:Olive;\"><pre>%1: %2</pre></p>")
-						      .arg(lineNumber - 1).arg(sourceData->sourceCodeTextlines.at(lineNumber));
+						html += QString("<p style=\"background-color:%1;\"><pre>%2: %3</pre></p>")
+								.arg(backgroundColor)
+								.arg(lineNumber).arg(sourceData->sourceCodeTextlines.at(lineNumber - 1));
 						currentLine ++;
 					}
 					else
 					{
-						html += QString("<p style=\"background-color:Olive;\"><pre>%1: %2</pre></p>")
-								  .arg(lineNumber).arg(fullFileName);
+						html += QString("<p style=\"background-color:%1;\"><pre>%2: %3</pre></p>")
+								.arg(backgroundColor)
+								.arg(lineNumber).arg(fullFileName);
 						currentLine ++;
 					}
 				}
@@ -2127,7 +2144,6 @@ bool MainWindow::handleMemoryResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult
 		if (x.first == "contents")
 			data += QByteArray::fromHex(QString::fromStdString(x.second->asConstant()->constant()).toLocal8Bit());
 	}
-	emit targetMemoryReadComplete(tokenNumber, address, data);
 	if (data.length() == 4)
 	{
 		uint32_t d = data.at(0) | (data.at(1) << 8) | (data.at(2) << 16) | (data.at(3) << 24);

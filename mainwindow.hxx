@@ -1147,7 +1147,7 @@ private:
 		/* Frame number 0 is the innermost (most recent) stack frame. */
 		int		level = -1;
 		int		lineNumber = -1;
-		uint32_t	pcAddress = -1;
+		uint64_t	pcAddress = -1;
 	};
 	std::vector<StackFrameData>	backtrace;
 
@@ -1316,7 +1316,6 @@ signals:
 	void findString(const QString & str, unsigned flags);
 	void targetCallStackFrameChanged(void);
 	void addFilesToSearchSet(const QStringList sourceCodeFiles);
-	void targetMemoryReadComplete(int tokenNumber, uint32_t address, const QByteArray & data);
 
 signals:
 	/* Gdb and target state change signals. */
