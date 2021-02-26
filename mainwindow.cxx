@@ -43,6 +43,16 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->setupUi(this);
 	setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North);
 
+	/* Move some widgets to the main toolbar. This makes the user interface not so cluttered. */
+	ui->mainToolBar->addWidget(ui->pushButtonShowWindow);
+	ui->mainToolBar->addWidget(ui->comboBoxSelectLayout);
+	ui->mainToolBar->addWidget(ui->pushButtonSettings);
+	ui->mainToolBar->addWidget(ui->pushButtonDisplayHelp);
+	ui->mainToolBar->addWidget(ui->pushButtonNavigateBack);
+	ui->mainToolBar->addWidget(ui->pushButtonNavigateForward);
+	ui->mainToolBar->addWidget(ui->pushButtonRESTART);
+	connect(ui->mainToolBar, & QToolBar::visibilityChanged, [&] { if (!ui->mainToolBar->isVisible()) ui->mainToolBar->setVisible(true); });
+
 	settings = std::make_shared<QSettings>(SETTINGS_FILE_NAME, QSettings::IniFormat);
 	restoreState(settings->value(SETTINGS_MAINWINDOW_STATE, QByteArray()).toByteArray());
 	restoreGeometry(settings->value(SETTINGS_MAINWINDOW_GEOMETRY, QByteArray()).toByteArray());
@@ -656,7 +666,8 @@ reopen_last_file:
 	connect(this, SIGNAL(findString(QString,uint)), stringFinder, SLOT(findString(QString,uint)));
 	connect(this, SIGNAL(addFilesToSearchSet(QStringList)), stringFinder, SLOT(addFilesToSearchSet(QStringList)));
 
-	widgetFlashHighlighterData.timer.setSingleShot(false);
+	widgetFlashHighlighterData.timer.setSingleShot(true);
+	widgetFlashHighlighterData.timer.setInterval(widgetFlashHighlighterData.flashIntervalMs);
 	connect(& widgetFlashHighlighterData.timer, SIGNAL(timeout()), this, SLOT(updateHighlightedWidget()));
 
 	connect(&controlKeyPressTimer, &QTimer::timeout, [&] (void) -> void {
@@ -716,6 +727,7 @@ reopen_last_file:
 	connect(ui->lineEditGdbCommand1, & QLineEdit::returnPressed, [&] { sendCommandsToGdb(ui->lineEditGdbCommand1); });
 	connect(ui->pushButtonSendCommandToGdb1, & QPushButton::clicked, [&] { sendCommandsToGdb(ui->lineEditGdbCommand1); });
 	connect(ui->lineEditGdbCommand2, & QLineEdit::returnPressed, [&] { sendCommandsToGdb(ui->lineEditGdbCommand2); });
+
 }
 
 void MainWindow::loadSessions()
@@ -2827,12 +2839,19 @@ QTreeWidgetItem * MainWindow::createNavigationWidgetItem(const QStringList &colu
 
 void MainWindow::updateHighlightedWidget()
 {
-	widgetFlashHighlighterData.highlightedWidget->setStyleSheet(widgetFlashHighlighterData.flashStyleSheets[(widgetFlashHighlighterData.flashCount ++) & 1]);
+	widgetFlashHighlighterData.highlightedWidget->setStyleSheet(widgetFlashHighlighterData.flashStyleSheets[(++ widgetFlashHighlighterData.flashCount) & 1]);
 
-	if (widgetFlashHighlighterData.flashCount == widgetFlashHighlighterData.flashRepeatCount)
+	if (widgetFlashHighlighterData.flashCount == widgetFlashHighlighterData.flashRepeatCount
+			/* Guard against highlights that are taking too much time. */
+			|| widgetFlashHighlighterData.profilingTimer.elapsed() > 2 * widgetFlashHighlighterData.flashIntervalMs)
 	{
 		widgetFlashHighlighterData.timer.stop();
 		widgetFlashHighlighterData.highlightedWidget->setStyleSheet(widgetFlashHighlighterData.defaultStyleSheet);
+	}
+	else
+	{
+		widgetFlashHighlighterData.timer.start();
+		widgetFlashHighlighterData.profilingTimer.start();
 	}
 }
 
@@ -2870,7 +2889,9 @@ void MainWindow::flashHighlightDockWidget(QDockWidget *w)
 
 	widgetFlashHighlighterData.flashCount = 0;
 	widgetFlashHighlighterData.highlightedWidget = w;
-	widgetFlashHighlighterData.timer.start(widgetFlashHighlighterData.flashIntervalMs);
+	widgetFlashHighlighterData.timer.start();
+	widgetFlashHighlighterData.profilingTimer.start();
+	widgetFlashHighlighterData.highlightedWidget->setStyleSheet(widgetFlashHighlighterData.flashStyleSheets[0]);
 }
 
 bool MainWindow::displaySourceCodeFile(const SourceCodeLocation &sourceCodeLocation, bool saveCurrentLocationToNavigationStack,

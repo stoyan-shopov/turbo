@@ -1193,11 +1193,17 @@ private:
 	struct
 	{
 		QTimer timer;
-		/*! \todo	!!! For largely populated widgets this is VERY SLOW !!! */
-		const QString flashStyleSheets[2] = { "background-color: lightblue;", "background-color: white;", };
+		/* This timer is used as a stopwatch, measuring the time between consecutive updates triggered by the highlight update timer.
+		 * Highlighting a widget, the way it is done here, generally triggers a widget repaint, and this can take a lot of time.
+		 * This timer is used for guarding against widget highlights that are taking too much time to complete.
+		 *
+		 * For example, highlighting the subprogram view, which can contain many items, may take a lot of time to repaint the
+		 * subprogram view. In such cases, the highlighting is aborted. */
+		QTime profilingTimer;
+		const QString flashStyleSheets[2] = { "QDockWidget::title { background-color: red; }", "QDockWidget::title { background-color: orange; }" };
 		const QString defaultStyleSheet = "";
 		const int flashIntervalMs = 70;
-		const int flashRepeatCount = 4;
+		const int flashRepeatCount = 6;
 		QDockWidget * highlightedWidget = 0;
 		int flashCount;
 	}
