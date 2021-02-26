@@ -864,20 +864,27 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 	if (watched == ui->plainTextEditSourceView->viewport() && event->type() == QEvent::MouseButtonRelease)
 	{
 		QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+		bool result = false;
 		if (mouseEvent->button() == Qt::LeftButton)
 		{
-			if( mouseEvent->modifiers() & Qt::ControlModifier)
-				navigateToSymbolAtCursor();
-			if( mouseEvent->modifiers() & Qt::AltModifier)
+			if (mouseEvent->modifiers() & Qt::ControlModifier)
+				result = true, navigateToSymbolAtCursor();
+			else if (mouseEvent->modifiers() & (Qt::AltModifier | Qt::ShiftModifier))
 			{
+				result = true;
 				QTextCursor c = ui->plainTextEditSourceView->textCursor();
 				c.select(QTextCursor::WordUnderCursor);
 				QString s = c.selectedText();
 				if (!s.isEmpty())
-					emit findString(s, ui->checkBoxSearchForWholeWordsOnly->isChecked() ? StringFinder::SEARCH_FOR_WHOLE_WORDS_ONLY : 0);
+				{
+					if (mouseEvent->modifiers() & Qt::AltModifier)
+						emit findString(s, ui->checkBoxSearchForWholeWordsOnly->isChecked() ? StringFinder::SEARCH_FOR_WHOLE_WORDS_ONLY : 0);
+					if (mouseEvent->modifiers() & Qt::ShiftModifier)
+						ui->lineEditObjectLocator->setText(s);
+				}
 			}
 		}
-		return false;
+		return result;
 	}
 
 	bool result = false;
@@ -1977,20 +1984,20 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 	 * 		it feels unnatural and irritating to re-center the disassembly view after each stepping operation. */
 	ui->plainTextEditDisassembly->clear();
 	ui->plainTextEditDisassembly->appendHtml(html);
-	/* Highlight the current program counter line, if detected. */
+	/* If detected, highlight the current program counter line. */
+	QTextCursor c(ui->plainTextEditDisassembly->textCursor());
+	c.movePosition(QTextCursor::Start);
 	if (currentPCLineNumber != -1)
 	{
-		QTextCursor c(ui->plainTextEditDisassembly->textCursor());
-		c.movePosition(QTextCursor::Start);
 		c.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, currentPCLineNumber);
 
 		QTextEdit::ExtraSelection s;
 		s.cursor = c;
 		s.format = highlightFormats.currentDisassemblyLine;
 		ui->plainTextEditDisassembly->setExtraSelections(QList<QTextEdit::ExtraSelection>() << s);
-		ui->plainTextEditDisassembly->setTextCursor(c);
-		ui->plainTextEditDisassembly->centerCursor();
 	}
+	ui->plainTextEditDisassembly->setTextCursor(c);
+	ui->plainTextEditDisassembly->centerCursor();
 	return true;
 }
 
