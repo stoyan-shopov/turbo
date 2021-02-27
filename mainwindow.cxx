@@ -28,9 +28,6 @@
 #include "ui_mainwindow.h"
 
 #include <QFileDialog>
-#include <QPainter>
-
-#include <set>
 
 #include "clex/cscanner.hxx"
 
@@ -1596,6 +1593,7 @@ bool MainWindow::handleBreakpointTableResponse(GdbMiParser::RESULT_CLASS_ENUM pa
 		breakpointCache.rebuildCache(breakpoints);
 		updateBreakpointsView();
 		refreshSourceCodeView();
+		disassemblyCache.highlightBreakpointedLines(ui->plainTextEditDisassembly, breakpointCache);
 	}
 	return true;
 }
@@ -1883,113 +1881,18 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 	const GdbMiParser::MIList * disassembly;
 	if (parseResult != GdbMiParser::DONE || results.size() != 1 || results.at(0).variable != "asm_insns" || !(disassembly = results.at(0).value->asList()))
 		return false;
-	int currentPCLineNumber = -1, currentLine = 0;
 
-	QString html;
-
-	html += ("<!DOCTYPE html>"
-			  "<html>"
-			  "<body>");
-	std::function<void(const GdbMiParser::MITuple & asmRecord)> processAsmRecord = [&](const GdbMiParser::MITuple & asmRecord) -> void
-	{
-		std::string address, opcodes, mnemonics, funcName, offset;
-		for (const auto & line_details : asmRecord.map)
-		{
-			if (line_details.first == "address")
-				address = line_details.second->asConstant()->constant();
-			else if (line_details.first == "func-name")
-				funcName = line_details.second->asConstant()->constant();
-			else if (line_details.first == "offset")
-				offset = line_details.second->asConstant()->constant();
-			else if (line_details.first == "opcodes")
-				opcodes = line_details.second->asConstant()->constant();
-			else if (line_details.first == "inst")
-				mnemonics = line_details.second->asConstant()->constant();
-		}
-		QString s = QString::fromStdString(address + '\t' + opcodes + '\t' + mnemonics);
-		if (funcName.length() && offset.length())
-			s += QString::fromStdString("\t; " + funcName + "+" + offset);
-		QString backgroundColor = "Silver";
-		bool ok;
-		uint64_t t;
-		t = QString::fromStdString(address).toULongLong(& ok, 0);
-		if (ok)
-		{
-			if (breakpointCache.hasDisabledBreakpointAtAddress(t))
-				backgroundColor = "MistyRose";
-			if (breakpointCache.hasEnabledBreakpointAtAddress(t))
-				backgroundColor = "Red";
-		}
-		html += QString("<p style=\"background-color:%1;\"><pre>%2</pre></p>")
-				.arg(backgroundColor)
-				.arg(s);
-		currentLine ++;
-		if (ok && t == lastKnownProgramCounter)
-			currentPCLineNumber = currentLine - 1;
-	};
-	for (const auto & d : disassembly->results)
-	{
-		if (d.variable == "src_and_asm_line")
-		{
-			const GdbMiParser::MITuple * t = d.value->asTuple();
-			bool ok = false;
-			int lineNumber = -1;
-			QString fullFileName;
-			auto i = t->map.find("line");
-			if (i != t->map.cend())
-				lineNumber = QString::fromStdString(i->second->asConstant()->constant()).toInt(& ok, 0);
-			i = t->map.find("fullname");
-			if (i != t->map.cend())
-				fullFileName = QString::fromStdString(i->second->asConstant()->constant());
-			i = t->map.find("line_asm_insn");
-			{
-				if (ok && lineNumber > 0 && !fullFileName.isEmpty())
-				{
-					QString errorMessage;
-					auto sourceData = sourceFilesCache.getSourceFileData(fullFileName, errorMessage);
-					QString backgroundColor = "Olive";
-					if (breakpointCache.hasDisabledBreakpointAtLineNumber(fullFileName, lineNumber))
-						backgroundColor = "MistyRose";
-					if (breakpointCache.hasEnabledBreakpointAtLineNumber(fullFileName, lineNumber))
-						backgroundColor = "Red";
-					if (sourceData && lineNumber - 1 < sourceData->sourceCodeTextlines.length())
-					{
-						html += QString("<p style=\"background-color:%1;\"><pre>%2: %3</pre></p>")
-								.arg(backgroundColor)
-								.arg(lineNumber).arg(sourceData->sourceCodeTextlines.at(lineNumber - 1));
-						currentLine ++;
-					}
-					else
-					{
-						html += QString("<p style=\"background-color:%1;\"><pre>%2: %3</pre></p>")
-								.arg(backgroundColor)
-								.arg(lineNumber).arg(fullFileName);
-						currentLine ++;
-					}
-				}
-				for (const auto & asmRecord : i->second->asList()->values)
-					processAsmRecord(* asmRecord->asTuple());
-			}
-		}
-		else
-			*(int*)0=0;
-	}
-	/* If this is a disassembly of code, for which there is no debug information available, the reply from
-	 * gdb will be a list of tuples, which will be stored as a list of values, not as a list of results, as handled above. */
-	for (const auto & d : disassembly->values)
-		if (d->asTuple())
-			processAsmRecord(* d->asTuple());
-	html += ("</body></html>");
-	/*! \todo	Only update the disassembly view document if it is different than the currently generated one. Otherwise
-	 * 		it feels unnatural and irritating to re-center the disassembly view after each stepping operation. */
+	QString disassemblyDocument;
+	disassemblyCache.generateDisassemblyDocument(disassembly, sourceFilesCache, lastKnownProgramCounter, disassemblyDocument);
 	ui->plainTextEditDisassembly->clear();
-	ui->plainTextEditDisassembly->appendHtml(html);
+	ui->plainTextEditDisassembly->appendHtml(disassemblyDocument);
+
 	/* If detected, highlight the current program counter line. */
 	QTextCursor c(ui->plainTextEditDisassembly->textCursor());
 	c.movePosition(QTextCursor::Start);
-	if (currentPCLineNumber != -1)
+	if (disassemblyCache.pcLineNumber() != -1)
 	{
-		c.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, currentPCLineNumber);
+		c.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, disassemblyCache.pcLineNumber());
 
 		QTextEdit::ExtraSelection s;
 		s.cursor = c;
@@ -1998,6 +1901,7 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 	}
 	ui->plainTextEditDisassembly->setTextCursor(c);
 	ui->plainTextEditDisassembly->centerCursor();
+	disassemblyCache.highlightBreakpointedLines(ui->plainTextEditDisassembly, breakpointCache);
 	return true;
 }
 
@@ -2666,26 +2570,27 @@ void MainWindow::highlightBreakpointedLines()
 	sourceCodeViewHighlights.disabledBreakpointedLines.clear();
 	sourceCodeViewHighlights.enabledBreakpointedLines.clear();
 
-	const QSet<int /* line numbers */> & enabledLines = breakpointCache.enabledBreakpointLinesForFile(displayedSourceCodeFile);
-	const QSet<int /* line numbers */> & disabledLines = breakpointCache.disabledBreakpointLinesForFile(displayedSourceCodeFile);
+	const QSet<int /* line number */> & enabledLines = breakpointCache.enabledBreakpointLinesForFile(displayedSourceCodeFile);
+	const QSet<int /* line number */> & disabledLines = breakpointCache.disabledBreakpointLinesForFile(displayedSourceCodeFile);
 
 	QTextEdit::ExtraSelection selection;
 
-	for (const auto & line : enabledLines)
+	std::function<void(int /* lineNumber*/)> rewindCursor = [&] (int line) -> void
 	{
 		c.movePosition(QTextCursor::Start);
 		c.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, line - 1);
 		c.movePosition(QTextCursor::NextBlock, QTextCursor::KeepAnchor);
 		selection.cursor = c;
+	};
+	for (const auto & line : enabledLines)
+	{
+		rewindCursor(line);
 		selection.format = highlightFormats.enabledBreakpoint;
 		sourceCodeViewHighlights.enabledBreakpointedLines << selection;
 	}
 	for (const auto & line : disabledLines)
 	{
-		c.movePosition(QTextCursor::Start);
-		c.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, line - 1);
-		c.movePosition(QTextCursor::NextBlock, QTextCursor::KeepAnchor);
-		selection.cursor = c;
+		rewindCursor(line);
 		selection.format = highlightFormats.disabledBreakpoint;
 		sourceCodeViewHighlights.disabledBreakpointedLines << selection;
 	}
@@ -3369,6 +3274,7 @@ void MainWindow::on_pushButtonDeleteAllBookmarks_clicked()
 	bookmarks.clear();
 	updateBookmarksView();
 	refreshSourceCodeView();
+	disassemblyCache.highlightBreakpointedLines(ui->plainTextEditDisassembly, breakpointCache);
 }
 
 void MainWindow::on_pushButtonDisconnectGdbServer_clicked()

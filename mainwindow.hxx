@@ -89,6 +89,8 @@ template<> struct hash<QString>
 }
 #endif
 
+#include "disassembly-cache.hxx"
+
 namespace Ui {
 class MainWindow;
 }
@@ -957,6 +959,8 @@ private:
 		QList<QTextEdit::ExtraSelection> searchedTextMatches;
 	}
 	sourceCodeViewHighlights;
+
+	DisassemblyCache disassemblyCache;
 
 	struct
 	{

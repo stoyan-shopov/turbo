@@ -67,7 +67,7 @@ private:
 	QMap<QString /* filename */, QSet<int /* line numbers */>> disabledSourceCodeBreakpoints;
 	QSet<uint64_t /* address */> enabledBreakpointAddresses;
 	QSet<uint64_t /* address */> disabledBreakpointAddresses;
-	QSet<int /* line number */> emptySet;
+	const QSet<int /* line number */> emptySet;
 public:
 	void rebuildCache(const std::vector<struct GdbBreakpointData> & breakpoints)
 	{
@@ -92,14 +92,18 @@ public:
 				}
 		}
 	}
-	bool hasEnabledBreakpointAtAddress(uint64_t address) { return enabledBreakpointAddresses.contains(address); }
-	bool hasDisabledBreakpointAtAddress(uint64_t address) { return disabledBreakpointAddresses.contains(address); }
-	bool hasEnabledBreakpointAtLineNumber(const QString & fullFileName, int lineNumber)
+	bool hasEnabledBreakpointAtAddress(uint64_t address) const { return enabledBreakpointAddresses.contains(address); }
+	bool hasDisabledBreakpointAtAddress(uint64_t address) const { return disabledBreakpointAddresses.contains(address); }
+	bool hasEnabledBreakpointAtLineNumber(const QString & fullFileName, int lineNumber) const
 	{ return enabledSourceCodeBreakpoints.contains(fullFileName) && enabledSourceCodeBreakpoints.operator [](fullFileName).contains(lineNumber); }
-	bool hasDisabledBreakpointAtLineNumber(const QString & fullFileName, int lineNumber)
+	bool hasDisabledBreakpointAtLineNumber(const QString & fullFileName, int lineNumber) const
 	{ return disabledSourceCodeBreakpoints.contains(fullFileName) && disabledSourceCodeBreakpoints.operator [](fullFileName).contains(lineNumber); }
-	const QSet<int /* line numbers */> & enabledBreakpointLinesForFile(const QString & fullFileName)
+	/*! \todo	!?!?!? Making this function 'const' leads to returning null references and crashing the program.
+	 *		Investigate what is going on??? */
+	const QSet<int /* line numbers */> & enabledBreakpointLinesForFile(const QString & fullFileName) /* const */
 	{ return enabledSourceCodeBreakpoints.contains(fullFileName) ? enabledSourceCodeBreakpoints.operator [](fullFileName) : emptySet; }
-	const QSet<int /* line numbers */> & disabledBreakpointLinesForFile(const QString & fullFileName)
+	/*! \todo	!?!?!? Making this function 'const' leads to returning null references and crashing the program.
+	 *		Investigate what is going on??? */
+	const QSet<int /* line numbers */> & disabledBreakpointLinesForFile(const QString & fullFileName) /* const */
 	{ return disabledSourceCodeBreakpoints.contains(fullFileName) ? disabledSourceCodeBreakpoints.operator [](fullFileName) : emptySet; }
 };

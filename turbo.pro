@@ -45,6 +45,7 @@ HEADERS += \
 	   bmpdetect.hxx \
 	   breakpoint-cache.hxx \
 	   clex/cscanner.hxx \
+	   disassembly-cache.hxx \
 	   gdb-mi-parser.hxx \
 	   mainwindow.hxx \
 	   gdbmireceiver.hxx \
