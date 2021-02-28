@@ -2182,8 +2182,13 @@ void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
 void MainWindow::sendDataToGdbProcess(const QString & data)
 {
 	appendLineToGdbLog(">>> " + data);
-	gdbProcess->write(data.toLocal8Bit());
-	gdbProcess->waitForBytesWritten();
+	if (gdbProcess->state() == QProcess::Running)
+	{
+		gdbProcess->write(data.toLocal8Bit());
+		gdbProcess->waitForBytesWritten();
+	}
+	else
+		appendLineToGdbLog("gdb process not running!!! Cannot send data to gdb");
 }
 void MainWindow::readGdbVarObjectChildren(const QString varObjectName)
 {
@@ -3042,8 +3047,8 @@ bool result = false;
 
 		/* Mark which source code lines have corresponding machine code generated for them,
 		 * and so can be used for setting breakpoints. */
-		/*! \todo	WARNING: tHIS TOTALLY DEFEATS HAVING A CACHE FOR THE SOURCE CODE FILES.
-		 * 		This actually dominates the rendering time for the source code view.
+		/*! \todo	!!! WARNING: THIS TOTALLY DEFEATS HAVING A CACHE FOR THE SOURCE CODE FILES !!!
+		 * 		The breakpoint marker insertion code below actually dominates the rendering time for the source code view.
 		 *		It is best that this marking is done when generating the html document
 		 *		for the source code file, instead of doing it here. */
 		const auto & f = sourceFiles.find(sourceCodeLocation.fullFileName);
