@@ -1938,7 +1938,7 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 	c.movePosition(QTextCursor::Start);
 	ui->plainTextEditDisassembly->setTextCursor(c);
 	ui->plainTextEditDisassembly->centerCursor();
-	disassemblyCache.highlightLines(ui->plainTextEditDisassembly, breakpoints, lastKnownProgramCounter);
+	disassemblyCache.highlightLines(ui->plainTextEditDisassembly, breakpoints, lastKnownProgramCounter, true);
 	return true;
 }
 

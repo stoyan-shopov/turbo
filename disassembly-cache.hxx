@@ -233,7 +233,7 @@ public:
 			extraSelections << selection;
 
 			if (centerViewOnCurrentPC)
-				textEdit->setTextCursor(c), textEdit->centerCursor();
+				c.clearSelection(), textEdit->setTextCursor(c), textEdit->centerCursor();
 		}
 		textEdit->setExtraSelections(extraSelections);
 	}
