@@ -1184,7 +1184,15 @@ void MainWindow::gdbMiLineAvailable(QString line)
 					emit targetStopped();
 					break;
 				default:
-					*(int*)0=0;
+					qDebug() << "Failed to parse gdb reply:" << line;
+					QMessageBox::critical(0, "Internal frontend error",
+							      "This frontend has failed to parse a reply from gdb\n\n"
+							      "This can happen on some obscure occasions (such as trying to parse\n"
+							      "a 'script' field entry in a 'BreakpointTable' response for tracepoints)\n"
+							      "where gdb violates its own documented response grammar\n\n"
+							      "Please, report the debug output of this frontend, so that I may improve it!\n\n"
+							      "At this point, it is recommended that you RESTART this frontend. It can no longer be trusted\n\n"
+							      "Thank you!");
 				}
 			}
 			break;
@@ -2182,6 +2190,20 @@ void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
 void MainWindow::sendDataToGdbProcess(const QString & data)
 {
 	appendLineToGdbLog(">>> " + data);
+	/*! \todo	WARNING. This needs to be investigated, but attempting to send data to the gdb process, when
+	 *		it is dead, of course - does not work, and this error is reported by Qt;
+	 *
+	 *		QWindowsPipeWriter::write failed. (The handle is invalid.)
+	 *
+	 * 		If the gdb process is then restarted, attempting to send data to it will continue NOT to work, with the same error.
+	 *
+	 *		However. Once dead, if the gdb process is restarted, but without attempting to send data to it
+	 *		(and, therefore, without triggering the code displaying the error message above), once running, sending data
+	 *		to the gdb process works without issues.
+	 *
+	 *		It looks like there is some additional handling of a QProcess being sent data, when it is dead, but as a
+	 *		workaround here - just check if the gdb process is running, before sending data to it. This is not a solution,
+	 *		it is a workaround, but it works very well for me. */
 	if (gdbProcess->state() == QProcess::Running)
 	{
 		gdbProcess->write(data.toLocal8Bit());
