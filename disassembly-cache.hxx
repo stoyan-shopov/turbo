@@ -51,32 +51,37 @@ public:
 			int		lineNumber;
 		};
 		QString		fullFileName;
-		DisassemblyBlock(enum KIND kind, uint64_t addressOrLineNumber, const QString & fullFileName)
+		DisassemblyBlock(enum KIND kind, uint64_t addressOrLineNumber, const QString & fullFileName = "")
 		{ this->kind = kind, this->address = addressOrLineNumber, this->fullFileName = fullFileName; }
 	};
 private:
-	int currentPCLineNumber = -1;
 	std::unordered_map<uint64_t /* address */, int /* textLineNumber */> disassemblyLines;
 	std::unordered_map<QString /* fileName */, std::unordered_map<int /* lineNumber */, std::unordered_set<int /* textLineNumber */>>> sourceLines;
 
-	QTextCharFormat enabledBreakpoint;
-	QTextCharFormat disabledBreakpoint;
+	QTextCharFormat enabledBreakpointFormat;
+	QTextCharFormat disabledBreakpointFormat;
+	QTextCharFormat currentPCLineFormat;
 	std::vector<struct DisassemblyBlock> disassemblyBlocks;
 	const struct DisassemblyBlock invalidDisassemblyBlock = DisassemblyBlock(DisassemblyBlock::INVALID, -1, "<<< invalid >>>");
 public:
-	uint64_t pcLineNumber(void) const { return currentPCLineNumber; }
 	DisassemblyCache()
 	{
-		enabledBreakpoint.setProperty(QTextFormat::FullWidthSelection, true);
-		enabledBreakpoint.setBackground(QBrush(Qt::red));
-		disabledBreakpoint.setProperty(QTextFormat::FullWidthSelection, true);
-		disabledBreakpoint.setBackground(QBrush(Qt::darkRed));
+		enabledBreakpointFormat.setProperty(QTextFormat::FullWidthSelection, true);
+		enabledBreakpointFormat.setBackground(QBrush(Qt::red));
+		disabledBreakpointFormat.setProperty(QTextFormat::FullWidthSelection, true);
+		disabledBreakpointFormat.setBackground(QBrush(Qt::darkRed));
+		currentPCLineFormat.setProperty(QTextFormat::FullWidthSelection, true);
+		currentPCLineFormat.setBackground(QBrush(Qt::cyan));
 	}
-	void generateDisassemblyDocument(const GdbMiParser::MIList * disassembly, SourceFilesCache & sourceFilesCache, uint64_t lastKnownProgramCounter, QString & htmlDocument)
+
+	const struct DisassemblyBlock & disassemblyBlockForTextBlockNumber(int blockNumber)
+	{ return (blockNumber < disassemblyBlocks.size()) ? disassemblyBlocks.at(blockNumber) : invalidDisassemblyBlock; }
+
+	void generateDisassemblyDocument(const GdbMiParser::MIList * disassembly, SourceFilesCache & sourceFilesCache, QString & htmlDocument)
 	{
-		currentPCLineNumber = -1;
 		disassemblyLines.clear();
 		sourceLines.clear();
+		disassemblyBlocks.clear();
 
 		int currentLine = 0;
 
@@ -110,9 +115,8 @@ public:
 					.arg(s);
 			disassemblyLines.operator [](t) = currentLine;
 
+			disassemblyBlocks.push_back(DisassemblyBlock(DisassemblyBlock::DISASSEMBLY_LINE, t));
 			currentLine ++;
-			if (ok && t == lastKnownProgramCounter)
-				currentPCLineNumber = currentLine - 1;
 		};
 		for (const auto & d : disassembly->results)
 		{
@@ -151,6 +155,7 @@ public:
 									.arg(lineNumber).arg(fullFileName);
 							currentLine ++;
 						}
+						disassemblyBlocks.push_back(DisassemblyBlock(DisassemblyBlock::SOURCE_LINE, lineNumber, fullFileName));
 					}
 					for (const auto & asmRecord : i->second->asList()->values)
 						processAsmRecord(* asmRecord->asTuple());
@@ -166,7 +171,7 @@ public:
 				processAsmRecord(* d->asTuple());
 		htmlDocument += ("</body></html>");
 	}
-	void highlightBreakpointedLines(QPlainTextEdit * textEdit, const BreakpointCache & breakpointCache)
+	void highlightLines(QPlainTextEdit * textEdit, const std::vector<GdbBreakpointData> & breakpoints, uint64_t programCounterValue, bool centerViewOnCurrentPC = false)
 	{
 		/* Highlight lines with breakpoints, if any. */
 		QTextCursor c(textEdit->textCursor());
@@ -175,12 +180,29 @@ public:
 		std::unordered_set<int /* line number */> enabledLines;
 		std::unordered_set<int /* line number */> disabledLines;
 
-		for (const auto & l : disassemblyLines)
-			if (breakpointCache.hasEnabledBreakpointAtAddress(l.first))
-				enabledLines.insert(l.second);
-			else if (breakpointCache.hasDisabledBreakpointAtAddress(l.first))
-				disabledLines.insert(l.second);
-
+		std::function<void(const GdbBreakpointData & /* breakpoint */)> processBreakpoint = [&] (const GdbBreakpointData & breakpoint) -> void
+		{
+			const auto s = sourceLines.find(breakpoint.sourceCodeLocation.fullFileName);
+			if (s != sourceLines.cend())
+			{
+				const auto lines = s->second.find(breakpoint.sourceCodeLocation.lineNumber);
+				if (lines != s->second.cend())
+					for (const auto & l : lines->second)
+						(breakpoint.enabled ? enabledLines : disabledLines).insert(l);
+			}
+			if (breakpoint.multipleLocationBreakpoints.empty())
+			{
+				const auto l = disassemblyLines.find(breakpoint.address);
+				if (l != disassemblyLines.cend())
+					(breakpoint.enabled ? enabledLines : disabledLines).insert(l->second);
+			}
+		};
+		for (const auto & b : breakpoints)
+		{
+			processBreakpoint(b);
+			for (const auto & t : b.multipleLocationBreakpoints)
+				processBreakpoint(t);
+		}
 		QTextEdit::ExtraSelection selection;
 
 		std::function<void(int /* lineNumber*/)> rewindCursor = [&] (int line) -> void
@@ -193,18 +215,26 @@ public:
 		for (const auto & line : enabledLines)
 		{
 			rewindCursor(line);
-			selection.format = enabledBreakpoint;
+			selection.format = enabledBreakpointFormat;
 			extraSelections << selection;
 		}
 		for (const auto & line : disabledLines)
 		{
 			rewindCursor(line);
-			selection.format = disabledBreakpoint;
+			selection.format = disabledBreakpointFormat;
 			extraSelections << selection;
+		}
+
+		const auto t = disassemblyLines.find(programCounterValue);
+		if (t != disassemblyLines.cend())
+		{
+			rewindCursor(t->second);
+			selection.format = currentPCLineFormat;
+			extraSelections << selection;
+
+			if (centerViewOnCurrentPC)
+				textEdit->setTextCursor(c), textEdit->centerCursor();
 		}
 		textEdit->setExtraSelections(extraSelections);
 	}
-
-	const struct DisassemblyBlock & disassemblyBlockForTextBlovkNumber(int blockNumber)
-	{ return (blockNumber < disassemblyBlocks.size()) ? disassemblyBlocks.at(blockNumber) : invalidDisassemblyBlock; }
 };

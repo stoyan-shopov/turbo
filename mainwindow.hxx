@@ -946,7 +946,6 @@ private:
 		QTextCharFormat disabledBreakpoint;
 		QTextCharFormat bookmark;
 		QTextCharFormat searchedText;
-		QTextCharFormat currentDisassemblyLine;
 	}
 	highlightFormats;
 	struct

@@ -450,6 +450,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->plainTextEditScratchpad->setPlainText(settings->value(SETTINGS_SCRATCHPAD_TEXT_CONTENTS, QString("Lorem ipsum dolor sit amet")).toString());
 
 	ui->plainTextEditSourceView->installEventFilter(this);
+	ui->plainTextEditDisassembly->installEventFilter(this);
 	ui->plainTextEditSourceView->viewport()->installEventFilter(this);
 	/*! \todo	Only execute the code below after gdb has been successfully started. */
 	connect(gdbProcess.get(), & QProcess::started, [&] {
@@ -524,8 +525,6 @@ reopen_last_file:
 	highlightFormats.currentLine.setBackground(QBrush(Qt::lightGray));
 	highlightFormats.bookmark.setProperty(QTextFormat::FullWidthSelection, true);
 	highlightFormats.bookmark.setBackground(QBrush(Qt::darkCyan));
-	highlightFormats.currentDisassemblyLine.setProperty(QTextFormat::FullWidthSelection, true);
-	highlightFormats.currentDisassemblyLine.setBackground(QBrush(Qt::cyan));
 	highlightFormats.searchedText.setBackground(QBrush(Qt::yellow));
 
 	connect(ui->plainTextEditSourceView, &QPlainTextEdit::cursorPositionChanged, [=]()
@@ -882,6 +881,54 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 			}
 		}
 		return result;
+	}
+
+	if (watched == ui->plainTextEditDisassembly && event->type() == QEvent::KeyPress)
+	{
+		QKeyEvent * e = static_cast<QKeyEvent *>(event);
+		if (e->key() == Qt::Key_Space)
+		{
+			/* Toggle breakpoint at current disassembly view block. */
+			const DisassemblyCache::DisassemblyBlock & t =
+				disassemblyCache.disassemblyBlockForTextBlockNumber(ui->plainTextEditDisassembly->textCursor().blockNumber());
+			if (t.kind != DisassemblyCache::DisassemblyBlock::INVALID)
+			{
+				std::vector<const GdbBreakpointData *> b;
+				if (t.kind == DisassemblyCache::DisassemblyBlock::SOURCE_LINE)
+				{
+					GdbBreakpointData::breakpointsForSourceCodeLineNumber(SourceCodeLocation(t.fullFileName, t.lineNumber), breakpoints, b);
+					if (b.empty())
+						/* Breakpoint not found for the source code line - insert one. */
+						sendDataToGdbProcess(QString("-break-insert --source \"%1\" --line %2\n")
+								     .arg(escapeString(t.fullFileName))
+								     .arg(t.lineNumber));
+					else
+					{
+						/* Breakpoint(s) found for the source code line - remove them. */
+						for (const auto & t : b)
+							sendDataToGdbProcess(QString("-break-delete %1\n").arg(t->gdbReportedNumberString));
+					}
+				}
+				else if (t.kind == DisassemblyCache::DisassemblyBlock::DISASSEMBLY_LINE)
+				{
+					GdbBreakpointData::breakpointsForAddress(t.address, breakpoints, b);
+					if (b.empty())
+						/* Breakpoint not found at address - insert one. */
+						sendDataToGdbProcess(QString("-break-insert *0x%1\n")
+								     .arg(t.address, 0, 16));
+					else
+					{
+						/* Breakpoint(s) found for address - remove them. */
+						for (const auto & t : b)
+							sendDataToGdbProcess(QString("-break-delete %1\n").arg(t->gdbReportedNumberString));
+					}
+				}
+				/* Reread the list of breakpoints. */
+				sendDataToGdbProcess("-break-list\n");
+			}
+			return true;
+		}
+		return false;
 	}
 
 	bool result = false;
@@ -1593,7 +1640,7 @@ bool MainWindow::handleBreakpointTableResponse(GdbMiParser::RESULT_CLASS_ENUM pa
 		breakpointCache.rebuildCache(breakpoints);
 		updateBreakpointsView();
 		refreshSourceCodeView();
-		disassemblyCache.highlightBreakpointedLines(ui->plainTextEditDisassembly, breakpointCache);
+		disassemblyCache.highlightLines(ui->plainTextEditDisassembly, breakpoints, lastKnownProgramCounter);
 	}
 	return true;
 }
@@ -1883,25 +1930,15 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 		return false;
 
 	QString disassemblyDocument;
-	disassemblyCache.generateDisassemblyDocument(disassembly, sourceFilesCache, lastKnownProgramCounter, disassemblyDocument);
+	disassemblyCache.generateDisassemblyDocument(disassembly, sourceFilesCache, disassemblyDocument);
 	ui->plainTextEditDisassembly->clear();
 	ui->plainTextEditDisassembly->appendHtml(disassemblyDocument);
 
-	/* If detected, highlight the current program counter line. */
 	QTextCursor c(ui->plainTextEditDisassembly->textCursor());
 	c.movePosition(QTextCursor::Start);
-	if (disassemblyCache.pcLineNumber() != -1)
-	{
-		c.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, disassemblyCache.pcLineNumber());
-
-		QTextEdit::ExtraSelection s;
-		s.cursor = c;
-		s.format = highlightFormats.currentDisassemblyLine;
-		ui->plainTextEditDisassembly->setExtraSelections(QList<QTextEdit::ExtraSelection>() << s);
-	}
 	ui->plainTextEditDisassembly->setTextCursor(c);
 	ui->plainTextEditDisassembly->centerCursor();
-	disassemblyCache.highlightBreakpointedLines(ui->plainTextEditDisassembly, breakpointCache);
+	disassemblyCache.highlightLines(ui->plainTextEditDisassembly, breakpoints, lastKnownProgramCounter);
 	return true;
 }
 
@@ -3274,7 +3311,7 @@ void MainWindow::on_pushButtonDeleteAllBookmarks_clicked()
 	bookmarks.clear();
 	updateBookmarksView();
 	refreshSourceCodeView();
-	disassemblyCache.highlightBreakpointedLines(ui->plainTextEditDisassembly, breakpointCache);
+	disassemblyCache.highlightLines(ui->plainTextEditDisassembly, breakpoints, lastKnownProgramCounter);
 }
 
 void MainWindow::on_pushButtonDisconnectGdbServer_clicked()

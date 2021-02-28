@@ -50,13 +50,25 @@ struct GdbBreakpointData
 			if (b.sourceCodeLocation == sourceCodeLocation)
 				foundBreakpoints.push_back(& b);
 			/* Special case for breakpoints with multiple locations. Otherwise breakpoint deletion gets broken,
-				 * because sub-breakpoints of a multiple location breakpoint cannot be deleted - only enabled or disabled. */
+			 * because sub-breakpoints of a multiple location breakpoint cannot be deleted - only enabled or disabled. */
 			if (b.multipleLocationBreakpoints.size() && b.multipleLocationBreakpoints.at(0).sourceCodeLocation == sourceCodeLocation)
 				foundBreakpoints.push_back(& b);
 			for (const auto & t : b.multipleLocationBreakpoints)
 				if (t.sourceCodeLocation == sourceCodeLocation)
 					foundBreakpoints.push_back(& t);
 		}
+	}
+	/* Note: this function will only match top-level breakpoints at the specified address.
+	 * This function will deliberately not match derived breakpoints at an address, because such breakpoints cannot be deleted
+	 * (only enabled, or disabled). */
+	static void breakpointsForAddress(
+			uint64_t address,
+			const std::vector<GdbBreakpointData> & breakpoints,
+			std::vector<const GdbBreakpointData *> & foundBreakpoints)
+	{
+		for (const auto & b : breakpoints)
+			if (b.multipleLocationBreakpoints.empty() && b.address == address)
+				foundBreakpoints.push_back(& b);
 	}
 };
 
