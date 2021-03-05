@@ -28,11 +28,17 @@
 #include <QFileInfo>
 #include <QDateTime>
 
+#include "source-file-data.hxx"
+
+/* Note: using a cache for the source code files is not really helpful for the source view, because
+ * refreshing the source code view is dominated by rendering the generated html, and not by reading
+ * the source code file and generating an html document for it. However, a cache for the source code
+ * files can be helpful when displaying large disassembly listings. */
 class SourceFilesCache
 {
 public:
 	SourceFilesCache(){}
-	struct SourceFileData
+	struct SourceFileCacheData
 	{
 		/* The name of the source file, by which it can be accessed in the filesystem. This may be
 		 * different from the filename initially supplied, e.g., in an MSYS2 environment. */
@@ -41,8 +47,11 @@ public:
 		std::shared_ptr<const QString>	htmlDocument;
 		QStringList			sourceCodeTextlines;
 	};
-	std::shared_ptr<const SourceFileData> getSourceFileData(const QString & sourceFileName, QString &errorMessage);
+	std::shared_ptr<const SourceFileCacheData> getSourceFileCacheData(const QString & sourceFileName, QString &errorMessage);
+	void setSourceFileData(std::shared_ptr<const QHash<QString /* gdb reported full file name */, SourceFileData>> sourceFileData)
+	{ this->sourceFileData = sourceFileData; }
 private:
-	QHash<QString /* source file name */, std::shared_ptr<const struct SourceFileData> /* source file data */> sourceFileData;
+	std::shared_ptr<const QHash<QString /* gdb reported full file name */, SourceFileData>> sourceFileData;
+	QHash<QString /* source file name */, std::shared_ptr<const struct SourceFileCacheData> /* source file data */> sourceFileCacheData;
 };
 

@@ -21,20 +21,21 @@
  */
 
 #pragma once
+#include <unordered_set>
 
 struct SourceFileData {
 	/* Enumeration constants used as a 'role' parameter in treeview item widgets, contained in
-		 * the different treeview widgets (subprograms, data objects, breakpoints, bookmarks, etc.). */
+	 * the different treeview widgets (subprograms, data objects, breakpoints, bookmarks, etc.). */
 	enum
 	{
 		FILE_NAME = Qt::UserRole,
 		LINE_NUMBER,
 
 		/* Item type values in the object locator view. Used for creating
-			 * custom context menus depending on the item type. */
+		 * custom context menus depending on the item type. */
 		/*! \todo	It may be simpler to add here all 'source location'-related objects,
-			 * i.e., bookmarks, breakpoints, stack frames, etc., and handle their context menus depending on
-			 * the item types. */
+		 * i.e., bookmarks, breakpoints, stack frames, etc., and handle their context menus depending on
+		 * the item types. */
 		/* The values for this role are from the SymbolData::SymbolKind enumeration. */
 		ITEM_KIND,
 		/* The data contents are a 'void' pointer that can be cast to a 'GdbBreakpointData' data structure. */
@@ -51,8 +52,8 @@ struct SourceFileData {
 	QString fileName, gdbReportedFileName, fullFileName;
 	bool isSourceLinesFetched = false;
 	/* This set is used to know for which source code line numbers, there is some machine code generated.
-		 * This is useful, for example, for showing which source code line numbers are potential candidates
-		 * for setting breakpoints. */
+	 * This is useful, for example, for showing which source code line numbers are potential candidates
+	 * for setting breakpoints. */
 	std::unordered_set<int /* Source code line number. */> machineCodeLineNumbers;
 	bool operator ==(const SourceFileData & other) const
 	{ return other.fileName == fileName && other.gdbReportedFileName == gdbReportedFileName && other.fullFileName == fullFileName; }
@@ -62,10 +63,10 @@ struct SourceFileData {
 		enum SymbolKind
 		{
 			/* For data type symbols, only the 'name' field is appropriate. For data object and subprogram symbols,
-				 * the description is normally a string specifying the declaration of the symbol.
-				 *
-				 * 'Source file name' is not really a symbol, it is here to make some parts of the user-interface code
-				 *  more uniform. */
+			 * the description is normally a string specifying the declaration of the symbol.
+			 *
+			 * 'Source file name' is not really a symbol, it is here to make some parts of the user-interface code
+			 *  more uniform. */
 			INVALID = 0,
 			DATA_OBJECT,
 			DATA_TYPE,
@@ -87,7 +88,6 @@ struct SourceFileData {
 		}
 	};
 
-	/*! \todo	Make the 'subprograms' and 'variables' fields below unordered_set-s as well. */
 	std::unordered_set<struct SymbolData, SymbolHash> subprograms;
 	std::unordered_set<struct SymbolData, SymbolHash> variables;
 	std::unordered_set<struct SymbolData, SymbolHash> dataTypes;

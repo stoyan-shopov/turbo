@@ -1101,7 +1101,7 @@ private:
 	 * manually issuing the '-symbol-list-lines' requests. A bug report has been
 	 * submitted here:
 	 * https://sourceware.org/bugzilla/show_bug.cgi?id=26735 */
-	QHash<QString /* gdb reported full file name */, SourceFileData> sourceFiles;
+	std::shared_ptr<QHash<QString /* gdb reported full file name */, SourceFileData>> sourceFiles = std::make_shared<QHash<QString /* gdb reported full file name */, SourceFileData>>();
 
 	QList<struct SourceCodeLocation> bookmarks;
 

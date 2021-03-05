@@ -1347,7 +1347,7 @@ bool MainWindow::handleFilesResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 		return false;
 	if (results.size() != 1 || results.at(0).variable != "files" || !results.at(0).value->asList())
 		return false;
-	sourceFiles.clear();
+	sourceFiles->clear();
 	for (const auto & t : results.at(0).value->asList()->values)
 	{
 		if (!t->asTuple())
@@ -1363,12 +1363,12 @@ bool MainWindow::handleFilesResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 			else if (v.first == "fullname")
 				s.fullFileName = v.second->asConstant()->constant().c_str();
 		}
-		sourceFiles.operator [](s.fullFileName) = s;
+		sourceFiles->operator [](s.fullFileName) = s;
 	}
 	updateSourceListView();
 
 	/* Retrieve source line addresses for all source code files reported. */
-	for (const auto & f : sourceFiles)
+	for (const auto & f : sourceFiles.operator *())
 	{
 		unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
 								   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_LINES,
@@ -1395,7 +1395,7 @@ bool MainWindow::handleFilesResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 	/* Now that the list of source code files that are used to build the executable is known,
 	 * deploy a string searching thread. */
 	QStringList sourceCodeFilenames;
-	for (const auto & f : sourceFiles)
+	for (const auto & f : sourceFiles.operator *())
 		sourceCodeFilenames << f.fullFileName;
 	//qRegisterMetaType<QSharedPointer<QVector<StringFinder::SearchResult>>>("StringSearchResultType");
 
@@ -1417,10 +1417,10 @@ bool MainWindow::handleLinesResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 	if (results.size() != 1 || results.at(0).variable != "lines" || !results.at(0).value->asList())
 		return false;
 	struct GdbTokenContext::GdbResponseContext context = gdbTokenContext.readAndRemoveContext(tokenNumber);
-	if (!sourceFiles.count(context.s))
+	if (!sourceFiles->count(context.s))
 		return false;
 
-	SourceFileData & sourceFile(sourceFiles[context.s]);
+	SourceFileData & sourceFile(sourceFiles.operator *().operator [](context.s));
 	for (const auto & t : results.at(0).value->asList()->values)
 	{
 		if (!t->asTuple())
@@ -1433,6 +1433,7 @@ bool MainWindow::handleLinesResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 		}
 		sourceFile.machineCodeLineNumbers.insert(lineNumber);
 	}
+	sourceFilesCache.setSourceFileData(sourceFiles);
 	sourceFile.isSourceLinesFetched = true;
 	return true;
 }
@@ -1496,7 +1497,7 @@ bool MainWindow::handleSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM parseResul
 								symbols.push_back(symbol);
 						}
 					}
-				if (!sourceFiles.count(fullFileName))
+				if (!sourceFiles.operator *().count(fullFileName))
 				{
 					/* Symbols found for a file, which was not reported by gdb in the list of source code files
 					 * by the response of the "-file-list-exec-source-files" machine interface command.
@@ -1511,21 +1512,21 @@ bool MainWindow::handleSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM parseResul
 					/* Force the "SourceFileData" to true so that the file does not appear when only files
 					 * with machine code are being shown. */
 					s.isSourceLinesFetched = true;
-					sourceFiles.operator[](fullFileName) = s;
+					sourceFiles->operator[](fullFileName) = s;
 				}
 				if (context.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_FUNCTION_SYMBOLS)
-					sourceFiles.operator [](fullFileName).subprograms.insert(symbols.cbegin(), symbols.cend());
+					sourceFiles->operator [](fullFileName).subprograms.insert(symbols.cbegin(), symbols.cend());
 				else if (context.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_VARIABLE_SYMBOLS)
-					sourceFiles.operator [](fullFileName).variables.insert(symbols.cbegin(), symbols.cend());
+					sourceFiles->operator [](fullFileName).variables.insert(symbols.cbegin(), symbols.cend());
 				else
-					sourceFiles.operator [](fullFileName).dataTypes.insert(symbols.cbegin(), symbols.cend());
+					sourceFiles->operator [](fullFileName).dataTypes.insert(symbols.cbegin(), symbols.cend());
 			}
 		}
 	}
 
 	/* Update the list of source code files that are searched. */
 	QStringList sourceCodeFilenames;
-	for (const auto & f : sourceFiles)
+	for (const auto & f : sourceFiles.operator *())
 		sourceCodeFilenames << f.fullFileName;
 
 	emit addFilesToSearchSet(sourceCodeFilenames);
@@ -2459,7 +2460,7 @@ bool showOnlyExistingSourceFiles = ui->checkBoxShowOnlyExistingSourceFiles->isCh
 		return !showOnlySourcesWithMachineCode || /* This is a safe-catch. */ !fileData.isSourceLinesFetched || fileData.machineCodeLineNumbers.size();
 	};
 	ui->treeWidgetSourceFiles->clear();
-	for (const auto & f : sourceFiles)
+	for (const auto & f : sourceFiles.operator *())
 		if (shouldFileBeListed(f))
 		{
 			QTreeWidgetItem * t = createNavigationWidgetItem(QStringList() << f.fileName << f.fullFileName, f.fullFileName,
@@ -2486,7 +2487,7 @@ void MainWindow::updateSymbolViews()
 	ui->treeWidgetSubprograms->clear();
 	ui->treeWidgetStaticDataObjects->clear();
 	ui->treeWidgetDataTypes->clear();
-	for (const auto & f : sourceFiles)
+	for (const auto & f : sourceFiles.operator *())
 	{
 		for (const auto & s : f.subprograms)
 		{
@@ -3058,7 +3059,7 @@ bool result = false;
 	else
 	{
 		QString errorMessage;
-		auto sourceData = sourceFilesCache.getSourceFileData(sourceCodeLocation.fullFileName, errorMessage);
+		auto sourceData = sourceFilesCache.getSourceFileCacheData(sourceCodeLocation.fullFileName, errorMessage);
 		if (!sourceData)
 		{
 			ui->plainTextEditSourceView->setPlainText(errorMessage);
@@ -3066,37 +3067,6 @@ bool result = false;
 		}
 
 		ui->plainTextEditSourceView->appendHtml(sourceData.operator *().htmlDocument.operator *());
-
-		/* Mark which source code lines have corresponding machine code generated for them,
-		 * and so can be used for setting breakpoints. */
-		/*! \todo	!!! WARNING: THIS TOTALLY DEFEATS HAVING A CACHE FOR THE SOURCE CODE FILES !!!
-		 * 		The breakpoint marker insertion code below actually dominates the rendering time for the source code view.
-		 *		It is best that this marking is done when generating the html document
-		 *		for the source code file, instead of doing it here. */
-		const auto & f = sourceFiles.find(sourceCodeLocation.fullFileName);
-		if (f != sourceFiles.cend() && f->machineCodeLineNumbers.size())
-		{
-			QTextCursor c(ui->plainTextEditSourceView->textCursor());
-			c.movePosition(QTextCursor::Start);
-			c.beginEditBlock();
-			while (1)
-			{
-				if (f->machineCodeLineNumbers.count(c.blockNumber() + 1))
-					c.insertText("*");
-				else
-					c.insertText(" ");
-				if (!c.movePosition(QTextCursor::NextBlock))
-					break;
-			}
-			c.endEditBlock();
-		}
-#if 0
-		for (const auto & l : lines)
-		{
-			QString n(QString("%1").arg(++ i));
-			source += QString(numFieldWidth - n.size(), QChar(' ')) + n + (machineCodeLineNumbers->count(i) ? '*':' ') + '|' + l + '\n';
-		}
-#endif
 
 		QTextCursor c(ui->plainTextEditSourceView->textCursor());
 		c.movePosition(QTextCursor::Start);

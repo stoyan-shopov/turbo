@@ -137,7 +137,7 @@ public:
 					if (ok && lineNumber > 0 && !fullFileName.isEmpty())
 					{
 						QString errorMessage;
-						auto sourceData = sourceFilesCache.getSourceFileData(fullFileName, errorMessage);
+						auto sourceData = sourceFilesCache.getSourceFileCacheData(fullFileName, errorMessage);
 						QString backgroundColor = "Olive";
 
 						sourceLines.operator [](fullFileName).operator [](lineNumber).insert(currentLine);
