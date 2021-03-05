@@ -210,7 +210,9 @@ public:
 		{
 			QStringList probeDescriptions;
 			for (const auto & p : probes)
-				probeDescriptions << p.description + " \\\\Serial# " + p.serialNumber + " \\\\Port# " + p.portName;
+				probeDescriptions << p.description + " Serial#: " + p.serialNumber +
+						     (/* Port names seem to be quite spacious on linux systems, do not append the port name if it is too long. */
+						      (p.portName.length() > 10) ? "" : " Port#: " + p.portName);
 			bool ok;
 			QString probe = QInputDialog::getItem(0, "Select probe to connect to",
 							      "Multiple blackmagic probes detected.\n"
@@ -1178,7 +1180,7 @@ private:
 	 * it is invalid for remote debugging. */
 	unsigned debugProcessId = -1;
 	////GdbServer	* gdbserver;
-	TargetCorefile	* targetCorefile;
+	std::shared_ptr<TargetCorefile>	targetCorefile;
 	QString normalizeGdbString(const QString & miString);
 	/*! \todo This is no longer needed. */
 	QThread gdbMiReceiverThread;

@@ -542,7 +542,7 @@ reopen_last_file:
 
 	QString targetFilesBaseDirectory =
 			"C:/src/build-troll-Desktop_Qt_5_12_0_MinGW_64_bit-Debug/troll-test-drive-files/";
-	targetCorefile = new TargetCorefile(targetFilesBaseDirectory + "flash.bin", 0x08000000,
+        targetCorefile = std::make_shared<TargetCorefile>(targetFilesBaseDirectory + "flash.bin", 0x08000000,
 					    targetFilesBaseDirectory + "ram.bin", 0x20000000,
 					    targetFilesBaseDirectory + "registers.bin");
 	////gdbserver = new GdbServer(targetCorefile);
