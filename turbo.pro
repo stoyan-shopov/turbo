@@ -38,7 +38,7 @@ SOURCES += \
 	   main.cxx \
 	   ./troll/gdbserver.cxx \
 	   ./troll/target-corefile.cxx \
-	   sourcefilescache.cxx \
+	   source-files-cache.cxx \
 	   svdfileparser.cxx
 
 HEADERS += \
@@ -54,7 +54,7 @@ HEADERS += \
 	   ./troll/target.hxx \
 	   source-code-location.hxx \
 	   source-file-data.hxx \
-	   sourcefilescache.hxx \
+	   source-files-cache.hxx \
 	   svdfileparser.hxx \
 	   troll/gdb-remote.hxx \
 	   utils.hxx

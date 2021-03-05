@@ -67,7 +67,7 @@
 #include <unistd.h>
 
 #include "bmpdetect.hxx"
-#include "sourcefilescache.hxx"
+#include "source-files-cache.hxx"
 #include "utils.hxx"
 #include "ui_settings-dialog.h"
 

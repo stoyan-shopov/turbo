@@ -20,7 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "sourcefilescache.hxx"
+#include "source-files-cache.hxx"
 #include "utils.hxx"
 #include "cscanner.hxx"
 

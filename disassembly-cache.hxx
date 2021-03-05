@@ -30,7 +30,7 @@
 #include <QPlainTextEdit>
 
 #include "breakpoint-cache.hxx"
-#include "sourcefilescache.hxx"
+#include "source-files-cache.hxx"
 #include "gdb-mi-parser.hxx"
 
 class DisassemblyCache
