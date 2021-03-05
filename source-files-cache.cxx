@@ -91,7 +91,10 @@ std::shared_ptr<const struct SourceFilesCache::SourceFileCacheData> SourceFilesC
 		/* Add breakpoint markers. */
 		const auto t = sourceFileData->find(sourceFileName)->machineCodeLineNumbers;
 		for (const auto & l : lines)
-			source += QString("%1%2 |%3\n").arg(t.count(++ lineNumber) ? '*' : ' ').arg(lineNumber, numFieldWidth).arg(l);
+		{
+			lineNumber ++;
+			source += QString("%1%2 |%3\n").arg(t.count(lineNumber) ? '*' : ' ').arg(lineNumber, numFieldWidth).arg(l);
+		}
 	}
 
 	source +=
@@ -106,6 +109,8 @@ std::shared_ptr<const struct SourceFilesCache::SourceFileCacheData> SourceFilesC
 	sourceData->lastModifiedDateTime = fi.lastModified();
 	sourceData->htmlDocument = std::make_shared<const QString>(source);
 	sourceData->sourceCodeTextlines = QString((f.seek(0), f.readAll())).split('\n');
+	sourceData->textDocument = std::make_shared<QTextDocument>();
+	sourceData->textDocument->setHtml(sourceData->htmlDocument.operator *());
 	sourceFileCacheData.operator [](sourceFileName) = sourceData;
 	return sourceData;
 }

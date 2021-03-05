@@ -27,6 +27,7 @@
 #include <QString>
 #include <QFileInfo>
 #include <QDateTime>
+#include <QTextDocument>
 
 #include "source-file-data.hxx"
 
@@ -46,6 +47,7 @@ public:
 		QDateTime			lastModifiedDateTime;
 		std::shared_ptr<const QString>	htmlDocument;
 		QStringList			sourceCodeTextlines;
+		std::shared_ptr<QTextDocument>	textDocument;
 	};
 	std::shared_ptr<const SourceFileCacheData> getSourceFileCacheData(const QString & sourceFileName, QString &errorMessage);
 	void setSourceFileData(std::shared_ptr<const QHash<QString /* gdb reported full file name */, SourceFileData>> sourceFileData)

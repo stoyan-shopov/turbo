@@ -3066,7 +3066,9 @@ bool result = false;
 			goto out;
 		}
 
-		ui->plainTextEditSourceView->appendHtml(sourceData.operator *().htmlDocument.operator *());
+		QTextDocument * d = (sourceData->textDocument.operator ->()->clone());
+		d->setDocumentLayout(new QPlainTextDocumentLayout(d));
+		ui->plainTextEditSourceView->setDocument(d);
 
 		QTextCursor c(ui->plainTextEditSourceView->textCursor());
 		c.movePosition(QTextCursor::Start);
