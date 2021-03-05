@@ -53,6 +53,7 @@ HEADERS += \
 	   ./troll/target-corefile.hxx \
 	   ./troll/target.hxx \
 	   source-code-location.hxx \
+	   source-file-data.hxx \
 	   sourcefilescache.hxx \
 	   svdfileparser.hxx \
 	   troll/gdb-remote.hxx \

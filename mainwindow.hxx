@@ -72,6 +72,7 @@
 #include "ui_settings-dialog.h"
 
 #include "breakpoint-cache.hxx"
+#include "source-file-data.hxx"
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
 /* It seems that prior to Qt version 5.14, Qt does not provide a specialization
@@ -1073,77 +1074,6 @@ private:
 	void moveCursorToPreviousMatch(void);
 
 	void sendCommandsToGdb(QLineEdit * lineEdit);
-
-	struct SourceFileData {
-		/* Enumeration constants used as a 'role' parameter in treeview item widgets, contained in
-		 * the different treeview widgets (subprograms, data objects, breakpoints, bookmarks, etc.). */
-		enum
-		{
-			FILE_NAME = Qt::UserRole,
-			LINE_NUMBER,
-
-			/* Item type values in the object locator view. Used for creating
-			 * custom context menus depending on the item type. */
-			/*! \todo	It may be simpler to add here all 'source location'-related objects,
-			 * i.e., bookmarks, breakpoints, stack frames, etc., and handle their context menus depending on
-			 * the item types. */
-			/* The values for this role are from the SymbolData::SymbolKind enumeration. */
-			ITEM_KIND,
-			/* The data contents are a 'void' pointer that can be cast to a 'GdbBreakpointData' data structure. */
-			BREAKPOINT_DATA_POINTER,
-			/* If set, and set to true, then the context menu for this item is disabled. */
-			DISABLE_CONTEXT_MENU,
-			/* If set, and set to true, then navigating to source code for this item is disabled. */
-			DISABLE_SOURCE_CODE_NAVIGATION,
-			/* If available, specifies the gdb string to use for setting a breakpoint. */
-			BREAKPOINT_TARGET_COORDINATES,
-			/* If available, specifies the gdb string to use for requesting a disassembly. */
-			DISASSEMBLY_TARGET_COORDINATES,
-		};
-		QString fileName, gdbReportedFileName, fullFileName;
-		bool isSourceLinesFetched = false;
-		/* This set is used to know for which source code line numbers, there is some machine code generated.
-		 * This is useful, for example, for showing which source code line numbers are potential candidates
-		 * for setting breakpoints. */
-		std::unordered_set<int /* Source code line number. */> machineCodeLineNumbers;
-		bool operator ==(const SourceFileData & other) const
-		{ return other.fileName == fileName && other.gdbReportedFileName == gdbReportedFileName && other.fullFileName == fullFileName; }
-		struct SymbolData
-		{
-			/* This enumeration specifies a symbol 'kind', useful in some cases when handling symbols. */
-			enum SymbolKind
-			{
-				/* For data type symbols, only the 'name' field is appropriate. For data object and subprogram symbols,
-				 * the description is normally a string specifying the declaration of the symbol.
-				 *
-				 * 'Source file name' is not really a symbol, it is here to make some parts of the user-interface code
-				 *  more uniform. */
-				INVALID = 0,
-				DATA_OBJECT,
-				DATA_TYPE,
-				SUBPROGRAM,
-				SOURCE_FILE_NAME,
-			};
-			int line = -1;
-			QString	name, type, description;
-			bool operator ==(const SymbolData & other) const
-			{
-				return name == other.name && type == other.type && description == other.description && line == other.line;
-			}
-		};
-		struct SymbolHash
-		{
-			size_t operator ()(const MainWindow::SourceFileData::SymbolData & t) const
-			{
-				return std::hash<std::string>()(QString("%1:%2:%3:%4").arg(t.name).arg(t.type).arg(t.description).arg(t.line).toStdString());
-			}
-		};
-
-		/*! \todo	Make the 'subprograms' and 'variables' fields below unordered_set-s as well. */
-		std::unordered_set<struct SymbolData, SymbolHash> subprograms;
-		std::unordered_set<struct SymbolData, SymbolHash> variables;
-		std::unordered_set<struct SymbolData, SymbolHash> dataTypes;
-	};
 
 	QTreeWidgetItem * createNavigationWidgetItem(const QStringList & columnTexts, const QString & fullFileName = QString(), int lineNumber = -1,
 						     enum SourceFileData::SymbolData::SymbolKind itemKind = SourceFileData::SymbolData::INVALID,
