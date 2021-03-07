@@ -204,7 +204,10 @@ public:
 		std::vector<BmpProbeData> probes;
 		findConnectedProbes(probes);
 		if (!probes.size())
+		{
+			QMessageBox::critical(0, "No blackmagic probes found", "No blackmagic probes found");
 			return;
+		}
 		QString portName;
 		if (probes.size() > 1)
 		{

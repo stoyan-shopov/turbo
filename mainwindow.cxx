@@ -279,8 +279,8 @@ MainWindow::MainWindow(QWidget *parent) :
 	/* Force updating of the full file name column in the source files widget. */
 	ui->actionSourceFilesViewShowFullFileNames->toggled(ui->actionSourceFilesViewShowFullFileNames->isChecked());
 
-	connect(ui->actionSourceFilesShowOnlyFilesWithMachineCode, QAction::toggled, [&] { updateSourceListView(); });
-	connect(ui->actionSourceFilesShowOnlyExistingFiles, QAction::toggled, [&] { updateSourceListView(); });
+	connect(ui->actionSourceFilesShowOnlyFilesWithMachineCode, & QAction::toggled, [&] { updateSourceListView(); });
+	connect(ui->actionSourceFilesShowOnlyExistingFiles, & QAction::toggled, [&] { updateSourceListView(); });
 	ui->actionSourceFilesShowOnlyFilesWithMachineCode->setChecked(settings->value(SETTINGS_BOOL_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE, false).toBool());
 	ui->actionSourceFilesShowOnlyExistingFiles->setChecked(settings->value(SETTINGS_BOOL_SHOW_ONLY_EXISTING_SOURCE_FILES, false).toBool());
 	ui->toolButtonSourceFilesViewSettings->addAction(ui->actionSourceFilesShowOnlyFilesWithMachineCode);
