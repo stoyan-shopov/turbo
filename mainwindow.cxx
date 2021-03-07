@@ -48,6 +48,9 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->mainToolBar->addWidget(ui->pushButtonNavigateBack);
 	ui->mainToolBar->addWidget(ui->pushButtonNavigateForward);
 	ui->mainToolBar->addWidget(ui->pushButtonRESTART);
+	ui->mainToolBar->addWidget(ui->toolButton);
+	ui->toolButton->addAction(ui->actionVerifyTargetFlash);
+	ui->toolButton->addAction(ui->actionAction_2);
 	connect(ui->mainToolBar, & QToolBar::visibilityChanged, [&] { if (!ui->mainToolBar->isVisible()) ui->mainToolBar->setVisible(true); });
 
 	settings = std::make_shared<QSettings>(SETTINGS_FILE_NAME, QSettings::IniFormat);
@@ -270,13 +273,18 @@ MainWindow::MainWindow(QWidget *parent) :
 
 	ui->treeWidgetBreakpoints->header()->setSectionResizeMode(5, QHeaderView::ResizeToContents);
 
-	connect(ui->checkBoxShowFullFileNames, & QCheckBox::stateChanged, [=](int newState) { ui->treeWidgetSourceFiles->setColumnHidden(1, newState == 0); });
-	ui->checkBoxShowFullFileNames->setChecked(settings->value(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_STATE, false).toBool());
+	connect(ui->actionSourceFilesViewShowFullFileNames, & QAction::toggled, [&](bool checked) { ui->treeWidgetSourceFiles->setColumnHidden(1, !checked); });
+	ui->actionSourceFilesViewShowFullFileNames->setChecked(settings->value(SETTINGS_BOOL_SHOW_FULL_FILE_NAME_STATE, false).toBool());
+	ui->toolButtonSourceFilesViewSettings->addAction(ui->actionSourceFilesViewShowFullFileNames);
+	/* Force updating of the full file name column in the source files widget. */
+	ui->actionSourceFilesViewShowFullFileNames->toggled(ui->actionSourceFilesViewShowFullFileNames->isChecked());
 
-	connect(ui->checkBoxShowOnlySourcesWithMachineCode, SIGNAL(stateChanged(int)), this, SLOT(updateSourceListView()));
-	connect(ui->checkBoxShowOnlyExistingSourceFiles, SIGNAL(stateChanged(int)), this, SLOT(updateSourceListView()));
-	ui->checkBoxShowOnlySourcesWithMachineCode->setChecked(settings->value(SETTINGS_CHECKBOX_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE, false).toBool());
-	ui->checkBoxShowOnlyExistingSourceFiles->setChecked(settings->value(SETTINGS_CHECKBOX_SHOW_ONLY_EXISTING_SOURCE_FILES, false).toBool());
+	connect(ui->actionSourceFilesShowOnlyFilesWithMachineCode, QAction::toggled, [&] { updateSourceListView(); });
+	connect(ui->actionSourceFilesShowOnlyExistingFiles, QAction::toggled, [&] { updateSourceListView(); });
+	ui->actionSourceFilesShowOnlyFilesWithMachineCode->setChecked(settings->value(SETTINGS_BOOL_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE, false).toBool());
+	ui->actionSourceFilesShowOnlyExistingFiles->setChecked(settings->value(SETTINGS_BOOL_SHOW_ONLY_EXISTING_SOURCE_FILES, false).toBool());
+	ui->toolButtonSourceFilesViewSettings->addAction(ui->actionSourceFilesShowOnlyFilesWithMachineCode);
+	ui->toolButtonSourceFilesViewSettings->addAction(ui->actionSourceFilesShowOnlyExistingFiles);
 
 
 	connect(ui->treeWidgetBookmarks, & QTreeWidget::itemActivated, [=] (QTreeWidgetItem * item, int column)
@@ -802,10 +810,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 	settings->setValue(SETTINGS_MAINWINDOW_STATE, saveState());
 	settings->setValue(SETTINGS_MAINWINDOW_GEOMETRY, saveGeometry());
-	settings->setValue(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_STATE, ui->checkBoxShowFullFileNames->isChecked());
+	settings->setValue(SETTINGS_BOOL_SHOW_FULL_FILE_NAME_STATE, ui->actionSourceFilesViewShowFullFileNames->isChecked());
 	settings->setValue(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE, ui->checkBoxShowFullFileNamesInTraceLog->isChecked());
-	settings->setValue(SETTINGS_CHECKBOX_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE, ui->checkBoxShowOnlySourcesWithMachineCode->isChecked());
-	settings->setValue(SETTINGS_CHECKBOX_SHOW_ONLY_EXISTING_SOURCE_FILES, ui->checkBoxShowOnlyExistingSourceFiles->isChecked());
+	settings->setValue(SETTINGS_BOOL_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE, ui->actionSourceFilesShowOnlyFilesWithMachineCode->isChecked());
+	settings->setValue(SETTINGS_BOOL_SHOW_ONLY_EXISTING_SOURCE_FILES, ui->actionSourceFilesShowOnlyExistingFiles->isChecked());
 	settings->setValue(SETTINGS_SCRATCHPAD_TEXT_CONTENTS, ui->plainTextEditScratchpad->document()->toPlainText());
 
 	settings->setValue(SETTINGS_SPLITTER_VERTICAL_SOURCE_VIEW_STATE, ui->splitterVerticalSourceView->saveState());
@@ -1938,6 +1946,8 @@ bool MainWindow::handleDisassemblyResponse(GdbMiParser::RESULT_CLASS_ENUM parseR
 	if (parseResult != GdbMiParser::DONE || results.size() != 1 || results.at(0).variable != "asm_insns" || !(disassembly = results.at(0).value->asList()))
 		return false;
 
+	/* If the disassembly view is currently non-visible, make it visible. */
+	ui->checkBoxShowDisassembly->setChecked(true);
 	QString disassemblyDocument;
 	disassemblyCache.generateDisassemblyDocument(disassembly, sourceFilesCache, disassemblyDocument);
 	ui->plainTextEditDisassembly->clear();
@@ -2445,8 +2455,8 @@ void MainWindow::stringSearchReady(const QString pattern, QSharedPointer<QVector
 
 void MainWindow::updateSourceListView()
 {
-bool showOnlySourcesWithMachineCode = ui->checkBoxShowOnlySourcesWithMachineCode->isChecked();
-bool showOnlyExistingSourceFiles = ui->checkBoxShowOnlyExistingSourceFiles->isChecked();
+bool showOnlySourcesWithMachineCode = ui->actionSourceFilesShowOnlyFilesWithMachineCode->isChecked();
+bool showOnlyExistingSourceFiles = ui->actionSourceFilesShowOnlyExistingFiles->isChecked();
 
 	std::function<bool(const SourceFileData & fileData)> shouldFileBeListed = [&] (const SourceFileData & fileData) -> bool
 	{
@@ -3067,8 +3077,10 @@ bool result = false;
 		}
 
 		QTextDocument * d = (sourceData->textDocument.operator ->()->clone());
+		QString savedStyleSheet = ui->plainTextEditSourceView->styleSheet();
 		d->setDocumentLayout(new QPlainTextDocumentLayout(d));
 		ui->plainTextEditSourceView->setDocument(d);
+		ui->plainTextEditSourceView->setStyleSheet(savedStyleSheet);
 
 		QTextCursor c(ui->plainTextEditSourceView->textCursor());
 		c.movePosition(QTextCursor::Start);

@@ -209,8 +209,9 @@ public:
 		if (probes.size() > 1)
 		{
 			QStringList probeDescriptions;
+			int i = 0;
 			for (const auto & p : probes)
-				probeDescriptions << p.description + " Serial#: " + p.serialNumber +
+				probeDescriptions << QString("%1: ").arg(++ i) + p.description + " Serial#: " + p.serialNumber +
 						     (/* Port names seem to be quite spacious on linux systems, do not append the port name if it is too long. */
 						      (p.portName.length() > 10) ? "" : " Port#: " + p.portName);
 			bool ok;
@@ -220,10 +221,11 @@ public:
 							      probeDescriptions, 0, false, &ok);
 			if (!ok)
 				return;
-			QRegularExpression rx("\\\\Port# (.*)");
+			QRegularExpression rx("^(\\d+): ");
 			QRegularExpressionMatch match = rx.match(probe);
-			if (match.hasMatch())
-				portName = match.captured(1);
+			bool isOk;
+			if (match.hasMatch() && (i = match.captured(1).toUInt(& isOk) - 1, isOk) && i < probes.size())
+				portName = probes.at(i).portName;
 			else
 				return;
 		}
@@ -659,9 +661,9 @@ private:
 	const QString SETTINGS_IS_TARGET_OUTPUT_VIEW_VISIBLE			= "is-target-output-view-visible";
 
 	const QString SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE		= "checkbox-gdb-output-limiting-mode-state";
-	const QString SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_STATE		= "checkbox-show-full-file-name-state";
-	const QString SETTINGS_CHECKBOX_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE		= "checkbox-show-only-sources-with-machine-code-state";
-	const QString SETTINGS_CHECKBOX_SHOW_ONLY_EXISTING_SOURCE_FILES		= "checkbox-show-only-existing-source-files";
+	const QString SETTINGS_BOOL_SHOW_FULL_FILE_NAME_STATE			= "setting-show-full-file-name-state";
+	const QString SETTINGS_BOOL_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE	= "setting-show-only-sources-with-machine-code-state";
+	const QString SETTINGS_BOOL_SHOW_ONLY_EXISTING_SOURCE_FILES		= "setting-show-only-existing-source-files";
 	const QString SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE		= "checkbox-enable-native-debugging";
 
 	const QString SETTINGS_SCRATCHPAD_TEXT_CONTENTS				= "scratchpad-text-contents";

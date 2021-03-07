@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1666</width>
-    <height>710</height>
+    <height>719</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -81,6 +81,16 @@
          </widget>
         </item>
        </layout>
+      </item>
+      <item>
+       <widget class="QToolButton" name="toolButton">
+        <property name="text">
+         <string>ACTION</string>
+        </property>
+        <property name="popupMode">
+         <enum>QToolButton::InstantPopup</enum>
+        </property>
+       </widget>
       </item>
       <item>
        <widget class="QPushButton" name="pushButtonRESTART">
@@ -405,6 +415,9 @@ for text:</string>
          </item>
          <item>
           <widget class="QPlainTextEdit" name="plainTextEditSourceView">
+           <property name="plainText">
+            <string>Lorem ipsum, dolor sit amet</string>
+           </property>
            <property name="textInteractionFlags">
             <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
            </property>
@@ -612,6 +625,21 @@ for text:</string>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents">
     <layout class="QVBoxLayout" name="verticalLayout">
+     <property name="spacing">
+      <number>3</number>
+     </property>
+     <property name="leftMargin">
+      <number>3</number>
+     </property>
+     <property name="topMargin">
+      <number>3</number>
+     </property>
+     <property name="rightMargin">
+      <number>3</number>
+     </property>
+     <property name="bottomMargin">
+      <number>3</number>
+     </property>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_2">
        <item>
@@ -670,29 +698,36 @@ for text:</string>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_2">
     <layout class="QVBoxLayout" name="verticalLayout_6">
+     <property name="spacing">
+      <number>3</number>
+     </property>
+     <property name="leftMargin">
+      <number>3</number>
+     </property>
+     <property name="topMargin">
+      <number>3</number>
+     </property>
+     <property name="rightMargin">
+      <number>3</number>
+     </property>
+     <property name="bottomMargin">
+      <number>3</number>
+     </property>
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_5">
        <item>
-        <widget class="QCheckBox" name="checkBoxShowFullFileNames">
-         <property name="text">
-          <string>Show full file names</string>
+        <widget class="QToolButton" name="toolButtonSourceFilesViewSettings">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
          </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="checkBoxShowOnlySourcesWithMachineCode">
          <property name="text">
-          <string>Only files with machine code</string>
+          <string>Settings...</string>
          </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="checkBoxShowOnlyExistingSourceFiles">
-         <property name="text">
-          <string>Only exising files</string>
+         <property name="popupMode">
+          <enum>QToolButton::InstantPopup</enum>
          </property>
         </widget>
        </item>
@@ -727,6 +762,21 @@ for text:</string>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_3">
     <layout class="QVBoxLayout" name="verticalLayout_7">
+     <property name="spacing">
+      <number>3</number>
+     </property>
+     <property name="leftMargin">
+      <number>3</number>
+     </property>
+     <property name="topMargin">
+      <number>3</number>
+     </property>
+     <property name="rightMargin">
+      <number>3</number>
+     </property>
+     <property name="bottomMargin">
+      <number>3</number>
+     </property>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_5">
        <item>
@@ -760,8 +810,29 @@ for text:</string>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_7">
     <layout class="QVBoxLayout" name="verticalLayout_8">
+     <property name="spacing">
+      <number>3</number>
+     </property>
+     <property name="leftMargin">
+      <number>3</number>
+     </property>
+     <property name="topMargin">
+      <number>3</number>
+     </property>
+     <property name="rightMargin">
+      <number>3</number>
+     </property>
+     <property name="bottomMargin">
+      <number>3</number>
+     </property>
      <item>
       <widget class="QTreeWidget" name="treeWidgetSubprograms">
+       <property name="indentation">
+        <number>0</number>
+       </property>
+       <property name="uniformRowHeights">
+        <bool>true</bool>
+       </property>
        <attribute name="headerStretchLastSection">
         <bool>false</bool>
        </attribute>
@@ -838,6 +909,21 @@ for text:</string>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_5">
     <layout class="QVBoxLayout" name="verticalLayout_10">
+     <property name="spacing">
+      <number>3</number>
+     </property>
+     <property name="leftMargin">
+      <number>3</number>
+     </property>
+     <property name="topMargin">
+      <number>3</number>
+     </property>
+     <property name="rightMargin">
+      <number>3</number>
+     </property>
+     <property name="bottomMargin">
+      <number>3</number>
+     </property>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_8">
        <item>
@@ -901,6 +987,21 @@ for text:</string>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_8">
     <layout class="QVBoxLayout" name="verticalLayout_11">
+     <property name="spacing">
+      <number>3</number>
+     </property>
+     <property name="leftMargin">
+      <number>3</number>
+     </property>
+     <property name="topMargin">
+      <number>3</number>
+     </property>
+     <property name="rightMargin">
+      <number>3</number>
+     </property>
+     <property name="bottomMargin">
+      <number>3</number>
+     </property>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_9">
        <item>
@@ -1088,6 +1189,21 @@ for text:</string>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_11">
     <layout class="QVBoxLayout" name="verticalLayout_15">
+     <property name="spacing">
+      <number>3</number>
+     </property>
+     <property name="leftMargin">
+      <number>3</number>
+     </property>
+     <property name="topMargin">
+      <number>3</number>
+     </property>
+     <property name="rightMargin">
+      <number>3</number>
+     </property>
+     <property name="bottomMargin">
+      <number>3</number>
+     </property>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_13">
        <item>
@@ -1104,6 +1220,15 @@ for text:</string>
      </item>
      <item>
       <widget class="QTreeWidget" name="treeWidgetObjectLocator">
+       <property name="styleSheet">
+        <string notr="true">background-color: PaleTurquoise</string>
+       </property>
+       <property name="indentation">
+        <number>0</number>
+       </property>
+       <attribute name="headerVisible">
+        <bool>false</bool>
+       </attribute>
        <column>
         <property name="text">
          <string notr="true">1</string>
@@ -1123,6 +1248,21 @@ for text:</string>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_12">
     <layout class="QVBoxLayout" name="verticalLayout_16">
+     <property name="spacing">
+      <number>3</number>
+     </property>
+     <property name="leftMargin">
+      <number>3</number>
+     </property>
+     <property name="topMargin">
+      <number>3</number>
+     </property>
+     <property name="rightMargin">
+      <number>3</number>
+     </property>
+     <property name="bottomMargin">
+      <number>3</number>
+     </property>
      <item>
       <widget class="QPushButton" name="pushButtonDeleteAllBookmarks">
        <property name="text">
@@ -1156,6 +1296,21 @@ for text:</string>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_13">
     <layout class="QVBoxLayout" name="verticalLayout_17">
+     <property name="spacing">
+      <number>3</number>
+     </property>
+     <property name="leftMargin">
+      <number>3</number>
+     </property>
+     <property name="topMargin">
+      <number>3</number>
+     </property>
+     <property name="rightMargin">
+      <number>3</number>
+     </property>
+     <property name="bottomMargin">
+      <number>3</number>
+     </property>
      <item>
       <widget class="QTreeWidget" name="treeWidgetRegisters">
        <column>
@@ -1374,6 +1529,40 @@ for text:</string>
     </layout>
    </widget>
   </widget>
+  <action name="actionVerifyTargetFlash">
+   <property name="text">
+    <string>Verify flash</string>
+   </property>
+  </action>
+  <action name="actionAction_2">
+   <property name="text">
+    <string>Action 2</string>
+   </property>
+  </action>
+  <action name="actionSourceFilesViewShowFullFileNames">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show full file names</string>
+   </property>
+  </action>
+  <action name="actionSourceFilesShowOnlyFilesWithMachineCode">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show only files with machine code</string>
+   </property>
+  </action>
+  <action name="actionSourceFilesShowOnlyExistingFiles">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show only existing files</string>
+   </property>
+  </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources/>
@@ -1385,12 +1574,12 @@ for text:</string>
    <slot>clear()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>381</x>
-     <y>461</y>
+     <x>345</x>
+     <y>429</y>
     </hint>
     <hint type="destinationlabel">
-     <x>940</x>
-     <y>539</y>
+     <x>1062</x>
+     <y>501</y>
     </hint>
    </hints>
   </connection>
@@ -1401,12 +1590,12 @@ for text:</string>
    <slot>clear()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>1136</x>
-     <y>87</y>
+     <x>977</x>
+     <y>567</y>
     </hint>
     <hint type="destinationlabel">
-     <x>1360</x>
-     <y>165</y>
+     <x>1201</x>
+     <y>680</y>
     </hint>
    </hints>
   </connection>
@@ -1417,12 +1606,12 @@ for text:</string>
    <slot>clear()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>374</x>
-     <y>310</y>
+     <x>346</x>
+     <y>295</y>
     </hint>
     <hint type="destinationlabel">
-     <x>359</x>
-     <y>361</y>
+     <x>347</x>
+     <y>384</y>
     </hint>
    </hints>
   </connection>
