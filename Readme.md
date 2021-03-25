@@ -1,4 +1,4 @@
-Turbo
+Turbo - increase efficiency of using the gdb debugger
 
 This is a minimalistic frontend to the gdb debugger.
 The goal was to provide a good graphical interface to the gdb debugger, for the purpose of debugging C programs for ARM Cortex-M devices, with the help of the blackmagic probe
