@@ -363,6 +363,9 @@ gdb server</string>
            </item>
            <item>
             <widget class="QCheckBox" name="checkBoxShowGdbConsoles">
+             <property name="styleSheet">
+              <string notr="true">background-color: Wheat</string>
+             </property>
              <property name="text">
               <string>Show gdb consoles</string>
              </property>

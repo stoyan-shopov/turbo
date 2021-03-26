@@ -6,124 +6,108 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>425</width>
-    <height>322</height>
+    <width>421</width>
+    <height>128</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Settings</string>
   </property>
-  <widget class="QLabel" name="label">
-   <property name="geometry">
-    <rect>
-     <x>50</x>
-     <y>50</y>
-     <width>47</width>
-     <height>13</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Gdb executable:</string>
-   </property>
-  </widget>
-  <widget class="QLineEdit" name="lineEditGdbExecutable">
-   <property name="geometry">
-    <rect>
-     <x>150</x>
-     <y>50</y>
-     <width>113</width>
-     <height>20</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="pushButtonSettingsOk">
-   <property name="geometry">
-    <rect>
-     <x>120</x>
-     <y>250</y>
-     <width>75</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Ok</string>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="pushButtonSettingsCancel">
-   <property name="geometry">
-    <rect>
-     <x>270</x>
-     <y>250</y>
-     <width>75</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Cancel</string>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="pushButtonSelectGdbExecutableFile">
-   <property name="geometry">
-    <rect>
-     <x>270</x>
-     <y>50</y>
-     <width>75</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Select File</string>
-   </property>
-  </widget>
-  <widget class="QCheckBox" name="checkBoxenableNativeDebugging">
-   <property name="geometry">
-    <rect>
-     <x>50</x>
-     <y>100</y>
-     <width>121</width>
-     <height>17</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Native debugging</string>
-   </property>
-  </widget>
-  <widget class="QLineEdit" name="lineEditTargetSVDFileName">
-   <property name="geometry">
-    <rect>
-     <x>170</x>
-     <y>160</y>
-     <width>113</width>
-     <height>20</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_2">
-   <property name="geometry">
-    <rect>
-     <x>60</x>
-     <y>170</y>
-     <width>47</width>
-     <height>13</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>SVD file</string>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="pushButtonSelectTargetSVDFile">
-   <property name="geometry">
-    <rect>
-     <x>300</x>
-     <y>160</y>
-     <width>75</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Select File</string>
-   </property>
-  </widget>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>Gdb executable:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="lineEditGdbExecutable"/>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButtonSelectGdbExecutableFile">
+       <property name="text">
+        <string>Select File</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="checkBoxenableNativeDebugging">
+     <property name="text">
+      <string>Delibeately undocumented</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <widget class="QLabel" name="label_2">
+       <property name="text">
+        <string>SVD file</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="lineEditTargetSVDFileName"/>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButtonSelectTargetSVDFile">
+       <property name="text">
+        <string>Select File</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_3">
+     <item>
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButtonSettingsOk">
+       <property name="text">
+        <string>Ok</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButtonSettingsCancel">
+       <property name="text">
+        <string>Cancel</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+  </layout>
  </widget>
  <resources/>
  <connections/>

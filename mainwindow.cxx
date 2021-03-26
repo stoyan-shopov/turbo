@@ -53,6 +53,9 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->toolButton->addAction(ui->actionAction_2);
 	connect(ui->mainToolBar, & QToolBar::visibilityChanged, [&] { if (!ui->mainToolBar->isVisible()) ui->mainToolBar->setVisible(true); });
 
+	/* If this flag is set, then provide a default user interface layout. */
+	bool isDefaultConfigRequested = !QFile::exists(SETTINGS_FILE_NAME);
+
 	settings = std::make_shared<QSettings>(SETTINGS_FILE_NAME, QSettings::IniFormat);
 	restoreState(settings->value(SETTINGS_MAINWINDOW_STATE, QByteArray()).toByteArray());
 	restoreGeometry(settings->value(SETTINGS_MAINWINDOW_GEOMETRY, QByteArray()).toByteArray());
@@ -198,7 +201,20 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->pushButtonStartGdb, & QPushButton::clicked, [&] {
 		if (gdbProcess->state() == QProcess::NotRunning)
 		{
-			gdbProcess->setProgram(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString());
+			QString gdbExecutableFileName = settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString();
+			/* If the gdb executable is not set, ask the user to specify a valid gdb executable. */
+			if (gdbExecutableFileName.isEmpty())
+			{
+				QMessageBox::critical(0, "Gdb executable not set", "Gdb executable not specified. Please, specify a valid gdb executable.");
+				settingsUi.lineEditGdbExecutable->setText(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString());
+				settingsUi.lineEditTargetSVDFileName->setText(targetSVDFileName);
+				settingsUi.checkBoxenableNativeDebugging->setChecked(settings->value(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, false).toBool());
+				/* Execute the settings dialog synchronously. */
+				dialogEditSettings->exec();
+			}
+			/* Do not check again if the gdb executable is available. */
+			gdbExecutableFileName = settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString();
+			gdbProcess->setProgram(gdbExecutableFileName);
 			gdbProcess->start();
 		}
 	});
@@ -497,7 +513,8 @@ reopen_last_file:
 			}
 		}
 	});
-	gdbProcess->start(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString(), QStringList() << "--interpreter=mi3");
+	gdbProcess->setArguments(QStringList() << "--interpreter=mi3");
+	ui->pushButtonStartGdb->click();
 
 	ui->treeWidgetBreakpoints->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(ui->treeWidgetBreakpoints, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(breakpointsContextMenuRequested(QPoint)));
@@ -732,6 +749,14 @@ reopen_last_file:
 	connect(ui->pushButtonSendCommandToGdb1, & QPushButton::clicked, [&] { sendCommandsToGdb(ui->lineEditGdbCommand1); });
 	connect(ui->lineEditGdbCommand2, & QLineEdit::returnPressed, [&] { sendCommandsToGdb(ui->lineEditGdbCommand2); });
 
+	if (isDefaultConfigRequested)
+	{
+		/* Provide a sensible default user interface layout. This is pretty arbitrary. */
+		ui->comboBoxSelectLayout->activated(defaultLayoutIndex);
+		ui->pushButtonHideGdbConsoles->click();
+		ui->pushButtonHideDisassembly->click();
+		ui->pushButtonHideTargetOutputView->click();
+	}
 }
 
 void MainWindow::loadSessions()

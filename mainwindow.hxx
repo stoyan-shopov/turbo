@@ -679,6 +679,9 @@ private:
 
 	const QString SETTINGS_SAVED_SESSIONS					= "saved-sessions";
 
+	/* This is the index in the layout combo box to set when a default user interface configuration is requested. */
+	const int defaultLayoutIndex = 2;
+
 	std::shared_ptr<QSettings> settings;
 	QString targetSVDFileName;
 
