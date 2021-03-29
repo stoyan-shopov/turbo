@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>421</width>
-    <height>128</height>
+    <width>407</width>
+    <height>164</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -39,6 +39,14 @@
     <widget class="QCheckBox" name="checkBoxenableNativeDebugging">
      <property name="text">
       <string>Delibeately undocumented</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="checkBoxHideLessUsedUiItems">
+     <property name="text">
+      <string>Hide less used UI items, to save some space in the UI.
+Such items are always more-compactly accessible from the ACTIONS menu</string>
      </property>
     </widget>
    </item>
@@ -82,6 +90,9 @@
       <widget class="QPushButton" name="pushButtonSettingsOk">
        <property name="text">
         <string>Ok</string>
+       </property>
+       <property name="default">
+        <bool>true</bool>
        </property>
       </widget>
      </item>

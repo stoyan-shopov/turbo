@@ -37,6 +37,7 @@
 #include <QSerialPortInfo>
 #include <QInputDialog>
 #include <QSettings>
+#include <QAction>
 
 #include <QMessageBox>
 #include <QFileSystemWatcher>
@@ -663,6 +664,7 @@ private:
 	const QString SETTINGS_IS_DISASSEMBLY_VIEW_VISIBLE			= "is-disassembly-view-visible";
 	const QString SETTINGS_IS_TARGET_OUTPUT_VIEW_VISIBLE			= "is-target-output-view-visible";
 
+	const QString SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS			= "checkbox-hide-less-used-ui-items";
 	const QString SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE		= "checkbox-gdb-output-limiting-mode-state";
 	const QString SETTINGS_BOOL_SHOW_FULL_FILE_NAME_STATE			= "setting-show-full-file-name-state";
 	const QString SETTINGS_BOOL_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE	= "setting-show-only-sources-with-machine-code-state";
@@ -681,9 +683,13 @@ private:
 
 	/* This is the index in the layout combo box to set when a default user interface configuration is requested. */
 	const int defaultLayoutIndex = 2;
+	const QString DEFAULT_PLAINTEXT_EDIT_STYLESHEET =  "font: 10pt 'Hack';";
 
 	std::shared_ptr<QSettings> settings;
 	QString targetSVDFileName;
+
+	/* This list holds the items that will be shown or hidden when requesting to show or hide the not-so-often used user interface items, in order to make the user interface less cluttered. */
+	QWidgetList lessUsedUiItems;
 
 	struct SessionState
 	{
@@ -1020,6 +1026,15 @@ private:
 		QWidgetList enabledWidgetsWhenTargetDetached;
 		QWidgetList disabledWidgetsWhenTargetDetached;
 
+		QList<QAction *> enabledActionsWhenGdbServerDisconnected;
+		QList<QAction *> disabledActionsWhenGdbServerDisconnected;
+		QList<QAction *> enabledActionsWhenTargetRunning;
+		QList<QAction *> disabledActionsWhenTargetRunning;
+		QList<QAction *> enabledActionsWhenTargetStopped;
+		QList<QAction *> disabledActionsWhenTargetStopped;
+		QList<QAction *> enabledActionsWhenTargetDetached;
+		QList<QAction *> disabledActionsWhenTargetDetached;
+
 		void enterTargetState(enum TARGET_STATE target_state)
 		{
 			switch (target_state)
@@ -1031,24 +1046,40 @@ private:
 					w->setEnabled(false);
 				for (const auto & w : enabledWidgetsWhenTargetDetached)
 					w->setEnabled(true);
-				return;
+				for (const auto & a : disabledActionsWhenTargetDetached)
+					a->setEnabled(false);
+				for (const auto & a : enabledActionsWhenTargetDetached)
+					a->setEnabled(true);
+				break;
 			case GDBSERVER_DISCONNECTED:
 				for (const auto & w : disabledWidgetsWhenGdbServerDisconnected)
 					w->setEnabled(false);
 				for (const auto & w : enabledWidgetsWhenGdbServerDisconnected)
 					w->setEnabled(true);
-				return;
+				for (const auto & a : disabledActionsWhenGdbServerDisconnected)
+					a->setEnabled(false);
+				for (const auto & a : enabledActionsWhenGdbServerDisconnected)
+					a->setEnabled(true);
+				break;
 			case TARGET_RUNNING:
 				for (const auto & w : disabledWidgetsWhenTargetRunning)
 					w->setEnabled(false);
 				for (const auto & w : enabledWidgetsWhenTargetRunning)
 					w->setEnabled(true);
+				for (const auto & a : disabledActionsWhenTargetRunning)
+					a->setEnabled(false);
+				for (const auto & a : enabledActionsWhenTargetRunning)
+					a->setEnabled(true);
 				break;
 			case TARGET_STOPPED:
 				for (const auto & w : disabledWidgetsWhenTargetStopped)
 					w->setEnabled(false);
 				for (const auto & w : enabledWidgetsWhenTargetStopped)
 					w->setEnabled(true);
+				for (const auto & a : disabledActionsWhenTargetStopped)
+					a->setEnabled(false);
+				for (const auto & a : enabledActionsWhenTargetStopped)
+					a->setEnabled(true);
 				break;
 			}
 		}

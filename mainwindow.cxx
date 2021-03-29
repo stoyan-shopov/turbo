@@ -50,6 +50,8 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->mainToolBar->addWidget(ui->pushButtonRESTART);
 	ui->mainToolBar->addWidget(ui->toolButton);
 	ui->toolButton->addAction(ui->actionVerifyTargetFlash);
+	ui->toolButton->addAction(ui->actionLoadProgramIntoTarget);
+	ui->toolButton->addAction(ui->actionDisconnectGdbServer);
 	ui->toolButton->addAction(ui->actionAction_2);
 	connect(ui->mainToolBar, & QToolBar::visibilityChanged, [&] { if (!ui->mainToolBar->isVisible()) ui->mainToolBar->setVisible(true); });
 
@@ -65,6 +67,16 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->pushButtonNavigateBack, & QPushButton::clicked, [&] { if (navigationStack.canNavigateBack()) displaySourceCodeFile(navigationStack.previous(), false); });
 
 	connect(ui->pushButtonVerifyTargetMemory, & QPushButton::clicked, [&] { compareTargetMemory(); });
+	connect(ui->actionVerifyTargetFlash, & QAction::triggered, [&] { compareTargetMemory(); });
+	connect(ui->actionLoadProgramIntoTarget, & QAction::triggered, [&] { sendDataToGdbProcess("-target-download\n"); });
+	connect(ui->actionDisconnectGdbServer, & QAction::triggered, [&] { blackMagicProbeServer.closeConnections(); });
+
+	/*! \todo	This is too verbose, should be improved. */
+	targetStateDependentWidgets.enabledActionsWhenTargetStopped << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
+	targetStateDependentWidgets.disabledActionsWhenTargetRunning << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
+	targetStateDependentWidgets.disabledActionsWhenTargetDetached << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
+	targetStateDependentWidgets.disabledActionsWhenGdbServerDisconnected << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
+
 	connect(ui->pushButtonRequestGdbHalt, & QPushButton::clicked, [&]{ requestTargetHalt(); });
 	connect(ui->pushButtonLoadSVDFile, & QPushButton::clicked, [&]{ loadSVDFile(); });
 
@@ -130,6 +142,7 @@ MainWindow::MainWindow(QWidget *parent) :
 		settingsUi.lineEditGdbExecutable->setText(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString());
 		settingsUi.lineEditTargetSVDFileName->setText(targetSVDFileName);
 		settingsUi.checkBoxenableNativeDebugging->setChecked(settings->value(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, false).toBool());
+		settingsUi.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
 		dialogEditSettings->open();
 	});
 	connect(settingsUi.pushButtonSelectGdbExecutableFile, & QPushButton::clicked, [&](){
@@ -146,9 +159,15 @@ MainWindow::MainWindow(QWidget *parent) :
 		settings->setValue(SETTINGS_GDB_EXECUTABLE_FILENAME, settingsUi.lineEditGdbExecutable->text());
 		targetSVDFileName = settingsUi.lineEditTargetSVDFileName->text();
 		settings->setValue(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, settingsUi.checkBoxenableNativeDebugging->isChecked());
+		settings->setValue(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, settingsUi.checkBoxHideLessUsedUiItems->isChecked());
 		dialogEditSettings->hide();
 	});
-	connect(settingsUi.pushButtonSettingsCancel, & QPushButton::clicked, [&](){ dialogEditSettings->hide(); });
+	connect(settingsUi.pushButtonSettingsCancel, & QPushButton::clicked, [&]()
+		{
+			settingsUi.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
+			dialogEditSettings->hide();
+		});
+	connect(dialogEditSettings, & QDialog::rejected, [&] { settingsUi.pushButtonSettingsCancel->click(); });
 	/*****************************************
 	 * End Settings.
 	 *****************************************/
@@ -179,7 +198,15 @@ MainWindow::MainWindow(QWidget *parent) :
 		{
 			ui->plainTextEditGdbLog->setMaximumBlockCount((newState == Qt::Checked) ? MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE : 0);
 		});
+
+	lessUsedUiItems << ui->pushButtonVerifyTargetMemory << ui->pushButtonLoadProgramToTarget << ui->pushButtonDisconnectGdbServer;
+	connect(settingsUi.checkBoxHideLessUsedUiItems, & QCheckBox::stateChanged, [&](int newState)
+		{
+			for (auto & w : lessUsedUiItems) w->setHidden(newState);
+		});
 	ui->checkBoxLimitGdbLog->setChecked(settings->value(SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE, true).toBool());
+
+	settingsUi.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
 
 	gdbProcess = std::make_shared<QProcess>();
 	/*! \todo This doesn't need to live in a separate thread. */
@@ -291,7 +318,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
 	connect(ui->actionSourceFilesViewShowFullFileNames, & QAction::toggled, [&](bool checked) { ui->treeWidgetSourceFiles->setColumnHidden(1, !checked); });
 	ui->actionSourceFilesViewShowFullFileNames->setChecked(settings->value(SETTINGS_BOOL_SHOW_FULL_FILE_NAME_STATE, false).toBool());
-	ui->toolButtonSourceFilesViewSettings->addAction(ui->actionSourceFilesViewShowFullFileNames);
+	ui->toolButtonSourceFilesViewOptions->addAction(ui->actionSourceFilesViewShowFullFileNames);
 	/* Force updating of the full file name column in the source files widget. */
 	ui->actionSourceFilesViewShowFullFileNames->toggled(ui->actionSourceFilesViewShowFullFileNames->isChecked());
 
@@ -299,8 +326,8 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->actionSourceFilesShowOnlyExistingFiles, & QAction::toggled, [&] { updateSourceListView(); });
 	ui->actionSourceFilesShowOnlyFilesWithMachineCode->setChecked(settings->value(SETTINGS_BOOL_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE, false).toBool());
 	ui->actionSourceFilesShowOnlyExistingFiles->setChecked(settings->value(SETTINGS_BOOL_SHOW_ONLY_EXISTING_SOURCE_FILES, false).toBool());
-	ui->toolButtonSourceFilesViewSettings->addAction(ui->actionSourceFilesShowOnlyFilesWithMachineCode);
-	ui->toolButtonSourceFilesViewSettings->addAction(ui->actionSourceFilesShowOnlyExistingFiles);
+	ui->toolButtonSourceFilesViewOptions->addAction(ui->actionSourceFilesShowOnlyFilesWithMachineCode);
+	ui->toolButtonSourceFilesViewOptions->addAction(ui->actionSourceFilesShowOnlyExistingFiles);
 
 
 	connect(ui->treeWidgetBookmarks, & QTreeWidget::itemActivated, [=] (QTreeWidgetItem * item, int column)
@@ -378,10 +405,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
 "QSplitter::handle:vertical:hover {\n"
 	"background: cyan;\n"
-"}\n"
-
-"QPlainTextEdit {\n"
-	"font: 10pt 'Hack';\n"
 "}\n"
 
 /* Horizontal scroll bars. */
@@ -464,7 +487,11 @@ MainWindow::MainWindow(QWidget *parent) :
     "background: none;\n"
 "}\n"
 #endif
-			      ));
+			      ) +
+"QPlainTextEdit {\n"
+	+ DEFAULT_PLAINTEXT_EDIT_STYLESHEET +
+"}\n"
+		      );
 
 	//gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
 	//gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
@@ -858,6 +885,13 @@ void MainWindow::closeEvent(QCloseEvent *event)
 		traceLog << l->text(0) + '|' + l->text(1) + '|' + l->text(2);
 	}
 	settings->setValue(SETTINGS_TRACE_LOG, traceLog);
+
+		if (QGuiApplication::queryKeyboardModifiers() & (Qt::ControlModifier | Qt::ShiftModifier))
+			if (QMessageBox::question(0, "Delete configuration data?", "Really delete configuration data?", QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes)
+				if (QFile::remove(SETTINGS_FILE_NAME))
+					QMessageBox::information(0, "Configuration settings deleted", "The configuration settings have been deleted.\nThe frontend will next time start in the default configuration.");
+
+
 	QWidget::closeEvent(event);
 }
 
@@ -896,9 +930,9 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 		bool result = false;
 		if (mouseEvent->button() == Qt::LeftButton)
 		{
-			if (mouseEvent->modifiers() & Qt::ControlModifier)
+			if (mouseEvent->modifiers() == Qt::ControlModifier)
 				result = true, navigateToSymbolAtCursor();
-			else if (mouseEvent->modifiers() & (Qt::AltModifier | Qt::ShiftModifier))
+			else if (mouseEvent->modifiers() & (Qt::ControlModifier | Qt::ShiftModifier))
 			{
 				result = true;
 				QTextCursor c = ui->plainTextEditSourceView->textCursor();
@@ -906,9 +940,9 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 				QString s = c.selectedText();
 				if (!s.isEmpty())
 				{
-					if (mouseEvent->modifiers() & Qt::AltModifier)
+					if (mouseEvent->modifiers() == Qt::ShiftModifier)
 						emit findString(s, ui->checkBoxSearchForWholeWordsOnly->isChecked() ? StringFinder::SEARCH_FOR_WHOLE_WORDS_ONLY : 0);
-					if (mouseEvent->modifiers() & Qt::ShiftModifier)
+					if (mouseEvent->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier))
 						ui->lineEditObjectLocator->setText(s);
 				}
 			}
@@ -2053,9 +2087,13 @@ bool MainWindow::handleVerifyTargetMemoryContentsSeqPoint(GdbMiParser::RESULT_CL
 		if (tf.readAll() != QByteArray(elfReader->segments[i]->get_data(), elfReader->segments[i]->get_file_size()))
 		{
 			match = false;
-			QMessageBox::critical(0, "Target memory contents mismatch",
+			auto choice = QMessageBox::question(0, "Target memory contents mismatch",
 					      QString("The target memory contents are different from the memory contents of file:\n\n"
-						      "%1").arg(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, "???").toString()));
+						      "%1\n\n"
+						      "It is recommended that you update (reflash) the target memory.\n"
+						      "Do you want to update (reflash) the target?"
+						      ).arg(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, "???").toString()),
+							    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
 			break;
 		}
 		i ++;
@@ -3070,6 +3108,7 @@ bool result = false;
 	if (sourceCodeLocation.fullFileName == internalHelpFileName)
 	{
 		QFile f(internalHelpFileName);
+		//ui->plainTextEditSourceView->setStyleSheet("");
 		f.open(QFile::ReadOnly);
 		sourceCodeViewHighlights.navigatedSourceCodeLine.clear();
 		ui->plainTextEditSourceView->appendPlainText(f.readAll());

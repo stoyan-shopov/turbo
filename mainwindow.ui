@@ -94,6 +94,9 @@
       </item>
       <item>
        <widget class="QPushButton" name="pushButtonRESTART">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Restart the frontend.&lt;/p&gt;&lt;p&gt;If you hold the &lt;span style=&quot; font-weight:600;&quot;&gt;CONTROL&lt;/span&gt; and &lt;span style=&quot; font-weight:600;&quot;&gt;SHIFT&lt;/span&gt; keys when activating this button, then the frontend settings file (by default, 'turbo.rc') &lt;span style=&quot; font-weight:600;&quot;&gt;will be deleted&lt;/span&gt;.&lt;/p&gt;&lt;p&gt;Make sure you know what you are doing if you decide to do so.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
         <property name="text">
          <string>RESTART</string>
         </property>
@@ -190,8 +193,7 @@ to target</string>
             <item>
              <widget class="QPushButton" name="pushButtonResetAndRunTarget">
               <property name="text">
-               <string>Reset and
-run target</string>
+               <string>Reset and run</string>
               </property>
              </widget>
             </item>
@@ -719,7 +721,7 @@ for text:</string>
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_5">
        <item>
-        <widget class="QToolButton" name="toolButtonSourceFilesViewSettings">
+        <widget class="QToolButton" name="toolButtonSourceFilesViewOptions">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
            <horstretch>0</horstretch>
@@ -727,7 +729,7 @@ for text:</string>
           </sizepolicy>
          </property>
          <property name="text">
-          <string>Settings...</string>
+          <string>Options...</string>
          </property>
          <property name="popupMode">
           <enum>QToolButton::InstantPopup</enum>
@@ -1564,6 +1566,16 @@ for text:</string>
    </property>
    <property name="text">
     <string>Show only existing files</string>
+   </property>
+  </action>
+  <action name="actionLoadProgramIntoTarget">
+   <property name="text">
+    <string>Load program into target</string>
+   </property>
+  </action>
+  <action name="actionDisconnectGdbServer">
+   <property name="text">
+    <string>Disconnect gdb server</string>
    </property>
   </action>
  </widget>

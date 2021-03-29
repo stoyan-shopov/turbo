@@ -1,15 +1,17 @@
 This program is a debugger frontend for the 'gdb' debugger.
-This program also provides access to the blackmagic probe.
+It also provides access to the blackmagic probe.
 
 This is the text view where source code is displayed.
 Here are some useful keyboard shortcuts in this source code view.
 
-SPACE	- toggle breakpoint on the current line
-<F2>	- toggle a bookmark on the current line
-CTRL + LEFT MOUSE BUTTON - when over a string, attempt to navigate to the definition of that string as a symbol
-ALT + LEFT MOUSE BUTTON - when over a string, search all known files for the occurrence of that string
-ALT + LEFT ARROW - navigate back (if possible)
-CTRL + ALT + v - open current file in the vim editor
+SPACE				- toggle breakpoint on the current line
+<F2>				- toggle a bookmark on the current line
+CTRL 	+ LEFT MOUSE BUTTON	- when over a string, attempt to navigate to the definition of that string as a symbol
+SHIFT	+ LEFT MOUSE BUTTON	- when over a string, search all known files for the occurrence of that string
+CTRL + SHIFT + LEFT MOUSE BUTTON- when over a string, use the symbol locator over this string
+ALT 	+ LEFT ARROW		- navigate back (if possible)
+ALT	+ RIGHT ARROW		- navigate forward (if possible)
+CTRL + ALT + v			- open current file in an external editor (specified in the settings dialog)
 
 When a connection to a target is established, and a debug session is active:
 
