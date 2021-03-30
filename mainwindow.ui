@@ -930,20 +930,6 @@ for text:</string>
       <number>3</number>
      </property>
      <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_8">
-       <item>
-        <widget class="QLabel" name="label_8">
-         <property name="text">
-          <string>Lorem ipsum</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="lineEdit_5"/>
-       </item>
-      </layout>
-     </item>
-     <item>
       <widget class="QTreeWidget" name="treeWidgetBreakpoints">
        <attribute name="headerStretchLastSection">
         <bool>false</bool>
@@ -1214,7 +1200,7 @@ for text:</string>
        <item>
         <widget class="QLabel" name="label_12">
          <property name="text">
-          <string>TextLabel</string>
+          <string>Type item to locate</string>
          </property>
         </widget>
        </item>

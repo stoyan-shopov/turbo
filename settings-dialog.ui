@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>407</width>
-    <height>164</height>
+    <width>526</width>
+    <height>288</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -24,7 +24,11 @@
       </widget>
      </item>
      <item>
-      <widget class="QLineEdit" name="lineEditGdbExecutable"/>
+      <widget class="QLineEdit" name="lineEditGdbExecutable">
+       <property name="placeholderText">
+        <string>arm-none-eabi-gdb</string>
+       </property>
+      </widget>
      </item>
      <item>
       <widget class="QPushButton" name="pushButtonSelectGdbExecutableFile">
@@ -36,7 +40,7 @@
     </layout>
    </item>
    <item>
-    <widget class="QCheckBox" name="checkBoxenableNativeDebugging">
+    <widget class="QCheckBox" name="checkBoxEnableNativeDebugging">
      <property name="text">
       <string>Intentionally undocumented</string>
      </property>
@@ -55,7 +59,7 @@ Such items are always more-compactly accessible from the ACTIONS menu</string>
      <item>
       <widget class="QLabel" name="label_2">
        <property name="text">
-        <string>SVD file</string>
+        <string>SVD file:</string>
        </property>
       </widget>
      </item>
@@ -70,6 +74,66 @@ Such items are always more-compactly accessible from the ACTIONS menu</string>
       </widget>
      </item>
     </layout>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupBox">
+     <property name="title">
+      <string>External editor settings</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_5">
+        <item>
+         <widget class="QLabel" name="label_5">
+          <property name="text">
+           <string>External editor program:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="lineEditExternalEditorProgram">
+          <property name="placeholderText">
+           <string>gvim</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButtonSelectExternalEditor">
+          <property name="text">
+           <string>Select File</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QLabel" name="label_4">
+        <property name="text">
+         <string>Use %FILE, %LINE to substitute the current source file and line number.
+E.g., for vim/gVim, you can use: &quot;%FILE +%LINE&quot; to open the current file, at the current line number</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_4">
+        <item>
+         <widget class="QLabel" name="label_3">
+          <property name="text">
+           <string>External editor command line options:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="lineEditExternalEditorOptions">
+          <property name="placeholderText">
+           <string>%FILE +%LINE</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
    </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_3">

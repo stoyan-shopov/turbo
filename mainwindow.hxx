@@ -660,6 +660,9 @@ private:
 	const QString SETTINGS_IS_DISASSEMBLY_VIEW_VISIBLE			= "is-disassembly-view-visible";
 	const QString SETTINGS_IS_TARGET_OUTPUT_VIEW_VISIBLE			= "is-target-output-view-visible";
 
+	const QString SETTINGS_EXTERNAL_EDITOR_PROGRAM				= "external-editor-program";
+	const QString SETTINGS_EXTERNAL_EDITOR_COMMAND_LINE_OPTIONS		= "external-editor-command-line-options";
+
 	const QString SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS			= "checkbox-hide-less-used-ui-items";
 	const QString SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE		= "checkbox-gdb-output-limiting-mode-state";
 	const QString SETTINGS_BOOL_SHOW_FULL_FILE_NAME_STATE			= "setting-show-full-file-name-state";
@@ -673,6 +676,7 @@ private:
 	const QString SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE	= "checkbox-show-full-file-name-in-trace-log-state";
 
 	const QString SETTINGS_LAST_LOADED_EXECUTABLE_FILE			= "last-loaded-executable-file";
+
 	const QString SETTINGS_GDB_EXECUTABLE_FILENAME				= "gdb-executable-filename";
 
 	const QString SETTINGS_SAVED_SESSIONS					= "saved-sessions";
@@ -726,10 +730,17 @@ private:
 	void restoreSession(const QString & executableFileName);
 	void saveSessions(void);
 
-	const QString internalHelpFileName = ":/resources/init.txt";
-
 	Ui::DialogSettings settingsUi;
 	QDialog * dialogEditSettings;
+	void populateSettingsDialog(void)
+	{
+		settingsUi.lineEditGdbExecutable->setText(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString());
+		settingsUi.lineEditExternalEditorProgram->setText(settings->value(SETTINGS_EXTERNAL_EDITOR_PROGRAM, "").toString());
+		settingsUi.lineEditExternalEditorOptions->setText(settings->value(SETTINGS_EXTERNAL_EDITOR_COMMAND_LINE_OPTIONS, "").toString());
+		settingsUi.lineEditTargetSVDFileName->setText(targetSVDFileName);
+		settingsUi.checkBoxEnableNativeDebugging->setChecked(settings->value(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, false).toBool());
+		settingsUi.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
+	}
 
 public:
 	explicit MainWindow(QWidget *parent = nullptr);
@@ -1040,6 +1051,7 @@ private:
 
 		void enterTargetState(enum TARGET_STATE target_state)
 		{
+			//qDebug() << "Entering target state: " << target_state;
 			switch (target_state)
 			{
 			default:
@@ -1213,7 +1225,6 @@ private:
 	};
 	SvdFileParser svdParser;
 	BlackMagicProbeServer blackMagicProbeServer;
-	const QString vimEditorLocation = "C:\\Program Files (x86)\\Vim\\vim80\\gvim.exe";
 	Ui::MainWindow *ui;
 	std::shared_ptr<QProcess> gdbProcess;
 	/* This is the process identifier of the debugged process, needed for sending signals
