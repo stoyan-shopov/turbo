@@ -52,6 +52,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->toolButton->addAction(ui->actionVerifyTargetFlash);
 	ui->toolButton->addAction(ui->actionLoadProgramIntoTarget);
 	ui->toolButton->addAction(ui->actionDisconnectGdbServer);
+	ui->toolButton->addAction(ui->actionShowTargetOutput);
 	ui->toolButton->addAction(ui->actionAction_2);
 	connect(ui->mainToolBar, & QToolBar::visibilityChanged, [&] { if (!ui->mainToolBar->isVisible()) ui->mainToolBar->setVisible(true); });
 
@@ -69,12 +70,13 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->pushButtonVerifyTargetMemory, & QPushButton::clicked, [&] { compareTargetMemory(); });
 	connect(ui->actionVerifyTargetFlash, & QAction::triggered, [&] { compareTargetMemory(); });
 	connect(ui->actionLoadProgramIntoTarget, & QAction::triggered, [&] { sendDataToGdbProcess("-target-download\n"); });
-	connect(ui->actionDisconnectGdbServer, & QAction::triggered, [&] { blackMagicProbeServer.closeConnections(); });
+	connect(ui->actionDisconnectGdbServer, & QAction::triggered, [&] { sendDataToGdbProcess("-target-disconnect\n"); });
 
 	/*! \todo	This is too verbose, should be improved. */
 	targetStateDependentWidgets.enabledActionsWhenTargetStopped << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
 	targetStateDependentWidgets.disabledActionsWhenTargetRunning << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
-	targetStateDependentWidgets.disabledActionsWhenTargetDetached << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
+	targetStateDependentWidgets.disabledActionsWhenTargetDetached << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget;
+	targetStateDependentWidgets.enabledActionsWhenTargetDetached << ui->actionDisconnectGdbServer;
 	targetStateDependentWidgets.disabledActionsWhenGdbServerDisconnected << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
 
 	connect(ui->pushButtonRequestGdbHalt, & QPushButton::clicked, [&]{ requestTargetHalt(); });
@@ -190,7 +192,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
 	ui->groupBoxTargetOutput->setVisible(flag = settings->value(SETTINGS_IS_TARGET_OUTPUT_VIEW_VISIBLE, true).toBool());
 	ui->checkBoxShowTargetOutput->setCheckState(flag ? Qt::Checked : Qt::Unchecked);
-	connect(ui->checkBoxShowTargetOutput, & QCheckBox::stateChanged, [&](int newState) { ui->groupBoxTargetOutput->setVisible(newState != Qt::Unchecked); });
+	ui->actionShowTargetOutput->setChecked(flag);
+	connect(ui->checkBoxShowTargetOutput, & QCheckBox::stateChanged, [&](int newState) { ui->groupBoxTargetOutput->setVisible(newState != Qt::Unchecked); ui->actionShowTargetOutput->setChecked(newState); });
+	connect(ui->actionShowTargetOutput, & QAction::toggled, [&](bool newState) { ui->checkBoxShowTargetOutput->setChecked(newState); });
 	connect(ui->pushButtonHideTargetOutputView, & QPushButton::clicked, [&] { ui->checkBoxShowTargetOutput->setCheckState(Qt::Unchecked); });
 
 	ui->plainTextEditGdbLog->setMaximumBlockCount(MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE);
@@ -199,7 +203,7 @@ MainWindow::MainWindow(QWidget *parent) :
 			ui->plainTextEditGdbLog->setMaximumBlockCount((newState == Qt::Checked) ? MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE : 0);
 		});
 
-	lessUsedUiItems << ui->pushButtonVerifyTargetMemory << ui->pushButtonLoadProgramToTarget << ui->pushButtonDisconnectGdbServer;
+	lessUsedUiItems << ui->pushButtonVerifyTargetMemory << ui->pushButtonLoadProgramToTarget << ui->pushButtonDisconnectGdbServer << ui->checkBoxShowTargetOutput;
 	connect(settingsUi.checkBoxHideLessUsedUiItems, & QCheckBox::stateChanged, [&](int newState)
 		{
 			for (auto & w : lessUsedUiItems) w->setHidden(newState);
@@ -491,6 +495,9 @@ MainWindow::MainWindow(QWidget *parent) :
 "QPlainTextEdit {\n"
 	+ DEFAULT_PLAINTEXT_EDIT_STYLESHEET +
 "}\n"
+"QLineEdit{\n"
+    "font: 10pt 'Hack';\n"
+"}\n"
 		      );
 
 	//gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
@@ -654,7 +661,9 @@ reopen_last_file:
 	targetStateDependentWidgets.enabledWidgetsWhenGdbServerDisconnected << ui->groupBoxTargetDisconnected;
 	targetStateDependentWidgets.disabledWidgetsWhenGdbServerDisconnected << ui->groupBoxTargetConnected;
 	connect(this, &MainWindow::gdbServerConnected, [&] {
+		/* A connection to the gdbserver has been established, but a connection to a target is not yet established. */
 		////QMessageBox::information(0, "Gdb connection established", "Gdb successfully connected to remote gdb server");
+		targetStateDependentWidgets.enterTargetState(target_state = TARGET_DETACHED);
 		ui->pushButtonScanForTargets->click();
 	});
 
@@ -1418,7 +1427,10 @@ bool MainWindow::handleFilesResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 	for (const auto & t : results.at(0).value->asList()->values)
 	{
 		if (!t->asTuple())
-			*(int*)0=0;
+		{
+			QMessageBox::critical(0, "Internal frontend error", "Internal frontend error - failed to parse gdb response. Please, report this");
+			return false;
+		}
 		SourceFileData s;
 		for (const auto & v : t->asTuple()->map)
 		{
@@ -1491,7 +1503,10 @@ bool MainWindow::handleLinesResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 	for (const auto & t : results.at(0).value->asList()->values)
 	{
 		if (!t->asTuple())
-			*(int*)0=0;
+		{
+			QMessageBox::critical(0, "Internal frontend error", "Internal frontend error - failed to parse gdb response. Please, report this");
+			return false;
+		}
 		int lineNumber = -1;
 		for (const auto & v : t->asTuple()->map)
 		{
@@ -3296,6 +3311,14 @@ QString searchPattern = ui->lineEditObjectLocator->text();
 	/* Make sure to *copy* the tree widget items, as the locator tree widget will take
 	 * ownership of the items added. */
 	QTreeWidgetItem * headerItem;
+
+	if (sourceFileNames.size() + subprograms.size() + dataObjects.size() + dataTypes.size() == 0)
+	{
+		ui->treeWidgetObjectLocator->addTopLevelItem(headerItem = new QTreeWidgetItem(QStringList() << "--- No items found ---"));
+		headerItem->setBackground(0, Qt::lightGray);
+		return;
+	}
+
 	if (sourceFileNames.size())
 	{
 		std::sort(sourceFileNames.begin(), sourceFileNames.end(), compare);
@@ -3328,57 +3351,6 @@ QString searchPattern = ui->lineEditObjectLocator->text();
 		for (const auto & s : dataTypes)
 			ui->treeWidgetObjectLocator->addTopLevelItem(new QTreeWidgetItem(* s));
 	}
-	/*! \todo	Remove this once it is clear the new code works fine. */
-#if 0
-	/* Search for symbols (subprograms, data objects, data types), and file names matching the search pattern.
-	 * Keep the sets of items found sorted, for each type of object (subrogram, data object, filename). */
-	std::multimap<QString /* filename */, const SourceFileData *> sourceFileNames;
-	std::multimap<QString /* subprogram name */, QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>> subprograms;
-	std::multimap<QString /* data object name */, QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>> dataObjects;
-	std::multimap<QString /* data type name */, QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>> dataTypes;
-	for (const auto & file : sourceFiles)
-	{
-		if (file.fileName.contains(searchPattern, Qt::CaseInsensitive))
-			sourceFileNames.insert({file.fileName, & file});
-		for (const auto & subprogram : file.subprograms)
-			if (subprogram.name.contains(searchPattern, Qt::CaseInsensitive))
-				subprograms.insert({subprogram.name,
-					QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>(& file.fullFileName, & subprogram)});
-		for (const auto & dataObject : file.variables)
-			if (dataObject.name.contains(searchPattern, Qt::CaseInsensitive))
-				dataObjects.insert({dataObject.name,
-					QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>(& file.fullFileName, & dataObject)});
-		for (const auto & dataType : file.dataTypes)
-			if (dataType.name.contains(searchPattern, Qt::CaseInsensitive))
-				dataTypes.insert({dataType.name,
-					QPair<const QString * /* full file name */, const struct SourceFileData::SymbolData *>(& file.fullFileName, & dataType)});
-	}
-	/* Populate the object locator view with the items matching the search pattern. */
-	for (const auto & file : sourceFileNames)
-		ui->treeWidgetObjectLocator->addTopLevelItem(createNavigationWidgetItem(
-								     QStringList() << file.first,
-								     file.second->fullFileName,
-								     0,
-								     SourceFileData::SymbolData::SOURCE_FILE_NAME));
-	for (const auto & dataObject : dataObjects)
-		ui->treeWidgetObjectLocator->addTopLevelItem(createNavigationWidgetItem(
-								     QStringList() << dataObject.first,
-								     * dataObject.second.first,
-								     dataObject.second.second->line,
-								     SourceFileData::SymbolData::DATA_OBJECT));
-	for (const auto & subprogram : subprograms)
-		ui->treeWidgetObjectLocator->addTopLevelItem(createNavigationWidgetItem(
-								     QStringList() << subprogram.first,
-								     * subprogram.second.first,
-								     subprogram.second.second->line,
-								     SourceFileData::SymbolData::SUBPROGRAM));
-	for (const auto & dataType : dataTypes)
-		ui->treeWidgetObjectLocator->addTopLevelItem(createNavigationWidgetItem(
-								     QStringList() << dataType.first,
-								     * dataType.second.first,
-								     dataType.second.second->line,
-								     SourceFileData::SymbolData::DATA_TYPE));
-#endif
 }
 
 void MainWindow::on_pushButtonDeleteAllBookmarks_clicked()
@@ -3391,7 +3363,7 @@ void MainWindow::on_pushButtonDeleteAllBookmarks_clicked()
 
 void MainWindow::on_pushButtonDisconnectGdbServer_clicked()
 {
-	blackMagicProbeServer.closeConnections();
+	sendDataToGdbProcess("-target-disconnect\n");
 }
 
 void MainWindow::on_lineEditFindText_returnPressed()
@@ -3646,9 +3618,4 @@ void MainWindow::compareTargetMemory()
 			   GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_CHECK_MEMORY_CONTENTS));
 	gdbRequest += QString("%1\n").arg(t);
 	sendDataToGdbProcess(gdbRequest);
-}
-
-void MainWindow::gdbStarted()
-{
-	{ *(int*)0=0; }
 }

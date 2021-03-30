@@ -50,7 +50,6 @@ public slots:
 		}
 	}
 private:
-	void panic(...) { *(int*)0=0; }
 	QByteArray data_received;
 };
 

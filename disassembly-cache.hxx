@@ -28,6 +28,7 @@
 
 #include <QTextCharFormat>
 #include <QPlainTextEdit>
+#include <QMessageBox>
 
 #include "breakpoint-cache.hxx"
 #include "source-files-cache.hxx"
@@ -162,7 +163,10 @@ public:
 				}
 			}
 			else
-				*(int*)0=0;
+			{
+				QMessageBox::critical(0, "Internal frontend error", "Internal frontend error - failed to parse gdb response. Please, report this");
+				return;
+			}
 		}
 		/* If this is a disassembly of code, for which there is no debug information available, the reply from
 		 * gdb will be a list of tuples, which will be stored as a list of values, not as a list of results, as handled above. */

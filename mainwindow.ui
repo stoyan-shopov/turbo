@@ -1578,6 +1578,14 @@ for text:</string>
     <string>Disconnect gdb server</string>
    </property>
   </action>
+  <action name="actionShowTargetOutput">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show target output (defunkt)</string>
+   </property>
+  </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources/>

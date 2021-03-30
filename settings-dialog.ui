@@ -38,7 +38,7 @@
    <item>
     <widget class="QCheckBox" name="checkBoxenableNativeDebugging">
      <property name="text">
-      <string>Delibeately undocumented</string>
+      <string>Intentionally undocumented</string>
      </property>
     </widget>
    </item>

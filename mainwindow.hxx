@@ -257,10 +257,6 @@ public:
 		else
 			qDebug() << "WARNING: tried to send data to the blackmagic probe, and no probe is connected; data:" << packet;
 	}
-	void closeConnections(void)
-	{
-		shutdown();
-	}
 };
 
 
@@ -469,7 +465,7 @@ public:
 				case 1: return("Value");
 				case 2: return("Type");
 				case 3: return("Hex value");
-			default: *(int*)0=0;
+				default: return "INTERNAL ERROR";
 			}
 		}
 		return QVariant();
@@ -892,17 +888,23 @@ private:
 		{
 			auto t = gdbTokenContextMap.find(tokenNumber);
 			if (t == gdbTokenContextMap.end())
-				*(int*)0=0;
+			{
+				QMessageBox::critical(0, "Internal frontend error", "Internal error - could not locate gdb context. Please, report this");
+				return GdbResponseContext(GdbResponseContext::GDB_RESPONSE_INVALID);
+			}
 			struct GdbResponseContext c = t->second;
 			gdbTokenContextMap.erase(t);
 			gdbTokenPool[tokenNumber >> 3] &=~ (1 << (tokenNumber & 7));
 			return c;
 		}
-		const struct GdbResponseContext & contextForTokenNumber(unsigned tokenNumber)
+		const struct GdbResponseContext & contextForTokenNumber(unsigned tokenNumber) const
 		{
 			auto t = gdbTokenContextMap.find(tokenNumber);
 			if (t == gdbTokenContextMap.end())
-				*(int*)0=0;
+			{
+				QMessageBox::critical(0, "Internal frontend error", "Internal error - could not locate gdb context. Please, report this.\nThe frontend will now exit.");
+				exit(-1);
+			}
 			return t->second;
 		}
 		unsigned insertContext(const GdbResponseContext & context)
@@ -940,7 +942,8 @@ private:
 						t ++;
 					}
 				}
-			*(int*)0=0;
+			QMessageBox::critical(0, "Internal frontend error", "Internal error - could not allocate gdb context. Please, report this.\nThe frontend will now exit.");
+			exit(-1);
 		}
 		std::unordered_map<unsigned /* token number */, struct GdbResponseContext> gdbTokenContextMap;
 		/* Token number 0 is invalid, so should be never allocated. */
@@ -1040,7 +1043,8 @@ private:
 			switch (target_state)
 			{
 			default:
-				*(int*)0=0;
+				QMessageBox::critical(0, "Internal frontend error", "Internal error - unknown target state. Please, report this");
+				return;
 			case TARGET_DETACHED:
 				for (const auto & w : disabledWidgetsWhenTargetDetached)
 					w->setEnabled(false);
@@ -1191,8 +1195,6 @@ private slots:
 	void on_pushButtonConnectGdbToGdbServer_clicked();
 
 	void compareTargetMemory();
-
-	void gdbStarted(void);
 
 private:
 	QTimer controlKeyPressTimer;
