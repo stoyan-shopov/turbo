@@ -28,6 +28,7 @@
 #include "ui_mainwindow.h"
 
 #include <QFileDialog>
+#include <QTextBlock>
 
 #include "clex/cscanner.hxx"
 
@@ -217,6 +218,7 @@ MainWindow::MainWindow(QWidget *parent) :
 			for (auto & w : lessUsedUiItems) w->setHidden(newState);
 		});
 	ui->checkBoxLimitGdbLog->setChecked(settings->value(SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE, true).toBool());
+	ui->checkBoxHideGdbMIData->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_GDB_MI_DATA_STATE, true).toBool());
 
 	settingsUi.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
 
@@ -898,6 +900,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	settings->setValue(SETTINGS_IS_TARGET_OUTPUT_VIEW_VISIBLE, ui->groupBoxTargetOutput->isVisible());
 
 	settings->setValue(SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE, ui->checkBoxLimitGdbLog->isChecked());
+	settings->setValue(SETTINGS_CHECKBOX_HIDE_GDB_MI_DATA_STATE, ui->checkBoxHideGdbMIData->isChecked());
 
 	QStringList traceLog;
 	for (int i = 0; i < ui->treeWidgetTraceLog->topLevelItemCount(); i ++)
@@ -1200,6 +1203,8 @@ void MainWindow::gdbMiLineAvailable(QString line)
 {
 	if (!line.length())
 		return;
+	QRegularExpression rxGdbPrompt("\\(gdb\\)s*");
+	bool isGdbPromptRecord =  rxGdbPrompt.match(line).hasMatch();
 	/* Process token number prefix, if present. Negative numbers are not possible, because a minus
 	 * sign ('-') denotes the start of a machine interface command. */
 	unsigned tokenNumber = 0;
@@ -1223,7 +1228,8 @@ void MainWindow::gdbMiLineAvailable(QString line)
 		/* Exec-async output. */
 		case '^':
 		/* Result record. */
-			appendLineToGdbLog((tokenNumber ? QString("%1").arg(tokenNumber) : QString()) + line);
+			if (!ui->checkBoxHideGdbMIData->isChecked())
+				appendLineToGdbLog((tokenNumber ? QString("%1").arg(tokenNumber) : QString()) + line);
 			{
 				std::vector<GdbMiParser::MIResult> results;
 				GdbMiParser parser;
@@ -1304,13 +1310,17 @@ void MainWindow::gdbMiLineAvailable(QString line)
 			targetDataCapture.captureLine(line.right(line.length() - 1));
 			/* FALLTHROUGH */
 		default:
-			appendLineToGdbLog(line);
+			/* Special case - filter out duplicate consecutive'(gdb)' prompt responses, if needed, to make the gdb log more pretty. */
+			if (!isGdbPromptRecord || !ui->checkBoxHideGdbMIData->isChecked()
+					|| !rxGdbPrompt.match(ui->plainTextEditGdbLog->document()->lastBlock().text()).hasMatch())
+				appendLineToGdbLog(line);
 			break;
 		case '=':
-			appendLineToGdbLog(line);
+			if (!ui->checkBoxHideGdbMIData->isChecked())
+				appendLineToGdbLog(line);
 			/* Handle gdb 'notify-async-output' records. */
 			/*! \todo	If the number of cases here grows too much,
-				 *		extract this into a separate function. */
+			 *		extract this into a separate function. */
 			if (line.startsWith("=breakpoint-created") || line.startsWith("=breakpoint-modified")
 					|| line.startsWith("=breakpoint-deleted"))
 				sendDataToGdbProcess("-break-list\n");
@@ -2321,9 +2331,10 @@ void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
 	}
 }
 
-void MainWindow::sendDataToGdbProcess(const QString & data)
+void MainWindow::sendDataToGdbProcess(const QString & data, bool isFrontendIssuedCommand)
 {
-	appendLineToGdbLog(">>> " + data);
+	if (!ui->checkBoxHideGdbMIData->isChecked() || !isFrontendIssuedCommand)
+		appendLineToGdbLog(">>> " + data);
 	/*! \todo	WARNING. This needs to be investigated, but attempting to send data to the gdb process, when
 	 *		it is dead, of course - does not work, and this error is reported by Qt;
 	 *
@@ -2745,7 +2756,7 @@ void MainWindow::sendCommandsToGdb(QLineEdit * lineEdit)
 QStringList l = lineEdit->text().split('\n');
 	lineEdit->clear();
 	for (const auto & s : l)
-		sendDataToGdbProcess(s + '\n');
+		sendDataToGdbProcess(s + '\n', false);
 
 }
 

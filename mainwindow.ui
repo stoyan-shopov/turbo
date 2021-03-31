@@ -540,8 +540,21 @@ for text:</string>
            </item>
            <item>
             <widget class="QCheckBox" name="checkBoxLimitGdbLog">
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Check this checkbox to limit the number of shown gdb lines in the gdb console, and to truncate long lines in the gdb output.&lt;/p&gt;&lt;p&gt;This can have a noticable impact on performance. Generally, you should normally check this checkbox, and uncheck it when debugging the gdb communication.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
              <property name="text">
               <string>Limit gdb log</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="checkBoxHideGdbMIData">
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Check this checkbox to hide the gdb machine interface (MI) data in the communication between the frontend and gdb.&lt;/p&gt;&lt;p&gt;This significantly improves the readability and convenience when communicating directly with gdb. Generally, you should normally check this checkbox, and uncheck it when debugging the gdb communication.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="text">
+              <string>Hide gdb MI data</string>
              </property>
             </widget>
            </item>

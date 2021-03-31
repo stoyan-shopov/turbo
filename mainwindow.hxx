@@ -665,6 +665,7 @@ private:
 
 	const QString SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS			= "checkbox-hide-less-used-ui-items";
 	const QString SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE		= "checkbox-gdb-output-limiting-mode-state";
+	const QString SETTINGS_CHECKBOX_HIDE_GDB_MI_DATA_STATE			= "checkbox-gdb-hide-gdb-mi-data-state";
 	const QString SETTINGS_BOOL_SHOW_FULL_FILE_NAME_STATE			= "setting-show-full-file-name-state";
 	const QString SETTINGS_BOOL_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE	= "setting-show-only-sources-with-machine-code-state";
 	const QString SETTINGS_BOOL_SHOW_ONLY_EXISTING_SOURCE_FILES		= "setting-show-only-existing-source-files";
@@ -752,7 +753,8 @@ private slots:
 	void displayHelp(void);
 	void gdbProcessError(QProcess::ProcessError error);
 	void gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
-	void sendDataToGdbProcess(const QString &data);
+	void sendDataToGdbProcess(const QString &data, bool isFrontendIssuedCommand = true);
+
 	void readGdbVarObjectChildren(const QString varObjectName);
 	/* Returns true, if the source code file was successfully displayed, false otherwise. */
 	bool showSourceCode(const QTreeWidgetItem * item);
