@@ -1436,7 +1436,7 @@ for text:</string>
        <item>
         <widget class="QLabel" name="label_6">
          <property name="text">
-          <string>Lorem ipsum</string>
+          <string>Search:</string>
          </property>
         </widget>
        </item>

@@ -99,10 +99,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->lineEditSearchSVDTree, & QLineEdit::returnPressed, [&]
 	{
 		QString text = ui->lineEditSearchSVDTree->text();
-		/* Special case for the empty string - show all items in the tree. */
-		if (!text.length())
-		{
-		}
+		/* Special case for the empty string - show all items in the tree. No need to do anything special. */
 		std::vector<QTreeWidgetItem *> matchingItems, nonMatchingItems;
 		std::function<void(QTreeWidgetItem * item)> scan = [&](QTreeWidgetItem * item) -> void
 		{
@@ -114,12 +111,21 @@ MainWindow::MainWindow(QWidget *parent) :
 			for (int i = 0; i < item->childCount(); scan(item->child(i ++)))
 			     ;
 		};
+		std::function<void(QTreeWidgetItem * item)> makeSubtreeVisible = [&](QTreeWidgetItem * root) -> void
+		{
+			root->setHidden(false);
+			for (int i = 0; i < root->childCount(); makeSubtreeVisible(root->child(i ++)))
+			     ;
+		};
 		for (int i = 0; i < ui->treeWidgetSvd->topLevelItemCount(); scan(ui->treeWidgetSvd->topLevelItem(i ++)))
-		     ;
+			;
+		/* For matching items - make sure its parent items, upto the tree root, are visible.
+		 * Also, make sure that all items in subtrees with, roots amongst the matching items, are visible. */
 		for (auto & i : matchingItems)
 		{
-			QTreeWidgetItem * w = i;
-			do w->setHidden(false), w = w->parent(); while (w);
+			QTreeWidgetItem * w = i->parent();
+			while (w) w->setHidden(false), w = w->parent();
+			makeSubtreeVisible(i);
 		}
 	});
 
@@ -3280,8 +3286,10 @@ void MainWindow::createSvdRegisterView(QTreeWidgetItem *item, int column)
 	SvdFileParser::SvdRegisterOrClusterNode * svdRegister = static_cast<SvdFileParser::SvdRegisterOrClusterNode *>(item->data(0, SVD_REGISTER_POINTER).value<void *>());
 
 	QDialog * dialog = new QDialog(0, Qt::WindowTitleHint | Qt::WindowMinimizeButtonHint);
+	unsigned address = item->data(0, SVD_REGISTER_ADDRESS).toUInt();
+	dialog->setWindowTitle(QString("%1 @ 0x%2").arg(svdRegister->name).arg(address, 8, 16, QChar('0')));
 	QGroupBox * fieldsGroupBox = new QGroupBox();
-	SvdRegisterViewData view(dialog, item->data(0, SVD_REGISTER_ADDRESS).toUInt());
+	SvdRegisterViewData view(dialog, address);
 	view.fieldsGroupBox = fieldsGroupBox;
 	dialog->setAttribute(Qt::WA_DeleteOnClose, true);
 	QVBoxLayout * fieldsLayout = new QVBoxLayout();
