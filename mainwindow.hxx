@@ -1013,6 +1013,7 @@ private:
 		TARGET_DETACHED,
 	}
 	target_state = GDBSERVER_DISCONNECTED;
+	bool isBlackmagicProbeConnected = false;
 
 	/* This structure captures target output data, e.g., the target responses
 	 * for 'monitor swdp_scan' and 'monitor jtag_scan' commands. */
@@ -1130,6 +1131,8 @@ private:
 	void moveCursorToNextMatch(void);
 	void moveCursorToPreviousMatch(void);
 
+	void scanForTargets(void);
+
 	void sendCommandsToGdb(QLineEdit * lineEdit);
 
 	QTreeWidgetItem * createNavigationWidgetItem(const QStringList & columnTexts, const QString & fullFileName = QString(), int lineNumber = -1,
@@ -1201,8 +1204,6 @@ private:
 private slots:
 	void updateHighlightedWidget(void);
 	void on_pushButtonSendScratchpadToGdb_clicked();
-
-	void on_pushButtonScanForTargets_clicked();
 
 	void on_pushButtonConnectGdbToGdbServer_clicked();
 

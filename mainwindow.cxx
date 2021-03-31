@@ -53,7 +53,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->toolButton->addAction(ui->actionLoadProgramIntoTarget);
 	ui->toolButton->addAction(ui->actionDisconnectGdbServer);
 	ui->toolButton->addAction(ui->actionShowTargetOutput);
-	ui->toolButton->addAction(ui->actionAction_2);
+	ui->toolButton->addAction(ui->actionactionScanForTargets);
 	connect(ui->mainToolBar, & QToolBar::visibilityChanged, [&] { if (!ui->mainToolBar->isVisible()) ui->mainToolBar->setVisible(true); });
 
 	/* If this flag is set, then provide a default user interface layout. */
@@ -67,17 +67,20 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->pushButtonNavigateForward, & QPushButton::clicked, [&] { if (navigationStack.canNavigateForward()) displaySourceCodeFile(navigationStack.following(), false); });
 	connect(ui->pushButtonNavigateBack, & QPushButton::clicked, [&] { if (navigationStack.canNavigateBack()) displaySourceCodeFile(navigationStack.previous(), false); });
 
+	connect(ui->pushButtonScanForTargets, & QPushButton::clicked, [&] { scanForTargets(); });
+
 	connect(ui->pushButtonVerifyTargetMemory, & QPushButton::clicked, [&] { compareTargetMemory(); });
 	connect(ui->actionVerifyTargetFlash, & QAction::triggered, [&] { compareTargetMemory(); });
 	connect(ui->actionLoadProgramIntoTarget, & QAction::triggered, [&] { sendDataToGdbProcess("-target-download\n"); });
 	connect(ui->actionDisconnectGdbServer, & QAction::triggered, [&] { sendDataToGdbProcess("-target-disconnect\n"); });
+	connect(ui->actionactionScanForTargets, & QAction::triggered, [&] { scanForTargets(); });
 
 	/*! \todo	This is too verbose, should be improved. */
-	targetStateDependentWidgets.enabledActionsWhenTargetStopped << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
-	targetStateDependentWidgets.disabledActionsWhenTargetRunning << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
+	targetStateDependentWidgets.enabledActionsWhenTargetStopped << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer << ui->actionactionScanForTargets;
+	targetStateDependentWidgets.disabledActionsWhenTargetRunning << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer << ui->actionactionScanForTargets;
 	targetStateDependentWidgets.disabledActionsWhenTargetDetached << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget;
-	targetStateDependentWidgets.enabledActionsWhenTargetDetached << ui->actionDisconnectGdbServer;
-	targetStateDependentWidgets.disabledActionsWhenGdbServerDisconnected << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
+	targetStateDependentWidgets.enabledActionsWhenTargetDetached << ui->actionDisconnectGdbServer << ui->actionactionScanForTargets;
+	targetStateDependentWidgets.disabledActionsWhenGdbServerDisconnected << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer << ui->actionactionScanForTargets;
 
 	connect(ui->pushButtonRequestGdbHalt, & QPushButton::clicked, [&]{ requestTargetHalt(); });
 	connect(ui->pushButtonLoadSVDFile, & QPushButton::clicked, [&]{ loadSVDFile(); });
@@ -642,6 +645,7 @@ reopen_last_file:
 			ui->groupBoxBlackMagicDisconnectedWidgets->setEnabled(false);
 			ui->groupBoxBlackMagicConnectedWidgets->setEnabled(true);
 			ui->pushButtonConnectGdbToGdbServer->click();
+			isBlackmagicProbeConnected = true;
 			});
 	connect(& blackMagicProbeServer, & BlackMagicProbeServer::BlackMagicProbeDisconnected,
 		[&] {
@@ -649,6 +653,7 @@ reopen_last_file:
 			ui->pushButtonConnectToBlackmagic->setText(tr("Connect to blackmagic"));
 			ui->groupBoxBlackMagicDisconnectedWidgets->setEnabled(true);
 			ui->groupBoxBlackMagicConnectedWidgets->setEnabled(false);
+			isBlackmagicProbeConnected = false;
 			if (target_state != GDBSERVER_DISCONNECTED)
 				sendDataToGdbProcess("-target-disconnect\n");
 			});
@@ -1319,6 +1324,23 @@ void MainWindow::gdbMiLineAvailable(QString line)
 				else
 					debugProcessId = match.captured(2).toULong(0, 0);
 			}
+			/* Note - it is problematic to precisely distinguish between a gdb 'detach' and 'disconnect' responses, they are, in fact
+			 * almost identical:
+				>>> -target-detach
+
+				=thread-exited,id="1",group-id="i1"
+				=thread-group-exited,id="i1"
+				[Inferior 1 (Remote target) detached]
+				^done
+				(gdb)
+				...
+				>>> -target-disconnect
+
+				=thread-exited,id="1",group-id="i1"
+				=thread-group-exited,id="i1"
+				^done
+				(gdb)
+			 */
 			else if (line.startsWith("=thread-group-exited"))
 			{
 				emit targetDetached();
@@ -3602,7 +3624,7 @@ void MainWindow::on_pushButtonSendScratchpadToGdb_clicked()
 	sendDataToGdbProcess(ui->plainTextEditScratchpad->toPlainText());
 }
 
-void MainWindow::on_pushButtonScanForTargets_clicked()
+void MainWindow::scanForTargets(void)
 {
 	unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TARGET_SCAN_COMPLETE));
 	targetDataCapture.startCapture();

@@ -1525,11 +1525,6 @@ for text:</string>
     <string>Verify flash</string>
    </property>
   </action>
-  <action name="actionAction_2">
-   <property name="text">
-    <string>Action 2</string>
-   </property>
-  </action>
   <action name="actionSourceFilesViewShowFullFileNames">
    <property name="checkable">
     <bool>true</bool>
@@ -1570,6 +1565,11 @@ for text:</string>
    </property>
    <property name="text">
     <string>Show target output (defunkt)</string>
+   </property>
+  </action>
+  <action name="actionactionScanForTargets">
+   <property name="text">
+    <string>Scan for targets</string>
    </property>
   </action>
  </widget>
