@@ -1009,12 +1009,13 @@ private:
 
 	enum TARGET_STATE
 	{
-		GDBSERVER_DISCONNECTED = 0,
+		GDB_NOT_RUNNING = 0,
+		GDBSERVER_DISCONNECTED,
 		TARGET_RUNNING,
 		TARGET_STOPPED,
 		TARGET_DETACHED,
 	}
-	target_state = GDBSERVER_DISCONNECTED;
+	target_state = GDB_NOT_RUNNING;
 	bool isBlackmagicProbeConnected = false;
 
 	/* This structure captures target output data, e.g., the target responses
@@ -1070,6 +1071,8 @@ private:
 				for (const auto & a : enabledActionsWhenTargetDetached)
 					a->setEnabled(true);
 				break;
+			case GDB_NOT_RUNNING:
+				/* Treat the GDB_NOT_RUNNING state the same as the GDBSERVER_DISCONNECTED state. */
 			case GDBSERVER_DISCONNECTED:
 				for (const auto & w : disabledWidgetsWhenGdbServerDisconnected)
 					w->setEnabled(false);

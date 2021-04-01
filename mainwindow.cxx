@@ -49,13 +49,13 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->mainToolBar->addWidget(ui->pushButtonNavigateBack);
 	ui->mainToolBar->addWidget(ui->pushButtonNavigateForward);
 	ui->mainToolBar->addWidget(ui->pushButtonRESTART);
-	ui->mainToolBar->addWidget(ui->toolButton);
-	ui->toolButton->addAction(ui->actionVerifyTargetFlash);
-	ui->toolButton->addAction(ui->actionLoadProgramIntoTarget);
-	ui->toolButton->addAction(ui->actionDisconnectGdbServer);
-	ui->toolButton->addAction(ui->actionShowTargetOutput);
-	ui->toolButton->addAction(ui->actionactionScanForTargets);
 	ui->mainToolBar->addWidget(ui->pushButtonConnectToBlackmagic);
+	ui->mainToolBar->addWidget(ui->toolButtonActions);
+	ui->toolButtonActions->addAction(ui->actionVerifyTargetFlash);
+	ui->toolButtonActions->addAction(ui->actionLoadProgramIntoTarget);
+	ui->toolButtonActions->addAction(ui->actionDisconnectGdbServer);
+	ui->toolButtonActions->addAction(ui->actionShowTargetOutput);
+	ui->toolButtonActions->addAction(ui->actionactionScanForTargets);
 	connect(ui->mainToolBar, & QToolBar::visibilityChanged, [&] { if (!ui->mainToolBar->isVisible()) ui->mainToolBar->setVisible(true); });
 
 	/* If this flag is set, then provide a default user interface layout. */
@@ -281,7 +281,9 @@ MainWindow::MainWindow(QWidget *parent) :
 	});
 
 	connect(gdbProcess.get(), & QProcess::started, [&] {
-		ui->pushButtonConnectGdbToGdbServer->setEnabled(true); ui->pushButtonStartGdb->setEnabled(false);
+		targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED);
+		ui->pushButtonConnectGdbToGdbServer->setEnabled(true);
+		ui->pushButtonStartGdb->setEnabled(false);
 	});
 	connect(gdbProcess.get(), SIGNAL(finished(int, QProcess::ExitStatus)), this, SLOT(gdbProcessFinished(int,QProcess::ExitStatus)));
 	connect(gdbProcess.get(), SIGNAL(errorOccurred(QProcess::ProcessError)), this, SLOT(gdbProcessError(QProcess::ProcessError)));
@@ -675,7 +677,7 @@ reopen_last_file:
 			ui->pushButtonConnectToBlackmagic->setText(tr("Connect to blackmagic"));
 			ui->pushButtonConnectToBlackmagic->setEnabled(true);
 			isBlackmagicProbeConnected = false;
-			if (target_state != GDBSERVER_DISCONNECTED)
+			if (target_state != GDBSERVER_DISCONNECTED && target_state != GDB_NOT_RUNNING)
 				sendDataToGdbProcess("-target-disconnect\n");
 			});
 	ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: yellow");
@@ -734,7 +736,7 @@ reopen_last_file:
 	);
 
 
-	targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED);
+	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING);
 	/***************************************
 	 ***************************************
 	 ***************************************/
@@ -2227,7 +2229,7 @@ bool MainWindow::handleTargetScanResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 							     detectedTargets, 0, false, &ok);
 		if (!ok)
 		{
-			QMessageBox::information(0, "No target selected", "No target selected, abborting target connection.");
+			QMessageBox::information(0, "No target selected", "No target selected, aborting target connection.");
 			return true;
 		}
 		QRegularExpressionMatch match = rx.match(targetNumber);
@@ -2311,6 +2313,7 @@ void MainWindow::gdbProcessError(QProcess::ProcessError error)
 			QMessageBox::critical(0, "Gdb process unknown error", "Unknown gdb error");
 			break;
 	}
+	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING);
 	ui->pushButtonConnectGdbToGdbServer->setEnabled(false);
 	ui->pushButtonStartGdb->setEnabled(true);
 }
@@ -2320,6 +2323,8 @@ void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
 	qDebug() << gdbProcess->readAllStandardError();
 	qDebug() << gdbProcess->readAllStandardOutput();
 	qDebug() << "gdb process finished";
+	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING);
+	ui->pushButtonConnectGdbToGdbServer->setEnabled(false);
 	ui->pushButtonStartGdb->setEnabled(true);
 	if (exitStatus == QProcess::CrashExit)
 	{

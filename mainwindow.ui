@@ -88,7 +88,7 @@
        </layout>
       </item>
       <item>
-       <widget class="QToolButton" name="toolButton">
+       <widget class="QToolButton" name="toolButtonActions">
         <property name="text">
          <string>ACTION</string>
         </property>
