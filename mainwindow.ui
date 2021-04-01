@@ -68,7 +68,7 @@
         <item>
          <widget class="QPushButton" name="pushButtonDisplayHelp">
           <property name="styleSheet">
-           <string notr="true">background-color: rgb(255, 170, 0);</string>
+           <string notr="true">background-color: Ivory</string>
           </property>
           <property name="text">
            <string>Help</string>
@@ -258,6 +258,16 @@ gdb server</string>
        <widget class="QPushButton" name="pushButtonStartGdb">
         <property name="text">
          <string>Start gdb</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButtonLocateWindow">
+        <property name="styleSheet">
+         <string notr="true">background-color: LightSteelBlue</string>
+        </property>
+        <property name="text">
+         <string>Locate window</string>
         </property>
        </widget>
       </item>
@@ -1155,7 +1165,7 @@ for text:</string>
      <item>
       <widget class="QTreeWidget" name="treeWidgetObjectLocator">
        <property name="styleSheet">
-        <string notr="true">background-color: PaleTurquoise</string>
+        <string notr="true">background-color: Azure</string>
        </property>
        <property name="indentation">
         <number>0</number>

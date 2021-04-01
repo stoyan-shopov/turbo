@@ -43,6 +43,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
 	/* Move some widgets to the main toolbar. This makes the user interface not so cluttered. */
 	ui->mainToolBar->addWidget(ui->pushButtonShowWindow);
+	ui->mainToolBar->addWidget(ui->pushButtonLocateWindow);
 	ui->mainToolBar->addWidget(ui->comboBoxSelectLayout);
 	ui->mainToolBar->addWidget(ui->pushButtonSettings);
 	ui->mainToolBar->addWidget(ui->pushButtonDisplayHelp);
@@ -50,6 +51,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->mainToolBar->addWidget(ui->pushButtonNavigateForward);
 	ui->mainToolBar->addWidget(ui->pushButtonRESTART);
 	ui->mainToolBar->addWidget(ui->pushButtonConnectToBlackmagic);
+	ui->mainToolBar->addWidget(ui->toolButtonActions);
 	ui->mainToolBar->addWidget(ui->toolButtonActions);
 	ui->toolButtonActions->addAction(ui->actionVerifyTargetFlash);
 	ui->toolButtonActions->addAction(ui->actionLoadProgramIntoTarget);
@@ -68,6 +70,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->pushButtonTrigger, & QPushButton::clicked, [&] { navigationStack.dump(); });
 	connect(ui->pushButtonNavigateForward, & QPushButton::clicked, [&] { if (navigationStack.canNavigateForward()) displaySourceCodeFile(navigationStack.following(), false); });
 	connect(ui->pushButtonNavigateBack, & QPushButton::clicked, [&] { if (navigationStack.canNavigateBack()) displaySourceCodeFile(navigationStack.previous(), false); });
+	connect(ui->pushButtonLocateWindow, & QPushButton::clicked, [&] { displayHelpMenu(); });
 
 	connect(ui->pushButtonScanForTargets, & QPushButton::clicked, [&] { scanForTargets(); });
 
@@ -524,7 +527,7 @@ MainWindow::MainWindow(QWidget *parent) :
 #endif
 			      ) +
 "QPlainTextEdit {\n"
-	+ DEFAULT_PLAINTEXT_EDIT_STYLESHEET +
+	+ DEFAULT_PLAINTEXTEDIT_STYLESHEET +
 "}\n"
 "QLineEdit{\n"
     "font: 10pt 'Hack';\n"
@@ -667,7 +670,7 @@ reopen_last_file:
 
 	connect(& blackMagicProbeServer, & BlackMagicProbeServer::BlackMagicProbeConnected,
 		[&] {
-			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: lawngreen");
+			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: SpringGreen");
 			ui->pushButtonConnectToBlackmagic->setText(tr("Blackmagic connected"));
 			ui->pushButtonConnectToBlackmagic->setEnabled(false);
 			/*! \todo	do not hardcode the gdb server listening port */
@@ -676,7 +679,7 @@ reopen_last_file:
 			});
 	connect(& blackMagicProbeServer, & BlackMagicProbeServer::BlackMagicProbeDisconnected,
 		[&] {
-			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: yellow");
+			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: Yellow");
 			ui->pushButtonConnectToBlackmagic->setText(tr("Connect to blackmagic"));
 			ui->pushButtonConnectToBlackmagic->setEnabled(true);
 			isBlackmagicProbeConnected = false;
@@ -756,12 +759,6 @@ reopen_last_file:
 	widgetFlashHighlighterData.timer.setInterval(widgetFlashHighlighterData.flashIntervalMs);
 	connect(& widgetFlashHighlighterData.timer, SIGNAL(timeout()), this, SLOT(updateHighlightedWidget()));
 
-	connect(&controlKeyPressTimer, &QTimer::timeout, [&] (void) -> void {
-		controlKeyPressTimer.stop();
-		if (QApplication::queryKeyboardModifiers() & Qt::ControlModifier)
-			displayHelpMenu();
-	});
-
 	auto makeHighlightAction = [&, this] (const QString & actionText, const QString & shortcut, QDockWidget * w) -> void
 	{
 		QAction * act;
@@ -822,6 +819,8 @@ reopen_last_file:
 		ui->pushButtonHideDisassembly->click();
 		ui->pushButtonHideTargetOutputView->click();
 	}
+
+	ui->plainTextEditSourceView->setTabStopDistance(8 * ui->plainTextEditSourceView->fontMetrics().width(' '));
 }
 
 void MainWindow::loadSessions()
@@ -954,8 +953,6 @@ bool MainWindow::event(QEvent *event)
 				controlKeyPressTimer.stop();
 				displayHelpMenu();
 			}
-			else if (!controlKeyPressTimer.isActive())
-				controlKeyPressTimer.start(2500);
 		}
 	}
 	return QMainWindow::event(event);
@@ -1043,6 +1040,16 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 		QKeyEvent * e = static_cast<QKeyEvent *>(event);
 		switch (e->key())
 		{
+		case Qt::Key_Escape:
+			/* Emulate Qt Creator's behavior of decluttering the views by pressing the ESCape key. */
+			if (ui->checkBoxShowTargetOutput->isChecked())
+				ui->checkBoxShowTargetOutput->setChecked(false);
+			else if (ui->checkBoxShowGdbConsoles->isChecked())
+				ui->checkBoxShowGdbConsoles->setChecked(false);
+			else if (ui->checkBoxShowDisassembly->isChecked())
+				ui->checkBoxShowDisassembly->setChecked(false);
+			result = true;
+			break;
 		case Qt::Key_S:
 			if (target_state == TARGET_STOPPED)
 				sendDataToGdbProcess("-exec-step\n");
@@ -2318,6 +2325,7 @@ void MainWindow::gdbProcessError(QProcess::ProcessError error)
 	}
 	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING);
 	ui->pushButtonStartGdb->setEnabled(true);
+	varObjectTreeItemModel.removeAllTopLevelItems();
 	ui->pushButtonConnectToBlackmagic->setEnabled(false);
 }
 
@@ -2328,6 +2336,7 @@ void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
 	qDebug() << "gdb process finished";
 	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING);
 	ui->pushButtonStartGdb->setEnabled(true);
+	varObjectTreeItemModel.removeAllTopLevelItems();
 	ui->pushButtonConnectToBlackmagic->setEnabled(false);
 	if (exitStatus == QProcess::CrashExit)
 	{
@@ -3227,6 +3236,7 @@ bool result = false;
 	/* Special case for internal files (e.g., the internal help file) - do not attempt to apply syntax highlighting. */
 	if (sourceCodeLocation.fullFileName.startsWith(":/"))
 	{
+		ui->plainTextEditSourceView->setStyleSheet(HELPVIEW_PLAINTEXTEDIT_STYLESHEET);
 		QFile f(sourceCodeLocation.fullFileName);
 		//ui->plainTextEditSourceView->setStyleSheet("");
 		f.open(QFile::ReadOnly);
@@ -3253,6 +3263,7 @@ bool result = false;
 	else
 	{
 		QString errorMessage;
+		ui->plainTextEditSourceView->setStyleSheet(DEFAULT_PLAINTEXTEDIT_STYLESHEET);
 		auto sourceData = sourceFilesCache.getSourceFileCacheData(sourceCodeLocation.fullFileName, errorMessage);
 		if (!sourceData)
 		{

@@ -643,6 +643,17 @@ public:
 		}
 	}
 
+	void removeAllTopLevelItems(void)
+	{
+		int i = root.childCount();
+		if (i)
+		{
+			beginRemoveRows(QModelIndex(), 0, 0);
+			do root.deleteChildAtRow(0); while (--i);
+			endRemoveRows();
+		}
+	}
+
 	static const GdbVarObjectTreeItem * varoObjectTreeItemForIndex(const QModelIndex & index)
 	{
 		if (!index.isValid())
@@ -703,7 +714,8 @@ private:
 
 	/* This is the index in the layout combo box to set when a default user interface configuration is requested. */
 	const int defaultLayoutIndex = 2;
-	const QString DEFAULT_PLAINTEXT_EDIT_STYLESHEET =  "font: 10pt 'Hack';";
+	const QString DEFAULT_PLAINTEXTEDIT_STYLESHEET =  "font: 10pt 'Hack';";
+	const QString HELPVIEW_PLAINTEXTEDIT_STYLESHEET =  "font: 10pt 'Hack'; background-color: MintCream;";
 
 	std::shared_ptr<QSettings> settings;
 	QString targetSVDFileName;
