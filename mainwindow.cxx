@@ -85,17 +85,16 @@ MainWindow::MainWindow(QWidget *parent) :
 	targetStateDependentWidgets.disabledActionsWhenGdbServerDisconnected << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer << ui->actionactionScanForTargets;
 
 	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->dockWidgetContentsMemoryDump << ui->groupBoxTargetHalted << ui->groupBoxTargetConnected;
-	targetStateDependentWidgets.disabledWidgetsWhenTargetStopped << ui->groupBoxTargetRunning << ui->pushButtonConnectGdbToGdbServer;
+	targetStateDependentWidgets.disabledWidgetsWhenTargetStopped << ui->groupBoxTargetRunning;
 	targetStateDependentWidgets.enabledWidgetsWhenTargetRunning << ui->groupBoxTargetRunning << ui->groupBoxTargetConnected;
-	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->dockWidgetContentsMemoryDump << ui->groupBoxTargetHalted << ui->pushButtonConnectGdbToGdbServer;
+	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->dockWidgetContentsMemoryDump << ui->groupBoxTargetHalted;
 
-	targetStateDependentWidgets.enabledWidgetsWhenGdbServerDisconnected << ui->pushButtonConnectGdbToGdbServer;
 	targetStateDependentWidgets.disabledWidgetsWhenGdbServerDisconnected << ui->dockWidgetContentsMemoryDump << ui->groupBoxTargetConnected << ui->pushButtonScanForTargets;
 
 	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << targetStateDependentWidgets.enabledWidgetsWhenTargetRunning;
 	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << targetStateDependentWidgets.enabledWidgetsWhenTargetStopped;
 	/* The button for scanning for targets connected to the blackmagic probe is a bit special. */
-	targetStateDependentWidgets.enabledWidgetsWhenTargetDetached << ui->pushButtonScanForTargets << ui->pushButtonConnectGdbToGdbServer;
+	targetStateDependentWidgets.enabledWidgetsWhenTargetDetached << ui->pushButtonScanForTargets;
 	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->pushButtonScanForTargets;
 	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->pushButtonScanForTargets;
 
@@ -282,8 +281,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
 	connect(gdbProcess.get(), & QProcess::started, [&] {
 		targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED);
-		ui->pushButtonConnectGdbToGdbServer->setEnabled(true);
 		ui->pushButtonStartGdb->setEnabled(false);
+		ui->pushButtonConnectToBlackmagic->setEnabled(true);
 	});
 	connect(gdbProcess.get(), SIGNAL(finished(int, QProcess::ExitStatus)), this, SLOT(gdbProcessFinished(int,QProcess::ExitStatus)));
 	connect(gdbProcess.get(), SIGNAL(errorOccurred(QProcess::ProcessError)), this, SLOT(gdbProcessError(QProcess::ProcessError)));
@@ -591,6 +590,9 @@ reopen_last_file:
 	ui->treeWidgetSvd->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(ui->treeWidgetSvd, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(svdContextMenuRequested(QPoint)));
 
+	ui->treeViewDataObjects->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(ui->treeViewDataObjects, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(varObjectContextMenuRequested(QPoint)));
+
 	/* Unified custom menu processing for source items. */
 	ui->treeWidgetObjectLocator->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(ui->treeWidgetObjectLocator, &QTreeWidget::customContextMenuRequested, [=] (QPoint p) -> void { sourceItemContextMenuRequested(ui->treeWidgetObjectLocator, p); });
@@ -668,7 +670,8 @@ reopen_last_file:
 			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: lawngreen");
 			ui->pushButtonConnectToBlackmagic->setText(tr("Blackmagic connected"));
 			ui->pushButtonConnectToBlackmagic->setEnabled(false);
-			ui->pushButtonConnectGdbToGdbServer->click();
+			/*! \todo	do not hardcode the gdb server listening port */
+			sendDataToGdbProcess("-target-select extended-remote :1122\n");
 			isBlackmagicProbeConnected = true;
 			});
 	connect(& blackMagicProbeServer, & BlackMagicProbeServer::BlackMagicProbeDisconnected,
@@ -2314,8 +2317,8 @@ void MainWindow::gdbProcessError(QProcess::ProcessError error)
 			break;
 	}
 	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING);
-	ui->pushButtonConnectGdbToGdbServer->setEnabled(false);
 	ui->pushButtonStartGdb->setEnabled(true);
+	ui->pushButtonConnectToBlackmagic->setEnabled(false);
 }
 
 void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
@@ -2324,8 +2327,8 @@ void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
 	qDebug() << gdbProcess->readAllStandardOutput();
 	qDebug() << "gdb process finished";
 	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING);
-	ui->pushButtonConnectGdbToGdbServer->setEnabled(false);
 	ui->pushButtonStartGdb->setEnabled(true);
+	ui->pushButtonConnectToBlackmagic->setEnabled(false);
 	if (exitStatus == QProcess::CrashExit)
 	{
 		if (QMessageBox::critical(0, "The gdb process crashed", "Gdb crashed\n\nDo you want to restart the gdb process?", "Restart gdb", "Abort")
@@ -2569,6 +2572,37 @@ void MainWindow::bookmarksContextMenuRequested(QPoint p)
 		break;
 	default:
 		break;
+	}
+}
+
+void MainWindow::varObjectContextMenuRequested(QPoint p)
+{
+	QModelIndex index = ui->treeViewDataObjects->indexAt(p);
+	if (!index.isValid())
+		return;
+	const GdbVarObjectTreeItem * varObject = varObjectTreeItemModel.varoObjectTreeItemForIndex(index);
+	if (varObject && /* Only allow deleting top-level varObjects. This looks like a sane behaviour. */ !index.parent().isValid())
+	{
+		qDebug() << varObject->miName;
+		QMenu menu(this);
+		QHash<void *, int> menuSelections;
+		menuSelections.operator [](menu.addAction("Delete")) = 1;
+		menu.addAction("Cancel");
+		/* Because of the header of the tree view, it looks more natural to set the
+		 * menu position on the screen at point translated from the tree view viewport,
+		 * not from the tree view itself. */
+		QAction * selection = menu.exec(ui->treeViewDataObjects->viewport()->mapToGlobal(p));
+
+		switch (menuSelections.operator []((void *) selection))
+		{
+		case 1:
+			/* Delete varObject. */
+			varObjectTreeItemModel.removeTopLevelItem(index);
+			sendDataToGdbProcess(QString("-var-delete %1\n").arg(varObject->miName));
+			break;
+		default:
+			break;
+		}
 	}
 }
 
@@ -3471,11 +3505,6 @@ void MainWindow::requestTargetHalt(void)
 	}
 }
 
-void MainWindow::on_pushButtonDumpVarObjects_clicked()
-{
-	varObjectTreeItemModel.dumpTree();
-}
-
 void MainWindow::on_pushButtonLoadProgramToTarget_clicked()
 {
 	sendDataToGdbProcess("-target-download\n");
@@ -3657,12 +3686,6 @@ void MainWindow::scanForTargets(void)
 	unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TARGET_SCAN_COMPLETE));
 	targetDataCapture.startCapture();
 	sendDataToGdbProcess(QString("%1monitor swdp_scan\n").arg(t));
-}
-
-void MainWindow::on_pushButtonConnectGdbToGdbServer_clicked()
-{
-	/*! \todo	do not hardcode the gdb server listening port */
-	sendDataToGdbProcess("-target-select extended-remote :1122\n");
 }
 
 void MainWindow::compareTargetMemory()

@@ -356,8 +356,9 @@ public:
 	bool isChildrenFetchingInProgress = false;
 	bool isInScope = true;
 	int getReportedChildCount(void) const { return isInScope ? reportedChildCount : 0; }
-	int setReportedChildCount(int reportedChildCount) { this->reportedChildCount = reportedChildCount; }
+	void setReportedChildCount(int reportedChildCount) { this->reportedChildCount = reportedChildCount; }
 	void deleteChildren(void) { qDeleteAll(children); children.clear(); }
+	void deleteChildAtRow(int row) { if (row < children.size()) children.removeAt(row); }
 
 	~GdbVarObjectTreeItem() { deleteChildren(); }
 
@@ -616,7 +617,7 @@ public:
 			GdbVarObjectTreeItem * t = static_cast<GdbVarObjectTreeItem *>(root.internalPointer());
 			if (t->miName == miName)
 				return root;
-			int i;
+			int i = 0;
 			QModelIndex x;
 			while ((x = index(i ++, 0, root)).isValid())
 				if ((x = scan(x)).isValid())
@@ -624,12 +625,30 @@ public:
 			return x;
 		};
 
-		int i;
+		int i = 0;
 		QModelIndex x, invalid = QModelIndex();
 		while ((x = index(i ++, 0, invalid)).isValid())
 			if ((x = scan(x)).isValid())
 				break;
 		return x;
+	}
+
+	void removeTopLevelItem(const QModelIndex & index)
+	{
+		if (!index.parent().isValid())
+		{
+			beginRemoveRows(QModelIndex(), index.row(), index.row());
+			root.deleteChildAtRow(index.row());
+			endRemoveRows();
+		}
+	}
+
+	static const GdbVarObjectTreeItem * varoObjectTreeItemForIndex(const QModelIndex & index)
+	{
+		if (!index.isValid())
+			return 0;
+		else
+			return static_cast<GdbVarObjectTreeItem *>(index.internalPointer());
 	}
 signals:
 	void readGdbVarObjectChildren(const QString varObjectName);
@@ -761,6 +780,7 @@ private slots:
 	void breakpointsContextMenuRequested(QPoint p);
 	void svdContextMenuRequested(QPoint p);
 	void bookmarksContextMenuRequested(QPoint p);
+	void varObjectContextMenuRequested(QPoint p);
 	void breakpointViewItemChanged(QTreeWidgetItem * item, int column);
 	void stringSearchReady(const QString pattern, QSharedPointer<QVector<StringFinder::SearchResult>> results, bool resultsTruncated);
 	void createSvdRegisterView(QTreeWidgetItem *item, int column);
@@ -784,8 +804,6 @@ private slots:
 	void on_lineEditFindText_returnPressed();
 
 	void requestTargetHalt(void);
-
-	void on_pushButtonDumpVarObjects_clicked();
 
 	void on_pushButtonLoadProgramToTarget_clicked();
 
@@ -1209,8 +1227,6 @@ private:
 private slots:
 	void updateHighlightedWidget(void);
 	void on_pushButtonSendScratchpadToGdb_clicked();
-
-	void on_pushButtonConnectGdbToGdbServer_clicked();
 
 	void compareTargetMemory();
 

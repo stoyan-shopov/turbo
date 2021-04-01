@@ -236,6 +236,9 @@ gdb server</string>
          </item>
          <item>
           <widget class="QPushButton" name="pushButtonConnectToBlackmagic">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
            <property name="text">
             <string>Connect to blackmagic</string>
            </property>
@@ -247,17 +250,7 @@ gdb server</string>
       <item>
        <widget class="QPushButton" name="pushButtonScanForTargets">
         <property name="text">
-         <string>Scan targets</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButtonConnectGdbToGdbServer">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="text">
-         <string>Connect gdb</string>
+         <string>Scan and attach</string>
         </property>
        </widget>
       </item>
@@ -672,7 +665,7 @@ for text:</string>
        <item>
         <widget class="QLabel" name="label_2">
          <property name="text">
-          <string>Access varObject:</string>
+          <string>Data object:</string>
          </property>
         </widget>
        </item>
@@ -680,13 +673,6 @@ for text:</string>
         <widget class="QLineEdit" name="lineEditVarObjectExpression"/>
        </item>
       </layout>
-     </item>
-     <item>
-      <widget class="QPushButton" name="pushButtonDumpVarObjects">
-       <property name="text">
-        <string>dump</string>
-       </property>
-      </widget>
      </item>
      <item>
       <widget class="QSplitter" name="splitter">
@@ -1527,6 +1513,9 @@ for text:</string>
   <action name="actionactionScanForTargets">
    <property name="text">
     <string>Scan for targets</string>
+   </property>
+   <property name="toolTip">
+    <string>Scan and attach to target</string>
    </property>
   </action>
  </widget>
