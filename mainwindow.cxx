@@ -55,6 +55,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->toolButton->addAction(ui->actionDisconnectGdbServer);
 	ui->toolButton->addAction(ui->actionShowTargetOutput);
 	ui->toolButton->addAction(ui->actionactionScanForTargets);
+	ui->mainToolBar->addWidget(ui->pushButtonConnectToBlackmagic);
 	connect(ui->mainToolBar, & QToolBar::visibilityChanged, [&] { if (!ui->mainToolBar->isVisible()) ui->mainToolBar->setVisible(true); });
 
 	/* If this flag is set, then provide a default user interface layout. */
@@ -76,14 +77,32 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->actionDisconnectGdbServer, & QAction::triggered, [&] { sendDataToGdbProcess("-target-disconnect\n"); });
 	connect(ui->actionactionScanForTargets, & QAction::triggered, [&] { scanForTargets(); });
 
-	/*! \todo	This is too verbose, should be improved. */
+	/*! \todo	This is too verbose, should be improved. This should be moved to a separate function. */
 	targetStateDependentWidgets.enabledActionsWhenTargetStopped << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer << ui->actionactionScanForTargets;
 	targetStateDependentWidgets.disabledActionsWhenTargetRunning << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer << ui->actionactionScanForTargets;
 	targetStateDependentWidgets.disabledActionsWhenTargetDetached << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget;
 	targetStateDependentWidgets.enabledActionsWhenTargetDetached << ui->actionDisconnectGdbServer << ui->actionactionScanForTargets;
 	targetStateDependentWidgets.disabledActionsWhenGdbServerDisconnected << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer << ui->actionactionScanForTargets;
 
+	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->dockWidgetContentsMemoryDump << ui->groupBoxTargetHalted << ui->groupBoxTargetConnected;
+	targetStateDependentWidgets.disabledWidgetsWhenTargetStopped << ui->groupBoxTargetRunning << ui->pushButtonConnectGdbToGdbServer;
+	targetStateDependentWidgets.enabledWidgetsWhenTargetRunning << ui->groupBoxTargetRunning << ui->groupBoxTargetConnected;
+	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->dockWidgetContentsMemoryDump << ui->groupBoxTargetHalted << ui->pushButtonConnectGdbToGdbServer;
+
+	targetStateDependentWidgets.enabledWidgetsWhenGdbServerDisconnected << ui->pushButtonConnectGdbToGdbServer;
+	targetStateDependentWidgets.disabledWidgetsWhenGdbServerDisconnected << ui->dockWidgetContentsMemoryDump << ui->groupBoxTargetConnected << ui->pushButtonScanForTargets;
+
+	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << targetStateDependentWidgets.enabledWidgetsWhenTargetRunning;
+	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << targetStateDependentWidgets.enabledWidgetsWhenTargetStopped;
+	/* The button for scanning for targets connected to the blackmagic probe is a bit special. */
+	targetStateDependentWidgets.enabledWidgetsWhenTargetDetached << ui->pushButtonScanForTargets << ui->pushButtonConnectGdbToGdbServer;
+	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->pushButtonScanForTargets;
+	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->pushButtonScanForTargets;
+
 	connect(ui->pushButtonRequestGdbHalt, & QPushButton::clicked, [&]{ requestTargetHalt(); });
+	connect(ui->pushButtonStepInto, & QPushButton::clicked, [&]{ if (target_state == TARGET_STOPPED) sendDataToGdbProcess("-exec-step\n"); });
+	connect(ui->pushButtonStepOver, & QPushButton::clicked, [&]{ if (target_state == TARGET_STOPPED) sendDataToGdbProcess("-exec-next\n"); });
+
 	connect(ui->pushButtonLoadSVDFile, & QPushButton::clicked, [&]{ loadSVDFile(); });
 
 	connect(ui->pushButtonRESTART, & QPushButton::clicked, [&]{
@@ -139,10 +158,6 @@ MainWindow::MainWindow(QWidget *parent) :
 		/* By default, enable target memory view auto update. */
 		ui->checkBoxMemoryDumpAutoUpdate->setChecked(false);
 	});
-	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->dockWidgetContentsMemoryDump;
-	targetStateDependentWidgets.disabledWidgetsWhenGdbServerDisconnected << ui->dockWidgetContentsMemoryDump;
-	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << ui->dockWidgetContentsMemoryDump;
-	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->dockWidgetContentsMemoryDump;
 
 	/*****************************************
 	 * Settings.
@@ -257,9 +272,9 @@ MainWindow::MainWindow(QWidget *parent) :
 				settingsUi.lineEditGdbExecutable->setFocus();
 				/* Execute the settings dialog synchronously. */
 				dialogEditSettings->exec();
+				/* Do not check again if the gdb executable is available. */
+				gdbExecutableFileName = settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString();
 			}
-			/* Do not check again if the gdb executable is available. */
-			gdbExecutableFileName = settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString();
 			gdbProcess->setProgram(gdbExecutableFileName);
 			gdbProcess->start();
 		}
@@ -528,6 +543,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	/*! \todo	Only execute the code below after gdb has been successfully started. */
 	connect(gdbProcess.get(), & QProcess::started, [&] {
 		QFileInfo f(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
+		sendDataToGdbProcess("-gdb-set tcp auto-retry off\n");
 		if (f.exists())
 		{
 			int choice = QMessageBox::question(0, "Reopen last executable for debugging",
@@ -555,7 +571,6 @@ reopen_last_file:
 										   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_EXECUTABLE_SYMBOL_FILE_LOADED,
 										   f.canonicalFilePath())
 									   );
-				sendDataToGdbProcess("-gdb-set tcp auto-retry off\n");
 				sendDataToGdbProcess("-gdb-set mem inaccessible-by-default off\n");
 				sendDataToGdbProcess("-gdb-set print elements unlimited\n");
 				sendDataToGdbProcess(QString("%1-file-exec-and-symbols \"%2\"\n").arg(t).arg(f.canonicalFilePath()));
@@ -650,8 +665,7 @@ reopen_last_file:
 		[&] {
 			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: lawngreen");
 			ui->pushButtonConnectToBlackmagic->setText(tr("Blackmagic connected"));
-			ui->groupBoxBlackMagicDisconnectedWidgets->setEnabled(false);
-			ui->groupBoxBlackMagicConnectedWidgets->setEnabled(true);
+			ui->pushButtonConnectToBlackmagic->setEnabled(false);
 			ui->pushButtonConnectGdbToGdbServer->click();
 			isBlackmagicProbeConnected = true;
 			});
@@ -659,8 +673,7 @@ reopen_last_file:
 		[&] {
 			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: yellow");
 			ui->pushButtonConnectToBlackmagic->setText(tr("Connect to blackmagic"));
-			ui->groupBoxBlackMagicDisconnectedWidgets->setEnabled(true);
-			ui->groupBoxBlackMagicConnectedWidgets->setEnabled(false);
+			ui->pushButtonConnectToBlackmagic->setEnabled(true);
 			isBlackmagicProbeConnected = false;
 			if (target_state != GDBSERVER_DISCONNECTED)
 				sendDataToGdbProcess("-target-disconnect\n");
@@ -674,9 +687,6 @@ reopen_last_file:
 	/***************************************
 	 * Gdb and target state change handling.
 	 ***************************************/
-	 /*! \todo: Move this to a separate function */
-	targetStateDependentWidgets.enabledWidgetsWhenGdbServerDisconnected << ui->groupBoxTargetDisconnected;
-	targetStateDependentWidgets.disabledWidgetsWhenGdbServerDisconnected << ui->groupBoxTargetConnected;
 	connect(this, &MainWindow::gdbServerConnected, [&] {
 		/* A connection to the gdbserver has been established, but a connection to a target is not yet established. */
 		////QMessageBox::information(0, "Gdb connection established", "Gdb successfully connected to remote gdb server");
@@ -688,8 +698,6 @@ reopen_last_file:
 		{ targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED);}
 	);
 
-	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->groupBoxTargetHalted << ui->groupBoxTargetConnected;
-	targetStateDependentWidgets.disabledWidgetsWhenTargetStopped << ui->groupBoxTargetRunning;
 	connect(this, &MainWindow::targetStopped, [&] {
 		if (target_state == GDBSERVER_DISCONNECTED || target_state == TARGET_DETACHED)
 			compareTargetMemory();
@@ -714,14 +722,10 @@ reopen_last_file:
 			ui->pushButtonShowCurrentDisassembly->click();
 	});
 
-	targetStateDependentWidgets.enabledWidgetsWhenTargetRunning << ui->groupBoxTargetRunning << ui->groupBoxTargetConnected;
-	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->groupBoxTargetHalted;
 	connect(this, &MainWindow::targetRunning, [&] {
 		targetStateDependentWidgets.enterTargetState(target_state = TARGET_RUNNING);
 	});
 
-	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << targetStateDependentWidgets.enabledWidgetsWhenTargetRunning;
-	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << targetStateDependentWidgets.enabledWidgetsWhenTargetStopped;
 	connect(this, &MainWindow::targetDetached, [&]
 		/*! \todo	This is getting too complicated... It is problematic to distinguish between a gdbserver detach and a gdbserver disconnect event.
 		 *		The target state handling needs to be improved and simplified.
@@ -1036,7 +1040,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 		{
 		case Qt::Key_S:
 			if (target_state == TARGET_STOPPED)
-				sendDataToGdbProcess("s\n");
+				sendDataToGdbProcess("-exec-step\n");
 			result = true;
 			break;
 		case Qt::Key_Left:
@@ -1106,6 +1110,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 		case Qt::Key_F3:
 		case Qt::Key_N:
 			result = true;
+			/*! \todo	Remove this, it is no longer needed. */
 			if (e->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier))
 			{
 				/*! \todo	Display a proper messagebox here, explaining the 'navigator' mode. */
@@ -1116,7 +1121,6 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 				ui->dockWidgetDataObjects->hide();
 				ui->dockWidgetStaticDataObjects->hide();
 				ui->dockWidgetScratchpad->hide();
-				ui->dockWidgetBlackmagicToolbox->hide();
 				ui->dockWidgetElfToolbox->hide();
 			}
 			else if (e->modifiers() == Qt::ShiftModifier)
@@ -2321,19 +2325,19 @@ void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
 	{
 		if (QMessageBox::critical(0, "The gdb process crashed", "Gdb crashed\n\nDo you want to restart the gdb process?", "Restart gdb", "Abort")
 				== 0)
-			gdbProcess->start();
+			ui->pushButtonStartGdb->click();
 	}
 	else if (exitCode != 0)
 	{
 		if (QMessageBox::critical(0, "The gdb process exited with error", QString("Gdb exited with error code: %1\n\nDo you want to restart the gdb process?").arg(exitCode), "Restart gdb", "Abort")
 				== 0)
-			gdbProcess->start();
+			ui->pushButtonStartGdb->click();
 	}
 	else
 	{
 		if (QMessageBox::information(0, "The gdb process exited normally", "Gdb exited normally.\n\nDo you want to restart the gdb process?", "Restart gdb", "Abort")
 				== 0)
-			gdbProcess->start();
+			ui->pushButtonStartGdb->click();
 	}
 }
 
@@ -3502,11 +3506,7 @@ void MainWindow::on_comboBoxSelectLayout_activated(int index)
 		break;
 	case 3:
 		/* Switch to debug layout. */
-		addDockWidget(Qt::TopDockWidgetArea, ui->dockWidgetBlackmagicToolbox, Qt::Horizontal);
-		ui->dockWidgetBlackmagicToolbox->setFloating(false);
-		ui->dockWidgetBlackmagicToolbox->show();
-
-		splitDockWidget(ui->dockWidgetBlackmagicToolbox, ui->dockWidgetObjectLocator, Qt::Horizontal);
+		addDockWidget(Qt::TopDockWidgetArea, ui->dockWidgetObjectLocator, Qt::Horizontal);
 		ui->dockWidgetObjectLocator->setFloating(false);
 		ui->dockWidgetObjectLocator->show();
 
@@ -3534,6 +3534,10 @@ void MainWindow::on_comboBoxSelectLayout_activated(int index)
 		ui->dockWidgetSearchResults->setFloating(false);
 		ui->dockWidgetSearchResults->show();
 
+		break;
+	case 4:
+		for (const auto & d : dockWidgets)
+			d->show();
 		break;
 	}
 	ui->comboBoxSelectLayout->setCurrentIndex(0);
@@ -3670,6 +3674,8 @@ void MainWindow::compareTargetMemory()
 	int i = 0;
 	for (const auto & segment : elfReader->segments)
 	{
+		if (!segment->get_file_size())
+			continue;
 		targetMemorySectionsTempFileNames << QString("section-%1-%2.bin").arg(i).arg(x);
 		/* There is no machine interface command for dumping target memory to files, so use the regular gdb commands. */
 		gdbRequest += QString("dump binary memory %1 0x%2 0x%3\n")

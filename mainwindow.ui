@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1666</width>
-    <height>719</height>
+    <width>1673</width>
+    <height>675</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -42,6 +42,11 @@
           <item>
            <property name="text">
             <string>Debug layout</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Show all views</string>
            </property>
           </item>
          </widget>
@@ -204,6 +209,20 @@ to target</string>
               </property>
              </widget>
             </item>
+            <item>
+             <widget class="QPushButton" name="pushButtonStepOver">
+              <property name="text">
+               <string>Step over</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButtonStepInto">
+              <property name="text">
+               <string>Step into</string>
+              </property>
+             </widget>
+            </item>
            </layout>
           </widget>
          </item>
@@ -215,41 +234,31 @@ gdb server</string>
            </property>
           </widget>
          </item>
-        </layout>
-       </widget>
-      </item>
-      <item>
-       <widget class="QGroupBox" name="groupBoxTargetDisconnected">
-        <property name="title">
-         <string>Target disconnected</string>
-        </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_19">
-         <property name="spacing">
-          <number>0</number>
-         </property>
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>0</number>
-         </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
-         <property name="bottomMargin">
-          <number>0</number>
-         </property>
          <item>
-          <widget class="QPushButton" name="pushButtonConnectGdbToGdbServer">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
+          <widget class="QPushButton" name="pushButtonConnectToBlackmagic">
            <property name="text">
-            <string>Connect gdb</string>
+            <string>Connect to blackmagic</string>
            </property>
           </widget>
          </item>
         </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButtonScanForTargets">
+        <property name="text">
+         <string>Scan targets</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButtonConnectGdbToGdbServer">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>Connect gdb</string>
+        </property>
        </widget>
       </item>
       <item>
@@ -617,7 +626,7 @@ for text:</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1666</width>
+     <width>1673</width>
      <height>21</height>
     </rect>
    </property>
@@ -1100,71 +1109,6 @@ for text:</string>
         </property>
        </column>
       </widget>
-     </item>
-    </layout>
-   </widget>
-  </widget>
-  <widget class="QDockWidget" name="dockWidgetBlackmagicToolbox">
-   <property name="windowTitle">
-    <string>Blackmagic toolbox</string>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>8</number>
-   </attribute>
-   <widget class="QWidget" name="dockWidgetContents_9">
-    <layout class="QVBoxLayout" name="verticalLayout_13">
-     <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_21">
-       <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_11">
-         <item>
-          <widget class="QGroupBox" name="groupBoxBlackMagicConnectedWidgets">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="title">
-            <string>GroupBox</string>
-           </property>
-           <layout class="QHBoxLayout" name="horizontalLayout_15">
-            <item>
-             <widget class="QLabel" name="label_11">
-              <property name="text">
-               <string>TextLabel</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="pushButtonScanForTargets">
-              <property name="text">
-               <string>Scan</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item>
-        <widget class="QGroupBox" name="groupBoxBlackMagicDisconnectedWidgets">
-         <property name="title">
-          <string>GroupBox</string>
-         </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_16">
-          <item>
-           <widget class="QPushButton" name="pushButtonConnectToBlackmagic">
-            <property name="text">
-             <string>Connect to blackmagic</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <widget class="QPlainTextEdit" name="plainTextEditBlackmagicLog"/>
      </item>
     </layout>
    </widget>
