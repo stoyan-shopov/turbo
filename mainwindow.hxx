@@ -811,8 +811,6 @@ private slots:
 
 	void on_pushButtonDeleteAllBookmarks_clicked();
 
-	void on_pushButtonDisconnectGdbServer_clicked();
-
 	void on_lineEditFindText_returnPressed();
 
 	void requestTargetHalt(void);

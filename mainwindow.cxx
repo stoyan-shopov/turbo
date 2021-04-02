@@ -51,8 +51,13 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->mainToolBar->addWidget(ui->pushButtonNavigateForward);
 	ui->mainToolBar->addWidget(ui->pushButtonRESTART);
 	ui->mainToolBar->addWidget(ui->pushButtonConnectToBlackmagic);
+
+	QWidget * spacer = new QWidget();
+	spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+	ui->mainToolBar->addWidget(spacer);
+
 	ui->mainToolBar->addWidget(ui->toolButtonActions);
-	ui->mainToolBar->addWidget(ui->toolButtonActions);
+
 	ui->toolButtonActions->addAction(ui->actionVerifyTargetFlash);
 	ui->toolButtonActions->addAction(ui->actionLoadProgramIntoTarget);
 	ui->toolButtonActions->addAction(ui->actionDisconnectGdbServer);
@@ -62,6 +67,12 @@ MainWindow::MainWindow(QWidget *parent) :
 
 	/* If this flag is set, then provide a default user interface layout. */
 	bool isDefaultConfigRequested = !QFile::exists(SETTINGS_FILE_NAME);
+
+	/* Clearing the titles of the group boxes makes the user interface look more tidy. Don't just delete them in Qt Designer - it is helpful to have the titles when
+	 * tweaking the user interface there. */
+	ui->groupBoxTargetConnected->setTitle("");
+	ui->groupBoxTargetHalted->setTitle("");
+	ui->groupBoxTargetRunning->setTitle("");
 
 	settings = std::make_shared<QSettings>(SETTINGS_FILE_NAME, QSettings::IniFormat);
 	restoreState(settings->value(SETTINGS_MAINWINDOW_STATE, QByteArray()).toByteArray());
@@ -104,6 +115,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->pushButtonRequestGdbHalt, & QPushButton::clicked, [&]{ requestTargetHalt(); });
 	connect(ui->pushButtonStepInto, & QPushButton::clicked, [&]{ if (target_state == TARGET_STOPPED) sendDataToGdbProcess("-exec-step\n"); });
 	connect(ui->pushButtonStepOver, & QPushButton::clicked, [&]{ if (target_state == TARGET_STOPPED) sendDataToGdbProcess("-exec-next\n"); });
+	connect(ui->pushButtonDisconnectGdb, & QPushButton::clicked, [&]{ sendDataToGdbProcess("-target-disconnect\n"); });
 
 	connect(ui->pushButtonLoadSVDFile, & QPushButton::clicked, [&]{ loadSVDFile(); });
 
@@ -235,7 +247,7 @@ MainWindow::MainWindow(QWidget *parent) :
 			ui->plainTextEditGdbLog->setMaximumBlockCount((newState == Qt::Checked) ? MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE : 0);
 		});
 
-	lessUsedUiItems << ui->pushButtonVerifyTargetMemory << ui->pushButtonLoadProgramToTarget << ui->pushButtonDisconnectGdbServer << ui->checkBoxShowTargetOutput;
+	lessUsedUiItems << ui->pushButtonVerifyTargetMemory << ui->pushButtonLoadProgramToTarget << ui->pushButtonDisconnectGdb << ui->checkBoxShowTargetOutput;
 	connect(settingsUi.checkBoxHideLessUsedUiItems, & QCheckBox::stateChanged, [&](int newState)
 		{
 			for (auto & w : lessUsedUiItems) w->setHidden(newState);
@@ -3479,10 +3491,6 @@ void MainWindow::on_pushButtonDeleteAllBookmarks_clicked()
 	disassemblyCache.highlightLines(ui->plainTextEditDisassembly, breakpoints, lastKnownProgramCounter);
 }
 
-void MainWindow::on_pushButtonDisconnectGdbServer_clicked()
-{
-	sendDataToGdbProcess("-target-disconnect\n");
-}
 
 void MainWindow::on_lineEditFindText_returnPressed()
 {
