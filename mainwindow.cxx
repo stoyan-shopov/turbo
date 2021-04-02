@@ -174,49 +174,83 @@ MainWindow::MainWindow(QWidget *parent) :
 	});
 
 	/*****************************************
-	 * Settings.
+	 * Configure the 'Settings' dialog.
 	 *****************************************/
 	loadSessions();
 	dialogEditSettings = new QDialog(this);
-	settingsUi.setupUi(dialogEditSettings);
+	uiSettings.setupUi(dialogEditSettings);
 	connect(ui->pushButtonSettings, & QPushButton::clicked, [&](){
 		populateSettingsDialog();
 		/* Execute the settings dialog asynchronously. */
 		dialogEditSettings->open();
 	});
-	connect(settingsUi.pushButtonSelectGdbExecutableFile, & QPushButton::clicked, [&](){
+	connect(uiSettings.pushButtonSelectGdbExecutableFile, & QPushButton::clicked, [&](){
 		QString s = QFileDialog::getOpenFileName(0, "Select gdb executable");
 		if (!s.isEmpty())
-			settingsUi.lineEditGdbExecutable->setText(s);
+			uiSettings.lineEditGdbExecutable->setText(s);
 	});
-	connect(settingsUi.pushButtonSelectTargetSVDFile, & QPushButton::clicked, [&](){
-		QString s = QFileDialog::getOpenFileName(0, "Select target SVD file", QFileInfo(settingsUi.lineEditTargetSVDFileName->text()).absoluteFilePath());
+	connect(uiSettings.pushButtonSelectTargetSVDFile, & QPushButton::clicked, [&](){
+		QString s = QFileDialog::getOpenFileName(0, "Select target SVD file", QFileInfo(uiSettings.lineEditTargetSVDFileName->text()).absoluteFilePath());
 		if (!s.isEmpty())
-			settingsUi.lineEditTargetSVDFileName->setText(s);
+			uiSettings.lineEditTargetSVDFileName->setText(s);
 	});
-	connect(settingsUi.pushButtonSelectExternalEditor, & QPushButton::clicked, [&](){
-		QString s = QFileDialog::getOpenFileName(0, "Select external editor", QFileInfo(settingsUi.lineEditExternalEditorOptions->text()).absoluteFilePath());
+	connect(uiSettings.pushButtonSelectExternalEditor, & QPushButton::clicked, [&](){
+		QString s = QFileDialog::getOpenFileName(0, "Select external editor", QFileInfo(uiSettings.lineEditExternalEditorOptions->text()).absoluteFilePath());
 		if (!s.isEmpty())
-			settingsUi.lineEditExternalEditorProgram->setText(s);
+			uiSettings.lineEditExternalEditorProgram->setText(s);
 	});
-	connect(settingsUi.pushButtonSettingsOk, & QPushButton::clicked, [&](){
-		settings->setValue(SETTINGS_GDB_EXECUTABLE_FILENAME, settingsUi.lineEditGdbExecutable->text());
-		settings->setValue(SETTINGS_EXTERNAL_EDITOR_PROGRAM, settingsUi.lineEditExternalEditorProgram->text());
-		settings->setValue(SETTINGS_EXTERNAL_EDITOR_COMMAND_LINE_OPTIONS, settingsUi.lineEditExternalEditorOptions->text());
-		targetSVDFileName = settingsUi.lineEditTargetSVDFileName->text();
-		settings->setValue(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, settingsUi.checkBoxEnableNativeDebugging->isChecked());
-		settings->setValue(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, settingsUi.checkBoxHideLessUsedUiItems->isChecked());
+	connect(uiSettings.pushButtonSettingsOk, & QPushButton::clicked, [&](){
+		settings->setValue(SETTINGS_GDB_EXECUTABLE_FILENAME, uiSettings.lineEditGdbExecutable->text());
+		settings->setValue(SETTINGS_EXTERNAL_EDITOR_PROGRAM, uiSettings.lineEditExternalEditorProgram->text());
+		settings->setValue(SETTINGS_EXTERNAL_EDITOR_COMMAND_LINE_OPTIONS, uiSettings.lineEditExternalEditorOptions->text());
+		targetSVDFileName = uiSettings.lineEditTargetSVDFileName->text();
+		settings->setValue(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, uiSettings.checkBoxEnableNativeDebugging->isChecked());
+		settings->setValue(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, uiSettings.checkBoxHideLessUsedUiItems->isChecked());
 		dialogEditSettings->hide();
 	});
-	connect(settingsUi.pushButtonSettingsCancel, & QPushButton::clicked, [&]()
+	connect(uiSettings.pushButtonSettingsCancel, & QPushButton::clicked, [&]()
 		{
-			settingsUi.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
+			uiSettings.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
 			dialogEditSettings->hide();
 		});
-	connect(dialogEditSettings, & QDialog::rejected, [&] { settingsUi.pushButtonSettingsCancel->click(); });
+	connect(dialogEditSettings, & QDialog::rejected, [&] { uiSettings.pushButtonSettingsCancel->click(); });
 	/*****************************************
-	 * End Settings.
+	 * End 'Settings' dialog configuration.
 	 *****************************************/
+
+	/********************************************************
+	 * Configure the 'Choose file for debugging' dialog.
+	 ********************************************************/
+	dialogChooseFileForDebugging = new QDialog(this);
+	uiChooseFileForDebugging.setupUi(dialogChooseFileForDebugging);
+	for (const auto & s : sessions)
+	{
+		QFileInfo fi(s.executableFileName);
+		uiChooseFileForDebugging.treeWidgetRecentDebugExecutables->addTopLevelItem(new QTreeWidgetItem(QStringList() << fi.fileName() << fi.filePath()));
+	}
+	uiChooseFileForDebugging.lineEditDebugExecutable->setText(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, "").toString());
+
+	uiChooseFileForDebugging.treeWidgetRecentDebugExecutables->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+	uiChooseFileForDebugging.treeWidgetRecentDebugExecutables->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+
+	/*! \todo	Also connect the 'itemActivated()' signal here. */
+	connect(uiChooseFileForDebugging.treeWidgetRecentDebugExecutables, & QTreeWidget::itemClicked, [&](QTreeWidgetItem * item, int column) -> void
+		{
+			uiChooseFileForDebugging.lineEditDebugExecutable->setText(item->text(1));
+		});
+	connect(uiChooseFileForDebugging.pushButtonSelectFile, & QPushButton::clicked, [&]
+		{
+			QString fileName = QFileDialog::getOpenFileName(0, "Choose executable file for debugging");
+			if (fileName.size())
+				uiChooseFileForDebugging.lineEditDebugExecutable->setText(fileName);
+		});
+	connect(uiChooseFileForDebugging.pushButtonOk, & QPushButton::clicked, [&] { dialogChooseFileForDebugging->accept(); });
+	connect(uiChooseFileForDebugging.pushButtonCancel, & QPushButton::clicked, [&] { dialogChooseFileForDebugging->reject(); });
+	qDebug() << dialogChooseFileForDebugging->exec();
+
+	/********************************************************
+	 * End 'Choose file for debugging' dialog configuration.
+	 ********************************************************/
 
 	ui->splitterVerticalSourceView->restoreState(settings->value(SETTINGS_SPLITTER_VERTICAL_SOURCE_VIEW_STATE, QByteArray()).toByteArray());
 	ui->splitterHorizontalSourceView->restoreState(settings->value(SETTINGS_SPLITTER_HORIZONTAL_SOURCE_VIEW_STATE, QByteArray()).toByteArray());
@@ -248,14 +282,14 @@ MainWindow::MainWindow(QWidget *parent) :
 		});
 
 	lessUsedUiItems << ui->pushButtonVerifyTargetMemory << ui->pushButtonLoadProgramToTarget << ui->pushButtonDisconnectGdb << ui->checkBoxShowTargetOutput;
-	connect(settingsUi.checkBoxHideLessUsedUiItems, & QCheckBox::stateChanged, [&](int newState)
+	connect(uiSettings.checkBoxHideLessUsedUiItems, & QCheckBox::stateChanged, [&](int newState)
 		{
 			for (auto & w : lessUsedUiItems) w->setHidden(newState);
 		});
 	ui->checkBoxLimitGdbLog->setChecked(settings->value(SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE, true).toBool());
 	ui->checkBoxHideGdbMIData->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_GDB_MI_DATA_STATE, true).toBool());
 
-	settingsUi.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
+	uiSettings.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
 
 	gdbProcess = std::make_shared<QProcess>();
 	/*! \todo This doesn't need to live in a separate thread. */
@@ -283,7 +317,7 @@ MainWindow::MainWindow(QWidget *parent) :
 			{
 				QMessageBox::critical(0, "Gdb executable not set", "Gdb executable not specified. Please, specify a valid gdb executable.");
 				populateSettingsDialog();
-				settingsUi.lineEditGdbExecutable->setFocus();
+				uiSettings.lineEditGdbExecutable->setFocus();
 				/* Execute the settings dialog synchronously. */
 				dialogEditSettings->exec();
 				/* Do not check again if the gdb executable is available. */
@@ -415,6 +449,8 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->treeWidgetDataTypes, & QTreeWidget::itemClicked, [=] (QTreeWidgetItem * item, int column)
 		{ showSourceCode(item); } );
 
+	/*! \todo	Handle the backtrace as other tree widgets. The behaviour here was once thought appropriate, but practice shows it is best to always refresh the source code view
+	 *		whenever a backtrace tree widget item is activated. */
 	connect(ui->treeWidgetBacktrace, & QTreeWidget::itemSelectionChanged, [=] ()
 		{	if (target_state != TARGET_STOPPED)
 				return;
@@ -560,6 +596,8 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(gdbProcess.get(), & QProcess::started, [&] {
 		QFileInfo f(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
 		sendDataToGdbProcess("-gdb-set tcp auto-retry off\n");
+		sendDataToGdbProcess("-gdb-set mem inaccessible-by-default off\n");
+		sendDataToGdbProcess("-gdb-set print elements unlimited\n");
 		if (f.exists())
 		{
 			int choice = QMessageBox::question(0, "Reopen last executable for debugging",
@@ -587,8 +625,6 @@ reopen_last_file:
 										   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_EXECUTABLE_SYMBOL_FILE_LOADED,
 										   f.canonicalFilePath())
 									   );
-				sendDataToGdbProcess("-gdb-set mem inaccessible-by-default off\n");
-				sendDataToGdbProcess("-gdb-set print elements unlimited\n");
 				sendDataToGdbProcess(QString("%1-file-exec-and-symbols \"%2\"\n").arg(t).arg(f.canonicalFilePath()));
 			}
 		}
@@ -1125,7 +1161,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 							sourceFilename.isEmpty() ? QApplication::applicationDirPath() : QFileInfo(sourceFilename).canonicalPath()))
 				{
 					QMessageBox::critical(0, "Error starting external editor", "Starting the external editor failed.\nPlease, review the external editor settings.");
-					settingsUi.lineEditExternalEditorProgram->setFocus();
+					uiSettings.lineEditExternalEditorProgram->setFocus();
 					ui->pushButtonSettings->click();
 				}
 			}
@@ -3601,7 +3637,7 @@ void MainWindow::loadSVDFile(void)
 	if (!QFileInfo(targetSVDFileName).exists())
 	{
 		QMessageBox::critical(0, "Target SVD file not found", "No valid SVD file specified.\nYou can specify the target SVD file in the settings.");
-		settingsUi.lineEditTargetSVDFileName->setFocus();
+		uiSettings.lineEditTargetSVDFileName->setFocus();
 		ui->pushButtonSettings->click();
 		return;
 	}

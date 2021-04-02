@@ -74,6 +74,7 @@
 
 #include "breakpoint-cache.hxx"
 #include "source-file-data.hxx"
+#include "ui_select-debug-executable-file-dialog.h"
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
 /* It seems that prior to Qt version 5.14, Qt does not provide a specialization
@@ -706,6 +707,7 @@ private:
 	const QString SETTINGS_TRACE_LOG					= "trace-log";
 	const QString SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE	= "checkbox-show-full-file-name-in-trace-log-state";
 
+	/*! #todo	This is redundant, it should equal the last loaded executable in the most recent session record. */
 	const QString SETTINGS_LAST_LOADED_EXECUTABLE_FILE			= "last-loaded-executable-file";
 
 	const QString SETTINGS_GDB_EXECUTABLE_FILENAME				= "gdb-executable-filename";
@@ -718,6 +720,7 @@ private:
 	const QString HELPVIEW_PLAINTEXTEDIT_STYLESHEET =  "font: 10pt 'Hack'; background-color: MintCream;";
 
 	std::shared_ptr<QSettings> settings;
+	/*! #todo	This is redundant, it should equal the last used SVD file in the most recent session record. */
 	QString targetSVDFileName;
 
 	/* This list holds the items that will be shown or hidden when requesting to show or hide the not-so-often used user interface items, in order to make the user interface less cluttered. */
@@ -762,16 +765,18 @@ private:
 	void restoreSession(const QString & executableFileName);
 	void saveSessions(void);
 
-	Ui::DialogSettings settingsUi;
-	QDialog * dialogEditSettings;
+	Ui::DialogSettings			uiSettings;
+	QDialog					* dialogEditSettings = 0;
+	Ui::DialogChooseFileForDebugging	uiChooseFileForDebugging;
+	QDialog					* dialogChooseFileForDebugging = 0;
 	void populateSettingsDialog(void)
 	{
-		settingsUi.lineEditGdbExecutable->setText(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString());
-		settingsUi.lineEditExternalEditorProgram->setText(settings->value(SETTINGS_EXTERNAL_EDITOR_PROGRAM, "").toString());
-		settingsUi.lineEditExternalEditorOptions->setText(settings->value(SETTINGS_EXTERNAL_EDITOR_COMMAND_LINE_OPTIONS, "").toString());
-		settingsUi.lineEditTargetSVDFileName->setText(targetSVDFileName);
-		settingsUi.checkBoxEnableNativeDebugging->setChecked(settings->value(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, false).toBool());
-		settingsUi.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
+		uiSettings.lineEditGdbExecutable->setText(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString());
+		uiSettings.lineEditExternalEditorProgram->setText(settings->value(SETTINGS_EXTERNAL_EDITOR_PROGRAM, "").toString());
+		uiSettings.lineEditExternalEditorOptions->setText(settings->value(SETTINGS_EXTERNAL_EDITOR_COMMAND_LINE_OPTIONS, "").toString());
+		uiSettings.lineEditTargetSVDFileName->setText(targetSVDFileName);
+		uiSettings.checkBoxEnableNativeDebugging->setChecked(settings->value(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, false).toBool());
+		uiSettings.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
 	}
 
 public:

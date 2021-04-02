@@ -61,6 +61,7 @@ HEADERS += \
 
 FORMS += \
         mainwindow.ui \
+        select-debug-executable-file-dialog.ui \
         settings-dialog.ui
 
 # Default rules for deployment.
