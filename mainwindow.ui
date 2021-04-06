@@ -98,6 +98,13 @@
        </widget>
       </item>
       <item>
+       <widget class="QLabel" name="labelSystemState">
+        <property name="text">
+         <string>System state</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QPushButton" name="pushButtonRESTART">
         <property name="toolTip">
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Restart the frontend.&lt;/p&gt;&lt;p&gt;If you hold the &lt;span style=&quot; font-weight:600;&quot;&gt;CONTROL&lt;/span&gt; and &lt;span style=&quot; font-weight:600;&quot;&gt;SHIFT&lt;/span&gt; keys when activating this button, then the frontend settings file (by default, 'turbo.rc') &lt;span style=&quot; font-weight:600;&quot;&gt;will be deleted&lt;/span&gt;.&lt;/p&gt;&lt;p&gt;Make sure you know what you are doing if you decide to do so.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>

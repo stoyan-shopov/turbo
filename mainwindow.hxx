@@ -1080,7 +1080,7 @@ private:
 		QList<QAction *> enabledActionsWhenTargetDetached;
 		QList<QAction *> disabledActionsWhenTargetDetached;
 
-		void enterTargetState(enum TARGET_STATE target_state)
+		void enterTargetState(enum TARGET_STATE target_state, bool isBlackmagicProbeConnected, QLabel * systemStateLabel)
 		{
 			//qDebug() << "Entering target state: " << target_state;
 			switch (target_state)

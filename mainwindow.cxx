@@ -56,6 +56,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 	ui->mainToolBar->addWidget(spacer);
 
+	ui->mainToolBar->addWidget(ui->labelSystemState);
 	ui->mainToolBar->addWidget(ui->toolButtonActions);
 
 	ui->toolButtonActions->addAction(ui->actionVerifyTargetFlash);
@@ -1712,9 +1713,11 @@ bool MainWindow::handleFileExecAndSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM
 		QString errorMessage = QString("Failed to load executable file in gdb, could not load file:\n%1").arg(context->s);
 		if (results.size() && results.at(0).variable == "msg" && results.at(0).value->asConstant())
 			errorMessage += QString("\n\n%1").arg(QString::fromStdString(results.at(0).value->asConstant()->constant()));
+		errorMessage += "\n\n\nThe frontend will now restart, so that you may reliably select a valid executable file for debugging";
 		QMessageBox::critical(0, "Error loading executable file in gdb",
 				      errorMessage);
-		return true;
+		ui->pushButtonRESTART->click();
+		/* Should never */ return true;
 	}
 
 	settings->setValue(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, context->s);
@@ -2305,6 +2308,31 @@ void MainWindow::handleGdbError(GdbMiParser::RESULT_CLASS_ENUM parseResult, cons
 {
 	if (parseResult != GdbMiParser::ERROR)
 		return;
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (context)
+	{
+		if (context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_FUNCTION_SYMBOLS
+				|| context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_VARIABLE_SYMBOLS
+				|| context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TYPE_SYMBOLS)
+		{
+			static bool symbolAccessMiErrrorPrinted = false;
+			/* It is likely that the gdb executable available is not a recent one, as the machine interface commands for querying function, variable, and type symbols
+			 * have been introduced in gdb version 10. */
+			if (!symbolAccessMiErrrorPrinted)
+			{
+				symbolAccessMiErrrorPrinted = true;
+				QMessageBox::critical(0, "Gdb version used is possibly out of date",
+						      "A gdb symbol query machine interface command has failed.\n\n"
+						      "Such gdb machine interface commands have only been introduced in recent gdb versions\n"
+						      "(gdb versions 10.x and above).\n\n"
+						      "Please, make sure you are running a recent gdb version.\n"
+						      "Otherwise, the behaviour of the frontend will be suboptimal.\n"
+						      "(This message shall not be printed again during this debug session."
+						      );
+			}
+			return;
+		}
+	}
 	QMessageBox::critical(0, "Gdb error", QString("Gdb error:\n%1").arg(gdbErrorString(parseResult, results)));
 }
 
