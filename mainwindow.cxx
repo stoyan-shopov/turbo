@@ -179,10 +179,13 @@ MainWindow::MainWindow(QWidget *parent) :
 	loadSessions();
 	dialogEditSettings = new QDialog(this);
 	uiSettings.setupUi(dialogEditSettings);
+	uiSettings.groupBoxAdvancedSettings->setVisible(false);
 	connect(ui->pushButtonSettings, & QPushButton::clicked, [&](){
 		populateSettingsDialog();
 		/* Execute the settings dialog asynchronously. */
 		dialogEditSettings->open();
+		if ((QGuiApplication::queryKeyboardModifiers() & (Qt::ControlModifier | Qt::ShiftModifier)) == (Qt::ControlModifier | Qt::ShiftModifier))
+			uiSettings.groupBoxAdvancedSettings->setVisible(true);
 	});
 	connect(uiSettings.pushButtonSelectGdbExecutableFile, & QPushButton::clicked, [&](){
 		QString s = QFileDialog::getOpenFileName(0, "Select gdb executable");
@@ -246,7 +249,6 @@ MainWindow::MainWindow(QWidget *parent) :
 		});
 	connect(uiChooseFileForDebugging.pushButtonOk, & QPushButton::clicked, [&] { dialogChooseFileForDebugging->accept(); });
 	connect(uiChooseFileForDebugging.pushButtonCancel, & QPushButton::clicked, [&] { dialogChooseFileForDebugging->reject(); });
-	qDebug() << dialogChooseFileForDebugging->exec();
 
 	/********************************************************
 	 * End 'Choose file for debugging' dialog configuration.
@@ -592,42 +594,25 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->plainTextEditSourceView->installEventFilter(this);
 	ui->plainTextEditDisassembly->installEventFilter(this);
 	ui->plainTextEditSourceView->viewport()->installEventFilter(this);
-	/*! \todo	Only execute the code below after gdb has been successfully started. */
+
+	/* Only execute the code below after gdb has been successfully started. */
 	connect(gdbProcess.get(), & QProcess::started, [&] {
-		QFileInfo f(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
 		sendDataToGdbProcess("-gdb-set tcp auto-retry off\n");
 		sendDataToGdbProcess("-gdb-set mem inaccessible-by-default off\n");
 		sendDataToGdbProcess("-gdb-set print elements unlimited\n");
-		if (f.exists())
+
+		int result;
+		QFileInfo fi;
+		do (result = dialogChooseFileForDebugging->exec()); while (result == QDialog::Accepted && !(fi = QFileInfo(uiChooseFileForDebugging.lineEditDebugExecutable->text())).exists());
+		if (result == QDialog::Accepted)
 		{
-			int choice = QMessageBox::question(0, "Reopen last executable for debugging",
-							   QString("Last opened executable file for debugging is:\n")
-							   + f.canonicalFilePath() + "\n\n"
-										     "Do you want to reopen it, or load a new file?",
-							   "Reopen last file", "Select new file", "Cancel");
-			if (choice == 0)
-				/* Reopen last file. */
-				goto reopen_last_file;
-			else if (choice == 1)
-				/* Select new file. */
-				goto select_new_file;
-			/* Otherwise, do not load anything. */
+			unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
+									   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_EXECUTABLE_SYMBOL_FILE_LOADED,
+									   fi.canonicalFilePath())
+								   );
+			sendDataToGdbProcess(QString("%1-file-exec-and-symbols \"%2\"\n").arg(t).arg(fi.canonicalFilePath()));
 		}
-		else
-		{
-select_new_file:
-			f = QFileInfo(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
-			f = QFileInfo(QFileDialog::getOpenFileName(0, "Load executable for debugging", f.canonicalPath()));
-			if (!f.canonicalFilePath().isEmpty())
-			{
-reopen_last_file:
-				unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
-										   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_EXECUTABLE_SYMBOL_FILE_LOADED,
-										   f.canonicalFilePath())
-									   );
-				sendDataToGdbProcess(QString("%1-file-exec-and-symbols \"%2\"\n").arg(t).arg(f.canonicalFilePath()));
-			}
-		}
+
 	});
 	gdbProcess->setArguments(QStringList() << "--interpreter=mi3");
 	ui->pushButtonStartGdb->click();
@@ -972,7 +957,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	}
 	settings->setValue(SETTINGS_TRACE_LOG, traceLog);
 
-		if (QGuiApplication::queryKeyboardModifiers() & (Qt::ControlModifier | Qt::ShiftModifier))
+		if ((QGuiApplication::queryKeyboardModifiers() & (Qt::ControlModifier | Qt::ShiftModifier)) == (Qt::ControlModifier | Qt::ShiftModifier))
 			if (QMessageBox::question(0, "Delete configuration data?", "Really delete configuration data?", QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes)
 				if (QFile::remove(SETTINGS_FILE_NAME))
 					QMessageBox::information(0, "Configuration settings deleted", "The configuration settings have been deleted.\nThe frontend will next time start in the default configuration.");

@@ -60,9 +60,15 @@
    </item>
    <item>
     <widget class="QTreeWidget" name="treeWidgetRecentDebugExecutables">
+     <property name="styleSheet">
+      <string notr="true">background-color: Azure </string>
+     </property>
      <property name="indentation">
       <number>0</number>
      </property>
+     <attribute name="headerVisible">
+      <bool>false</bool>
+     </attribute>
      <column>
       <property name="text">
        <string>File name</string>
