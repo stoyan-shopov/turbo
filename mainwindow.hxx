@@ -930,28 +930,21 @@ private:
 			GdbResponseContext(enum GDB_RESPONSE_ENUM gdbResponseCode, const QString & s, void * p) : gdbResponseCode(gdbResponseCode), s(s), p(p) {}
 		};
 
-		struct GdbResponseContext readAndRemoveContext(unsigned tokenNumber)
+		void removeContext(unsigned tokenNumber)
 		{
 			auto t = gdbTokenContextMap.find(tokenNumber);
-			if (t == gdbTokenContextMap.end())
+			if (t != gdbTokenContextMap.end())
 			{
-				QMessageBox::critical(0, "Internal frontend error", "Internal error - could not locate gdb context. Please, report this");
-				return GdbResponseContext(GdbResponseContext::GDB_RESPONSE_INVALID);
+				gdbTokenPool[tokenNumber >> 3] &=~ (1 << (tokenNumber & 7));
+				gdbTokenContextMap.erase(t);
 			}
-			struct GdbResponseContext c = t->second;
-			gdbTokenContextMap.erase(t);
-			gdbTokenPool[tokenNumber >> 3] &=~ (1 << (tokenNumber & 7));
-			return c;
 		}
-		const struct GdbResponseContext & contextForTokenNumber(unsigned tokenNumber) const
+		const struct GdbResponseContext * contextForTokenNumber(unsigned tokenNumber) const
 		{
 			auto t = gdbTokenContextMap.find(tokenNumber);
 			if (t == gdbTokenContextMap.end())
-			{
-				QMessageBox::critical(0, "Internal frontend error", "Internal error - could not locate gdb context. Please, report this.\nThe frontend will now exit.");
-				exit(-1);
-			}
-			return t->second;
+				return 0;
+			return & t->second;
 		}
 		unsigned insertContext(const GdbResponseContext & context)
 		{
@@ -962,7 +955,8 @@ private:
 		bool hasContextForToken(unsigned tokenNumber)
 		{
 			/* Token number 0 is regarded as invalid, and must never be used. */
-			if (!tokenNumber) return false;
+			if (!tokenNumber)
+				return false;
 			return gdbTokenContextMap.count(tokenNumber) != 0;
 		}
 	private:
@@ -1341,6 +1335,9 @@ private:
 	bool handleTargetScanResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 	/* Handle the response to the "-data-read-memory-bytes" machine interface gdb command. */
 	bool handleMemoryResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
+
+	/* Generic error handler. */
+	void handleGdbError(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 
 protected:
 	void closeEvent(QCloseEvent *event) override;

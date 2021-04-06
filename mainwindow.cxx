@@ -1289,53 +1289,35 @@ void MainWindow::gdbMiLineAvailable(QString line)
 				std::vector<GdbMiParser::MIResult> results;
 				GdbMiParser parser;
 				enum GdbMiParser::RESULT_CLASS_ENUM result = parser.parse(line.toStdString(), results);
-				if (handleFilesResponse(result, results, tokenNumber))
-					break;
-				if (handleLinesResponse(result, results, tokenNumber))
-					break;
-				if (handleNameResponse(result, results, tokenNumber))
-					break;
-				if (handleNumchildResponse(result, results, tokenNumber))
-					break;
-				if (handleFileExecAndSymbolsResponse(result, results, tokenNumber))
-					break;
-				if (handleSequencePoints(result, results, tokenNumber))
-					break;
-				if (handleTargetScanResponse(result, results, tokenNumber))
-					break;
-				if (handleSymbolsResponse(result, results, tokenNumber))
-					break;
-				if (handleBreakpointTableResponse(result, results, tokenNumber))
-					break;
-				if (handleStackResponse(result, results, tokenNumber))
-					break;
-				if (handleRegisterNamesResponse(result, results, tokenNumber))
-					break;
-				if (handleRegisterValuesResponse(result, results, tokenNumber))
-					break;
-				if (handleChangelistResponse(result, results, tokenNumber))
-					break;
-				if (handleVariablesResponse(result, results, tokenNumber))
-					break;
-				if (handleFrameResponse(result, results, tokenNumber))
-					break;
-				if (handleDisassemblyResponse(result, results, tokenNumber))
-					break;
-				if (handleValueResponse(result, results, tokenNumber))
-					break;
-				if (handleVerifyTargetMemoryContentsSeqPoint(result, results, tokenNumber))
-					break;
-				if (handleMemoryResponse(result, results, tokenNumber))
+				/* Try all command handlers, until some of them handles the response. */
+				if (
+				handleFilesResponse(result, results, tokenNumber) ||
+				handleLinesResponse(result, results, tokenNumber) ||
+				handleNameResponse(result, results, tokenNumber) ||
+				handleNumchildResponse(result, results, tokenNumber) ||
+				handleFileExecAndSymbolsResponse(result, results, tokenNumber) ||
+				handleSequencePoints(result, results, tokenNumber) ||
+				handleTargetScanResponse(result, results, tokenNumber) ||
+				handleSymbolsResponse(result, results, tokenNumber) ||
+				handleBreakpointTableResponse(result, results, tokenNumber) ||
+				handleStackResponse(result, results, tokenNumber) ||
+				handleRegisterNamesResponse(result, results, tokenNumber) ||
+				handleRegisterValuesResponse(result, results, tokenNumber) ||
+				handleChangelistResponse(result, results, tokenNumber) ||
+				handleVariablesResponse(result, results, tokenNumber) ||
+				handleFrameResponse(result, results, tokenNumber) ||
+				handleDisassemblyResponse(result, results, tokenNumber) ||
+				handleValueResponse(result, results, tokenNumber) ||
+				handleVerifyTargetMemoryContentsSeqPoint(result, results, tokenNumber) ||
+				handleMemoryResponse(result, results, tokenNumber) ||
+				false)
 					break;
 				switch (result)
 				{
 					case GdbMiParser::DONE:
 						break;
 					case GdbMiParser::ERROR:
-				{
-					/* \todo	Remove the 'gdbTokenContext' for the current token number, if not already removed above. */
-					QMessageBox::critical(0, "Gdb error", QString("Gdb error:\n%1").arg(gdbErrorString(result, results)));
-				}
+						handleGdbError(result, results, tokenNumber);
 					break;
 				case GdbMiParser::CONNECTED:
 					emit gdbServerConnected();
@@ -1413,6 +1395,8 @@ void MainWindow::gdbMiLineAvailable(QString line)
 			}
 			break;
 	}
+	/* Remove the 'gdbTokenContext' for the current token number, if not already removed above. */
+	gdbTokenContext.removeContext(tokenNumber);
 }
 
 QString MainWindow::normalizeGdbString(const QString &miString)
@@ -1447,13 +1431,12 @@ bool MainWindow::handleNameResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseRes
 {
 	if (parseResult != GdbMiParser::DONE)
 		return false;
-	if (!gdbTokenContext.hasContextForToken(tokenNumber)
-		|| gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_NAME)
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context || context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_NAME)
 		return false;
-	struct GdbTokenContext::GdbResponseContext context = gdbTokenContext.readAndRemoveContext(tokenNumber);
 	struct GdbVarObjectTreeItem * node = new GdbVarObjectTreeItem;
 
-	node->name = context.s;
+	node->name = context->s;
 	int childCount = 0;
 	for (const auto & t : results)
 	{
@@ -1467,7 +1450,7 @@ bool MainWindow::handleNameResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseRes
 			childCount = QString::fromStdString(t.value->asConstant()->constant()).toInt(0, 0);
 	}
 	node->setReportedChildCount(childCount);
-	static_cast<GdbVarObjectTreeItemModel *>(context.p)->appendRootItem(node);
+	static_cast<GdbVarObjectTreeItemModel *>(context->p)->appendRootItem(node);
 	return true;
 }
 
@@ -1475,12 +1458,11 @@ bool MainWindow::handleNumchildResponse(GdbMiParser::RESULT_CLASS_ENUM parseResu
 {
 	if (parseResult != GdbMiParser::DONE)
 		return false;
-	if (!gdbTokenContext.hasContextForToken(tokenNumber)
-		|| gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_NUMCHILD)
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context || context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_NUMCHILD)
 		return false;
 
-	struct GdbTokenContext::GdbResponseContext context = gdbTokenContext.readAndRemoveContext(tokenNumber);
-	QModelIndex index = varObjectTreeItemModel.indexForMiVariableName(context.s);
+	QModelIndex index = varObjectTreeItemModel.indexForMiVariableName(context->s);
 	if (!index.isValid())
 	{
 		/* If this case is reached, this means that a gdb "-var-list-children" machine interface
@@ -1584,7 +1566,6 @@ bool MainWindow::handleFilesResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 	QStringList sourceCodeFilenames;
 	for (const auto & f : sourceFiles.operator *())
 		sourceCodeFilenames << f.fullFileName;
-	//qRegisterMetaType<QSharedPointer<QVector<StringFinder::SearchResult>>>("StringSearchResultType");
 
 	emit addFilesToSearchSet(sourceCodeFilenames);
 	qRegisterMetaType<QSharedPointer<QVector<StringFinder::SearchResult>>>();
@@ -1598,16 +1579,15 @@ bool MainWindow::handleLinesResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 {
 	if (parseResult != GdbMiParser::DONE)
 		return false;
-	if (!gdbTokenContext.hasContextForToken(tokenNumber)
-		|| gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_LINES)
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context || context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_LINES)
 		return false;
 	if (results.size() != 1 || results.at(0).variable != "lines" || !results.at(0).value->asList())
 		return false;
-	struct GdbTokenContext::GdbResponseContext context = gdbTokenContext.readAndRemoveContext(tokenNumber);
-	if (!sourceFiles->count(context.s))
+	if (!sourceFiles->count(context->s))
 		return false;
 
-	SourceFileData & sourceFile(sourceFiles.operator *().operator [](context.s));
+	SourceFileData & sourceFile(sourceFiles.operator *().operator [](context->s));
 	for (const auto & t : results.at(0).value->asList()->values)
 	{
 		if (!t->asTuple())
@@ -1632,14 +1612,13 @@ bool MainWindow::handleSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM parseResul
 {
 	if (parseResult != GdbMiParser::DONE)
 		return false;
-	if (!gdbTokenContext.hasContextForToken(tokenNumber))
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context)
 		return false;
-	const GdbTokenContext::GdbResponseContext & c = gdbTokenContext.contextForTokenNumber(tokenNumber);
-	if (c.gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_FUNCTION_SYMBOLS
-			&& c.gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_VARIABLE_SYMBOLS
-			&& c.gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TYPE_SYMBOLS)
+	if (context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_FUNCTION_SYMBOLS
+			&& context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_VARIABLE_SYMBOLS
+			&& context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TYPE_SYMBOLS)
 		return false;
-	GdbTokenContext::GdbResponseContext context = gdbTokenContext.readAndRemoveContext(tokenNumber);
 	const GdbMiParser::MITuple * t;
 	if (results.size() != 1 || results.at(0).variable != "symbols" || !(t = results.at(0).value->asTuple()))
 		return false;
@@ -1704,9 +1683,9 @@ bool MainWindow::handleSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM parseResul
 					s.isSourceLinesFetched = true;
 					sourceFiles->operator[](fullFileName) = s;
 				}
-				if (context.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_FUNCTION_SYMBOLS)
+				if (context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_FUNCTION_SYMBOLS)
 					sourceFiles->operator [](fullFileName).subprograms.insert(symbols.cbegin(), symbols.cend());
-				else if (context.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_VARIABLE_SYMBOLS)
+				else if (context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_VARIABLE_SYMBOLS)
 					sourceFiles->operator [](fullFileName).variables.insert(symbols.cbegin(), symbols.cend());
 				else
 					sourceFiles->operator [](fullFileName).dataTypes.insert(symbols.cbegin(), symbols.cend());
@@ -1725,13 +1704,12 @@ bool MainWindow::handleSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM parseResul
 
 bool MainWindow::handleFileExecAndSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
 {
-	if (!gdbTokenContext.hasContextForToken(tokenNumber)
-		|| gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_EXECUTABLE_SYMBOL_FILE_LOADED)
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context || context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_EXECUTABLE_SYMBOL_FILE_LOADED)
 		return false;
-	struct GdbTokenContext::GdbResponseContext context = gdbTokenContext.readAndRemoveContext(tokenNumber);
 	if (parseResult == GdbMiParser::ERROR)
 	{
-		QString errorMessage = QString("Failed to load executable file in gdb, could not load file:\n%1").arg(context.s);
+		QString errorMessage = QString("Failed to load executable file in gdb, could not load file:\n%1").arg(context->s);
 		if (results.size() && results.at(0).variable == "msg" && results.at(0).value->asConstant())
 			errorMessage += QString("\n\n%1").arg(QString::fromStdString(results.at(0).value->asConstant()->constant()));
 		QMessageBox::critical(0, "Error loading executable file in gdb",
@@ -1739,11 +1717,11 @@ bool MainWindow::handleFileExecAndSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM
 		return true;
 	}
 
-	settings->setValue(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, context.s);
+	settings->setValue(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, context->s);
 	elfReader = std::make_shared<elfio>();
-	if (!elfReader->load(context.s.toStdString()))
+	if (!elfReader->load(context->s.toStdString()))
 		elfReader.reset();
-	restoreSession(context.s);
+	restoreSession(context->s);
 	sendDataToGdbProcess("-file-list-exec-source-files\n");
 	return true;
 }
@@ -2147,9 +2125,8 @@ bool MainWindow::handleValueResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 {
 	if (parseResult != GdbMiParser::DONE || results.size() != 1 || results.at(0).variable != "value" || !results.at(0).value->asConstant())
 		return false;
-	if (gdbTokenContext.hasContextForToken(tokenNumber))
-	if (gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode
-		&& gdbTokenContext.readAndRemoveContext(tokenNumber).gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_UPDATE_LAST_KNOWN_PROGRAM_COUNTER)
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (context && context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_UPDATE_LAST_KNOWN_PROGRAM_COUNTER)
 	{
 		bool ok;
 		uint64_t pc;
@@ -2164,30 +2141,28 @@ bool MainWindow::handleSequencePoints(GdbMiParser::RESULT_CLASS_ENUM parseResult
 {
 	if (parseResult != GdbMiParser::DONE)
 		return false;
-	bool response_handled = false;
-	if (!gdbTokenContext.hasContextForToken(tokenNumber))
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context)
 		return false;
-	switch (gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode)
+	switch (context->gdbResponseCode)
 	{
 	case GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_SOURCE_CODE_ADDRESSES_RETRIEVED:
 		updateSourceListView();
 		updateSymbolViews();
+		return true;
+	default:
 		break;
 	}
-	if (response_handled)
-		gdbTokenContext.readAndRemoveContext(tokenNumber);
-	return response_handled;
+	return false;
 }
 
 bool MainWindow::handleVerifyTargetMemoryContentsSeqPoint(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
 {
 	if (parseResult != GdbMiParser::DONE)
 		return false;
-	if (!gdbTokenContext.hasContextForToken(tokenNumber))
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context || context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_CHECK_MEMORY_CONTENTS)
 		return false;
-	if (gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_CHECK_MEMORY_CONTENTS)
-		return false;
-	gdbTokenContext.readAndRemoveContext(tokenNumber);
 	bool match = true;
 	int i = 0;
 	for (const auto & f : targetMemorySectionsTempFileNames)
@@ -2235,11 +2210,10 @@ bool MainWindow::handleVerifyTargetMemoryContentsSeqPoint(GdbMiParser::RESULT_CL
 
 bool MainWindow::handleTargetScanResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
 {
-	if (gdbTokenContext.hasContextForToken(tokenNumber)
-		&& gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TARGET_SCAN_COMPLETE)
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (context && context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TARGET_SCAN_COMPLETE)
 	{
 		targetDataCapture.stopCapture();
-		gdbTokenContext.readAndRemoveContext(tokenNumber);
 		if (parseResult == GdbMiParser::ERROR)
 		{
 			QMessageBox::critical(0, "Target scan failed", QString("Target scan command failed, error:\n%1").arg(gdbErrorString(parseResult, results)));
@@ -2284,15 +2258,12 @@ bool MainWindow::handleTargetScanResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 
 bool MainWindow::handleMemoryResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
 {
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
 	if (parseResult == GdbMiParser::ERROR)
 	{
 		/* If there is an error reading the target memory, disable the auto update of the memory view. */
-		if (gdbTokenContext.hasContextForToken(tokenNumber) && gdbTokenContext.contextForTokenNumber(tokenNumber)
-				.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_DATA_READ_MEMORY)
-		{
-			gdbTokenContext.readAndRemoveContext(tokenNumber);
+		if (context && context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_DATA_READ_MEMORY)
 			ui->checkBoxMemoryDumpAutoUpdate->setChecked(false);
-		}
 		return false;
 	}
 	const GdbMiParser::MIList * l;
@@ -2321,15 +2292,20 @@ bool MainWindow::handleMemoryResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult
 					f.spinbox->setValue((d >> f.bitoffset) & ((1 << f.bitwidth) - 1));
 	}
 	/* Check if the memory dump view should be updated. */
-	if (gdbTokenContext.hasContextForToken(tokenNumber) && gdbTokenContext.contextForTokenNumber(tokenNumber)
-			.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_DATA_READ_MEMORY)
+	if (context && context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_DATA_READ_MEMORY)
 	{
-		gdbTokenContext.readAndRemoveContext(tokenNumber);
 		ui->plainTextEditMemoryDump->clear();
 		ui->plainTextEditMemoryDump->appendPlainText(data.toHex());
 	}
 
 	return true;
+}
+
+void MainWindow::handleGdbError(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
+{
+	if (parseResult != GdbMiParser::ERROR)
+		return;
+	QMessageBox::critical(0, "Gdb error", QString("Gdb error:\n%1").arg(gdbErrorString(parseResult, results)));
 }
 
 void MainWindow::gdbProcessError(QProcess::ProcessError error)
