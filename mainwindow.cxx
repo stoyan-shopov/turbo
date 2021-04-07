@@ -38,6 +38,10 @@ MainWindow::MainWindow(QWidget *parent) :
 	QMainWindow(parent),
 	ui(new Ui::MainWindow)
 {
+	/* Force a windows style for the user interface.
+	 * It looks like the most compact user interface. */
+	QApplication::setStyle("windows");
+
 	ui->setupUi(this);
 	setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North);
 
