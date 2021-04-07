@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1673</width>
+    <width>1773</width>
     <height>675</height>
    </rect>
   </property>
@@ -101,6 +101,13 @@
        <widget class="QLabel" name="labelSystemState">
         <property name="text">
          <string>System state</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButtonShortState">
+        <property name="text">
+         <string/>
         </property>
        </widget>
       </item>
@@ -379,22 +386,18 @@
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout_4">
            <item>
-            <layout class="QVBoxLayout" name="verticalLayout_28">
-             <item>
-              <widget class="QCheckBox" name="checkBoxShowDisassembly">
-               <property name="text">
-                <string>Show disassembly</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QCheckBox" name="checkBoxShowTargetOutput">
-               <property name="text">
-                <string>Show target output</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
+            <widget class="QCheckBox" name="checkBoxShowTargetOutput">
+             <property name="text">
+              <string>Gdb stderr</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="checkBoxShowDisassembly">
+             <property name="text">
+              <string>Disassembly</string>
+             </property>
+            </widget>
            </item>
            <item>
             <widget class="QCheckBox" name="checkBoxShowGdbConsoles">
@@ -439,13 +442,6 @@ for text:</string>
             <widget class="QPushButton" name="pushButtonNavigateForward">
              <property name="text">
               <string>Go forward</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="pushButtonTrigger">
-             <property name="text">
-              <string>Trigger</string>
              </property>
             </widget>
            </item>
@@ -656,7 +652,7 @@ for text:</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1673</width>
+     <width>1773</width>
      <height>21</height>
     </rect>
    </property>
@@ -722,7 +718,7 @@ for text:</string>
          <item>
           <widget class="QLabel" name="label_8">
            <property name="text">
-            <string>TextLabel</string>
+            <string>Local variables</string>
            </property>
           </widget>
          </item>

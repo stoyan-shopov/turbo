@@ -1080,7 +1080,10 @@ private:
 		QList<QAction *> enabledActionsWhenTargetDetached;
 		QList<QAction *> disabledActionsWhenTargetDetached;
 
-		void enterTargetState(enum TARGET_STATE target_state, bool isBlackmagicProbeConnected, QLabel * systemStateLabel)
+		/*! \todo	The `isBlackmagicProbeConnected` parameter here is only needed to distinguish between a 'target detached'
+		 *		and a 'target disconnected' state, which is hard to do by only using information reports from gdb.
+		 *		This really needs to be handled in a better way. */
+		void enterTargetState(enum TARGET_STATE target_state, bool isBlackmagicProbeConnected, QLabel * systemStateLabel, QWidget * shortStatusLabel = 0)
 		{
 			//qDebug() << "Entering target state: " << target_state;
 			switch (target_state)
@@ -1131,6 +1134,34 @@ private:
 					a->setEnabled(true);
 				break;
 			}
+			/* Update the status label. */
+			QString stateMessage = "<<< INVALID >>>", backgroundColor = "Red";
+			switch (target_state)
+			{
+				case GDB_NOT_RUNNING:
+					stateMessage = "GDB NOT RUNNING";
+					break;
+				case TARGET_DETACHED:
+					if (isBlackmagicProbeConnected)
+						stateMessage = "Target detached";
+					else
+				case GDBSERVER_DISCONNECTED:
+						stateMessage = "Target disconnected";
+					backgroundColor = "Yellow";
+					break;
+				case TARGET_RUNNING:
+					stateMessage = "Target running";
+					backgroundColor = "SpringGreen";
+					break;
+				case TARGET_STOPPED:
+					stateMessage = "Target halted";
+					backgroundColor = "SpringGreen";
+					break;
+			}
+			systemStateLabel->setText(stateMessage);
+			systemStateLabel->setStyleSheet(QString("background-color: %1;").arg(backgroundColor));
+			if (shortStatusLabel)
+				shortStatusLabel->setStyleSheet(QString("background-color: %1;").arg(backgroundColor));
 		}
 	}
 	targetStateDependentWidgets;

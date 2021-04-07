@@ -52,12 +52,18 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->mainToolBar->addWidget(ui->pushButtonRESTART);
 	ui->mainToolBar->addWidget(ui->pushButtonConnectToBlackmagic);
 
-	QWidget * spacer = new QWidget();
-	spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-	ui->mainToolBar->addWidget(spacer);
+	QWidget * toolbarSpacers[1];
+	for (auto & s : toolbarSpacers)
+	{
+		s = new QWidget();
+		s->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+	}
+	ui->mainToolBar->addWidget(ui->toolButtonActions);
+	ui->mainToolBar->addWidget(toolbarSpacers[0]);
 
 	ui->mainToolBar->addWidget(ui->labelSystemState);
-	ui->mainToolBar->addWidget(ui->toolButtonActions);
+
+	ui->mainToolBar->addWidget(ui->pushButtonShortState);
 
 	ui->toolButtonActions->addAction(ui->actionVerifyTargetFlash);
 	ui->toolButtonActions->addAction(ui->actionLoadProgramIntoTarget);
@@ -79,7 +85,6 @@ MainWindow::MainWindow(QWidget *parent) :
 	restoreState(settings->value(SETTINGS_MAINWINDOW_STATE, QByteArray()).toByteArray());
 	restoreGeometry(settings->value(SETTINGS_MAINWINDOW_GEOMETRY, QByteArray()).toByteArray());
 
-	connect(ui->pushButtonTrigger, & QPushButton::clicked, [&] { navigationStack.dump(); });
 	connect(ui->pushButtonNavigateForward, & QPushButton::clicked, [&] { if (navigationStack.canNavigateForward()) displaySourceCodeFile(navigationStack.following(), false); });
 	connect(ui->pushButtonNavigateBack, & QPushButton::clicked, [&] { if (navigationStack.canNavigateBack()) displaySourceCodeFile(navigationStack.previous(), false); });
 	connect(ui->pushButtonLocateWindow, & QPushButton::clicked, [&] { displayHelpMenu(); });
@@ -332,7 +337,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	});
 
 	connect(gdbProcess.get(), & QProcess::started, [&] {
-		targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED);
+		targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
 		ui->pushButtonStartGdb->setEnabled(false);
 		ui->pushButtonConnectToBlackmagic->setEnabled(true);
 	});
@@ -585,11 +590,6 @@ MainWindow::MainWindow(QWidget *parent) :
 "}\n"
 		      );
 
-	//gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("xxx", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("c:/src1/gdb-10.1-build-1/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("c:/src1/gdb-10.1-build-2/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 	ui->plainTextEditScratchpad->setPlainText(settings->value(SETTINGS_SCRATCHPAD_TEXT_CONTENTS, QString("Lorem ipsum dolor sit amet")).toString());
 
 	ui->plainTextEditSourceView->installEventFilter(this);
@@ -616,6 +616,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
 	});
 	gdbProcess->setArguments(QStringList() << "--interpreter=mi3");
+	/* Make sure to first update the target state, and only then start the gdb process. */
+	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
 	ui->pushButtonStartGdb->click();
 
 	ui->treeWidgetBreakpoints->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -732,18 +734,18 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(this, &MainWindow::gdbServerConnected, [&] {
 		/* A connection to the gdbserver has been established, but a connection to a target is not yet established. */
 		////QMessageBox::information(0, "Gdb connection established", "Gdb successfully connected to remote gdb server");
-		targetStateDependentWidgets.enterTargetState(target_state = TARGET_DETACHED);
+		targetStateDependentWidgets.enterTargetState(target_state = TARGET_DETACHED, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
 		ui->pushButtonScanForTargets->click();
 	});
 
 	connect(&blackMagicProbeServer, &BlackMagicProbeServer::GdbClientDisconnected, [&]
-		{ targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED);}
+		{ targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);}
 	);
 
 	connect(this, &MainWindow::targetStopped, [&] {
 		if (target_state == GDBSERVER_DISCONNECTED || target_state == TARGET_DETACHED)
 			compareTargetMemory();
-		targetStateDependentWidgets.enterTargetState(target_state = TARGET_STOPPED);
+		targetStateDependentWidgets.enterTargetState(target_state = TARGET_STOPPED, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
 		/*! \todo Make the frame limits configurable. */
 		sendDataToGdbProcess("-stack-list-frames 0 100\n");
 		if (!targetRegisterIndices.size())
@@ -765,18 +767,16 @@ MainWindow::MainWindow(QWidget *parent) :
 	});
 
 	connect(this, &MainWindow::targetRunning, [&] {
-		targetStateDependentWidgets.enterTargetState(target_state = TARGET_RUNNING);
+		targetStateDependentWidgets.enterTargetState(target_state = TARGET_RUNNING, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
 	});
 
 	connect(this, &MainWindow::targetDetached, [&]
 		/*! \todo	This is getting too complicated... It is problematic to distinguish between a gdbserver detach and a gdbserver disconnect event.
 		 *		The target state handling needs to be improved and simplified.
 		 *		For the moment, try to do some special case handling - if the target state is GDBSERVER_DISCONNECTED, then stay in the disconnected state. */
-		{ if (target_state != GDBSERVER_DISCONNECTED) targetStateDependentWidgets.enterTargetState(target_state = TARGET_DETACHED);}
+		{ if (target_state != GDBSERVER_DISCONNECTED) targetStateDependentWidgets.enterTargetState(target_state = TARGET_DETACHED, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);}
 	);
 
-
-	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING);
 	/***************************************
 	 ***************************************
 	 ***************************************/
@@ -2360,7 +2360,7 @@ void MainWindow::gdbProcessError(QProcess::ProcessError error)
 			QMessageBox::critical(0, "Gdb process unknown error", "Unknown gdb error");
 			break;
 	}
-	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING);
+	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
 	ui->pushButtonStartGdb->setEnabled(true);
 	varObjectTreeItemModel.removeAllTopLevelItems();
 	ui->pushButtonConnectToBlackmagic->setEnabled(false);
@@ -2371,7 +2371,7 @@ void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
 	qDebug() << gdbProcess->readAllStandardError();
 	qDebug() << gdbProcess->readAllStandardOutput();
 	qDebug() << "gdb process finished";
-	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING);
+	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
 	ui->pushButtonStartGdb->setEnabled(true);
 	varObjectTreeItemModel.removeAllTopLevelItems();
 	ui->pushButtonConnectToBlackmagic->setEnabled(false);
