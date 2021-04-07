@@ -459,18 +459,10 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->treeWidgetDataTypes, & QTreeWidget::itemClicked, [=] (QTreeWidgetItem * item, int column)
 		{ showSourceCode(item); } );
 
-	/*! \todo	Handle the backtrace as other tree widgets. The behaviour here was once thought appropriate, but practice shows it is best to always refresh the source code view
-	 *		whenever a backtrace tree widget item is activated. */
-	connect(ui->treeWidgetBacktrace, & QTreeWidget::itemSelectionChanged, [=] ()
-		{	if (target_state != TARGET_STOPPED)
-				return;
-			QList<QTreeWidgetItem *> selectedItems = ui->treeWidgetBacktrace->selectedItems();
-			if (selectedItems.size())
-			{
-				sendDataToGdbProcess(QString("-stack-select-frame %1\n").arg(ui->treeWidgetBacktrace->indexOfTopLevelItem(selectedItems.at(0))));
-				sendDataToGdbProcess("-stack-info-frame\n");
-			}
-		} );
+	connect(ui->treeWidgetBacktrace, & QTreeWidget::itemActivated, [=] (QTreeWidgetItem * item, int column)
+		{ selectStackFrame(item); } );
+	connect(ui->treeWidgetBacktrace, & QTreeWidget::itemClicked, [=] (QTreeWidgetItem * item, int column)
+		{ selectStackFrame(item); } );
 
 	connect(ui->treeWidgetBreakpoints, & QTreeWidget::itemActivated, [=] (QTreeWidgetItem * item, int column)
 		{ if (column != TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER) showSourceCode(item); } );
@@ -900,6 +892,12 @@ void MainWindow::saveSessions()
 	for (const auto & s : sessions)
 		v << s.toVariant();
 	settings->setValue(SETTINGS_SAVED_SESSIONS, v);
+}
+
+void MainWindow::selectStackFrame(QTreeWidgetItem *item)
+{
+	sendDataToGdbProcess(QString("-stack-select-frame %1\n").arg(ui->treeWidgetBacktrace->indexOfTopLevelItem(item)));
+	sendDataToGdbProcess("-stack-info-frame\n");
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -1402,6 +1400,9 @@ void MainWindow::appendLineToGdbLog(const QString &data)
 		return;
 	}
 	ui->plainTextEditGdbLog->appendPlainText(data);
+	QTextCursor c = ui->plainTextEditGdbLog->textCursor();
+	c.movePosition(QTextCursor::End);
+	ui->plainTextEditGdbLog->setTextCursor(c);
 }
 
 bool MainWindow::handleNameResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
@@ -2193,18 +2194,19 @@ bool MainWindow::handleTargetScanResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 		/* Try to parse any stream output from the target. */
 		const QStringList & output(targetDataCapture.capturedLines());
 		QStringList detectedTargets;
-		QRegularExpression rx("^\"\\s*(\\d+)\\s+");
-		for (const auto & l : output)
+                QRegularExpression rx("^\\s*(\\d+)\\s+(.+)");
+                for (auto l : output)
 		{
-			qDebug() << "processing line:" << l;
-			if (l.contains("scan failed"))
+                        /* Clean up the string a bit. */
+                        l.replace('"', "").replace("\\n","");
+                        if (l.contains("scan failed"))
 			{
 				QMessageBox::critical(0, "Target scan failed", QString("Target scan command failed, error:\n%1").arg(l));
 				return true;
 			}
 			QRegularExpressionMatch match = rx.match(l);
 			if (match.hasMatch())
-				detectedTargets << l;
+                                detectedTargets << l;
 		}
 		assert(detectedTargets.length() != 0);
 		bool ok;
@@ -2365,8 +2367,16 @@ void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
 
 void MainWindow::sendDataToGdbProcess(const QString & data, bool isFrontendIssuedCommand)
 {
-	if (!ui->checkBoxHideGdbMIData->isChecked() || !isFrontendIssuedCommand)
+	if (isFrontendIssuedCommand && !ui->checkBoxHideGdbMIData->isChecked())
 		appendLineToGdbLog(">>> " + data);
+	else if (!isFrontendIssuedCommand)
+	{
+		QTextCursor c = ui->plainTextEditGdbLog->textCursor();
+		c.movePosition(QTextCursor::End);
+		c.insertText(data);
+		c.movePosition(QTextCursor::End);
+		ui->plainTextEditGdbLog->setTextCursor(c);
+	}
 	/*! \todo	WARNING. This needs to be investigated, but attempting to send data to the gdb process, when
 	 *		it is dead, of course - does not work, and this error is reported by Qt;
 	 *

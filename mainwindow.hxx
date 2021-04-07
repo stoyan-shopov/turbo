@@ -762,6 +762,8 @@ private:
 	void restoreSession(const QString & executableFileName);
 	void saveSessions(void);
 
+	void selectStackFrame(QTreeWidgetItem *item);
+
 	Ui::DialogSettings			uiSettings;
 	QDialog					* dialogEditSettings = 0;
 	Ui::DialogChooseFileForDebugging	uiChooseFileForDebugging;
