@@ -704,9 +704,6 @@ private:
 
 	const QString SETTINGS_SCRATCHPAD_TEXT_CONTENTS				= "scratchpad-text-contents";
 
-	const QString SETTINGS_TRACE_LOG					= "trace-log";
-	const QString SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE	= "checkbox-show-full-file-name-in-trace-log-state";
-
 	/*! #todo	This is redundant, it should equal the last loaded executable in the most recent session record. */
 	const QString SETTINGS_LAST_LOADED_EXECUTABLE_FILE			= "last-loaded-executable-file";
 

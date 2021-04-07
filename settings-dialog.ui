@@ -42,7 +42,7 @@
    <item>
     <widget class="QGroupBox" name="groupBoxAdvancedSettings">
      <property name="title">
-      <string>GroupBox</string>
+      <string>Advanced and experimental options</string>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_3">
       <item>

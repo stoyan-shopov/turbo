@@ -1145,21 +1145,6 @@ for text:</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="dockWidgetElfToolbox">
-   <property name="windowTitle">
-    <string>ELF toolbox</string>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>4</number>
-   </attribute>
-   <widget class="QWidget" name="dockWidgetContents_10">
-    <layout class="QVBoxLayout" name="verticalLayout_14">
-     <item>
-      <widget class="QPlainTextEdit" name="plainTextEditELFToolbox"/>
-     </item>
-    </layout>
-   </widget>
-  </widget>
   <widget class="QDockWidget" name="dockWidgetObjectLocator">
    <property name="windowTitle">
     <string>Object locator</string>
@@ -1339,66 +1324,7 @@ for text:</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="dockWidgetTraceLog">
-   <property name="windowTitle">
-    <string>Trace log</string>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>8</number>
-   </attribute>
-   <widget class="QWidget" name="dockWidgetContents_15">
-    <layout class="QVBoxLayout" name="verticalLayout_20">
-     <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_22">
-       <item>
-        <widget class="QPushButton" name="pushButton">
-         <property name="text">
-          <string>Clear</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="checkBoxEnableTraceLogging">
-         <property name="text">
-          <string>gather trace log</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="checkBoxShowFullFileNamesInTraceLog">
-         <property name="text">
-          <string>show full file name</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <widget class="QTreeWidget" name="treeWidgetTraceLog">
-       <column>
-        <property name="text">
-         <string>File</string>
-        </property>
-       </column>
-       <column>
-        <property name="text">
-         <string>Line</string>
-        </property>
-       </column>
-       <column>
-        <property name="text">
-         <string>Full file name</string>
-        </property>
-       </column>
-      </widget>
-     </item>
-    </layout>
-   </widget>
-  </widget>
-  <widget class="QDockWidget" name="dockWidget">
+  <widget class="QDockWidget" name="dockWidgetSvdView">
    <property name="windowTitle">
     <string>SVD view</string>
    </property>
@@ -1581,22 +1507,6 @@ for text:</string>
     <hint type="destinationlabel">
      <x>1130</x>
      <y>493</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>pushButton</sender>
-   <signal>clicked()</signal>
-   <receiver>treeWidgetTraceLog</receiver>
-   <slot>clear()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>849</x>
-     <y>559</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>1073</x>
-     <y>645</y>
     </hint>
    </hints>
   </connection>

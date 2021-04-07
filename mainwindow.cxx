@@ -63,7 +63,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
 	ui->mainToolBar->addWidget(ui->labelSystemState);
 
-	ui->mainToolBar->addWidget(ui->pushButtonShortState);
+	/* For the moment, hide the short status widget. */
+	//ui->mainToolBar->addWidget(ui->pushButtonShortState);
+	ui->pushButtonShortState->setVisible(false);
 
 	ui->toolButtonActions->addAction(ui->actionVerifyTargetFlash);
 	ui->toolButtonActions->addAction(ui->actionLoadProgramIntoTarget);
@@ -371,10 +373,6 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->treeWidgetStackVariables->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
 	ui->treeWidgetStackVariables->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
 
-	ui->treeWidgetTraceLog->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-	ui->treeWidgetTraceLog->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-	ui->treeWidgetTraceLog->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
-
 	ui->treeWidgetBookmarks->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 	ui->treeWidgetBookmarks->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
 
@@ -677,32 +675,8 @@ MainWindow::MainWindow(QWidget *parent) :
         targetCorefile = std::make_shared<TargetCorefile>(targetFilesBaseDirectory + "flash.bin", 0x08000000,
 					    targetFilesBaseDirectory + "ram.bin", 0x20000000,
 					    targetFilesBaseDirectory + "registers.bin");
+	/* Use this to inspect coredumps instead of connecting to a real remote target. */
 	////gdbserver = new GdbServer(targetCorefile);
-
-	QStringList traceLog = settings->value(SETTINGS_TRACE_LOG, QStringList()).toStringList();
-	for (const auto & l : traceLog)
-	{
-		QStringList t = l.split('|');
-		QString x;
-		if (t.count() != 3)
-			continue;
-		int lineNumber;
-		bool ok;
-		lineNumber = t.at(1).toUInt(& ok);
-		if (!ok)
-			lineNumber = -1;
-		ui->treeWidgetTraceLog->addTopLevelItem(createNavigationWidgetItem(t, t.at(2), lineNumber));
-	}
-
-	connect(ui->checkBoxShowFullFileNamesInTraceLog, & QCheckBox::stateChanged, [&](int newState) { ui->treeWidgetTraceLog->setColumnHidden(2, newState == 0); });
-	ui->checkBoxShowFullFileNamesInTraceLog->setChecked(settings->value(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE, false).toBool());
-
-	connect(ui->treeWidgetTraceLog, & QTreeWidget::itemActivated, [=] (QTreeWidgetItem * item, int column)
-		{ showSourceCode(item); } );
-	connect(ui->treeWidgetTraceLog, & QTreeWidget::currentItemChanged, [=] (QTreeWidgetItem * current, QTreeWidgetItem * previous)
-		{ showSourceCode(current); } );
-	connect(ui->treeWidgetTraceLog, & QTreeWidget::itemClicked, [=] (QTreeWidgetItem * item, int column)
-		{ showSourceCode(item); } );
 
 	connect(& blackMagicProbeServer, & BlackMagicProbeServer::BlackMagicProbeConnected,
 		[&] {
@@ -797,17 +771,25 @@ MainWindow::MainWindow(QWidget *parent) :
 	{
 		QAction * act;
 		act = new QAction(actionText, this);
-		act->setShortcut(shortcut);
+		if (!shortcut.isEmpty())
+			act->setShortcut(shortcut);
 		connect(act, &QAction::triggered, [=] { flashHighlightDockWidget(w); });
 		highlightWidgetActions << act;
 	};
-	makeHighlightAction("Backtrace", "Ctrl+t", ui->dockWidgetBacktrace);
-	makeHighlightAction("Bookmarks", "Ctrl+b", ui->dockWidgetBookmarks);
-	makeHighlightAction("Breakpoints", "Ctrl+r", ui->dockWidgetBreakpoints);
-	makeHighlightAction("Data objects", "Ctrl+d", ui->dockWidgetDataObjects);
-	makeHighlightAction("Search results", "Ctrl+s", ui->dockWidgetSearchResults);
-	makeHighlightAction("Source files", "Ctrl+l", ui->dockWidgetSourceFiles);
-	makeHighlightAction("Subprograms", "Ctrl+u", ui->dockWidgetSubprograms);
+	makeHighlightAction(ui->dockWidgetBacktrace->windowTitle(), "Ctrl+t", ui->dockWidgetBacktrace);
+	makeHighlightAction(ui->dockWidgetBookmarks->windowTitle(), "Ctrl+b", ui->dockWidgetBookmarks);
+	makeHighlightAction(ui->dockWidgetBreakpoints->windowTitle(), "Ctrl+r", ui->dockWidgetBreakpoints);
+	makeHighlightAction(ui->dockWidgetDataObjects->windowTitle(), "Ctrl+d", ui->dockWidgetDataObjects);
+	makeHighlightAction(ui->dockWidgetSearchResults->windowTitle(), "Ctrl+s", ui->dockWidgetSearchResults);
+	makeHighlightAction(ui->dockWidgetSourceFiles->windowTitle(), "Ctrl+l", ui->dockWidgetSourceFiles);
+	makeHighlightAction(ui->dockWidgetSubprograms->windowTitle(), "Ctrl+u", ui->dockWidgetSubprograms);
+	makeHighlightAction(ui->dockWidgetScratchpad->windowTitle(), "", ui->dockWidgetScratchpad);
+	makeHighlightAction(ui->dockWidgetStaticDataObjects->windowTitle(), "", ui->dockWidgetStaticDataObjects);
+	makeHighlightAction(ui->dockWidgetObjectLocator->windowTitle(), "", ui->dockWidgetObjectLocator);
+	makeHighlightAction(ui->dockWidgetRegisters->windowTitle(), "", ui->dockWidgetRegisters);
+	makeHighlightAction(ui->dockWidgetDataTypes->windowTitle(), "", ui->dockWidgetDataTypes);
+	makeHighlightAction(ui->dockWidgetSvdView->windowTitle(), "", ui->dockWidgetSvdView);
+	makeHighlightAction(ui->dockWidgetMemoryDump->windowTitle(), "", ui->dockWidgetMemoryDump);
 	for (const auto & a : highlightWidgetActions)
 		addAction(a);
 
@@ -934,7 +916,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	settings->setValue(SETTINGS_MAINWINDOW_STATE, saveState());
 	settings->setValue(SETTINGS_MAINWINDOW_GEOMETRY, saveGeometry());
 	settings->setValue(SETTINGS_BOOL_SHOW_FULL_FILE_NAME_STATE, ui->actionSourceFilesViewShowFullFileNames->isChecked());
-	settings->setValue(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE, ui->checkBoxShowFullFileNamesInTraceLog->isChecked());
 	settings->setValue(SETTINGS_BOOL_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE, ui->actionSourceFilesShowOnlyFilesWithMachineCode->isChecked());
 	settings->setValue(SETTINGS_BOOL_SHOW_ONLY_EXISTING_SOURCE_FILES, ui->actionSourceFilesShowOnlyExistingFiles->isChecked());
 	settings->setValue(SETTINGS_SCRATCHPAD_TEXT_CONTENTS, ui->plainTextEditScratchpad->document()->toPlainText());
@@ -950,19 +931,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	settings->setValue(SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE, ui->checkBoxLimitGdbLog->isChecked());
 	settings->setValue(SETTINGS_CHECKBOX_HIDE_GDB_MI_DATA_STATE, ui->checkBoxHideGdbMIData->isChecked());
 
-	QStringList traceLog;
-	for (int i = 0; i < ui->treeWidgetTraceLog->topLevelItemCount(); i ++)
-	{
-		const QTreeWidgetItem * l = ui->treeWidgetTraceLog->topLevelItem(i);
-		traceLog << l->text(0) + '|' + l->text(1) + '|' + l->text(2);
-	}
-	settings->setValue(SETTINGS_TRACE_LOG, traceLog);
-
-		if ((QGuiApplication::queryKeyboardModifiers() & (Qt::ControlModifier | Qt::ShiftModifier)) == (Qt::ControlModifier | Qt::ShiftModifier))
-			if (QMessageBox::question(0, "Delete configuration data?", "Really delete configuration data?", QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes)
-				if (QFile::remove(SETTINGS_FILE_NAME))
-					QMessageBox::information(0, "Configuration settings deleted", "The configuration settings have been deleted.\nThe frontend will next time start in the default configuration.");
-
+	if ((QGuiApplication::queryKeyboardModifiers() & (Qt::ControlModifier | Qt::ShiftModifier)) == (Qt::ControlModifier | Qt::ShiftModifier))
+		if (QMessageBox::question(0, "Delete configuration data?", "Really delete configuration data?", QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes)
+			if (QFile::remove(SETTINGS_FILE_NAME))
+				QMessageBox::information(0, "Configuration settings deleted", "The configuration settings have been deleted.\nThe frontend will next time start in the default configuration.");
 
 	QWidget::closeEvent(event);
 }
@@ -1167,7 +1139,6 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 				ui->dockWidgetDataObjects->hide();
 				ui->dockWidgetStaticDataObjects->hide();
 				ui->dockWidgetScratchpad->hide();
-				ui->dockWidgetElfToolbox->hide();
 			}
 			else if (e->modifiers() == Qt::ShiftModifier)
 				moveCursorToPreviousMatch();
@@ -1392,7 +1363,8 @@ void MainWindow::gdbMiLineAvailable(QString line)
 			else if (line.startsWith("=thread-group-exited"))
 			{
 				emit targetDetached();
-				QMessageBox::information(0, "Target detached", "Gdb has detached from the target");
+				/* Do not print an information message on target detach. It is getting tedious, and the target status is already visualized anyway. */
+				//QMessageBox::information(0, "Target detached", "Gdb has detached from the target");
 			}
 			break;
 	}
@@ -1870,14 +1842,6 @@ bool MainWindow::handleStackResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 			 frame.fullFileName,
 			 frame.lineNumber));
 
-	if (ui->checkBoxEnableTraceLogging->isChecked() && backtrace.size())
-	{
-		StackFrameData frame = backtrace.at(0);
-		ui->treeWidgetTraceLog->addTopLevelItem(createNavigationWidgetItem(
-				QStringList() << frame.fileName << QString("%1").arg(frame.lineNumber) << frame.fullFileName,
-				frame.fullFileName,
-				frame.lineNumber));
-	}
 	return true;
 }
 
@@ -3079,7 +3043,10 @@ void MainWindow::displayHelpMenu()
 	menu.addAction("(but you may select items here with the mouse)");
 	for (const auto & a : highlightWidgetActions)
 	{
-		QAction * act = menu.addAction(a->text() + "\t(" + a->shortcut().toString() + ")");
+		QString actionText = a->text();
+		if (!a->shortcut().toString().isEmpty())
+			actionText += "\t(" + a->shortcut().toString() + ")";
+		QAction * act = menu.addAction(actionText);
 		connect(act, SIGNAL(triggered(bool)), a, SLOT(trigger()));
 	}
 	QAction * selection = menu.exec((p));
