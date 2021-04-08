@@ -28,6 +28,7 @@
 #include "ui_mainwindow.h"
 
 #include <QFileDialog>
+#include <QTextBlock>
 
 #include "clex/cscanner.hxx"
 
@@ -37,49 +38,97 @@ MainWindow::MainWindow(QWidget *parent) :
 	QMainWindow(parent),
 	ui(new Ui::MainWindow)
 {
+	/* Force a windows style for the user interface.
+	 * It looks like the most compact user interface. */
+	QApplication::setStyle("windows");
+
 	ui->setupUi(this);
 	setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North);
 
 	/* Move some widgets to the main toolbar. This makes the user interface not so cluttered. */
 	ui->mainToolBar->addWidget(ui->pushButtonShowWindow);
+	ui->mainToolBar->addWidget(ui->pushButtonLocateWindow);
 	ui->mainToolBar->addWidget(ui->comboBoxSelectLayout);
 	ui->mainToolBar->addWidget(ui->pushButtonSettings);
 	ui->mainToolBar->addWidget(ui->pushButtonDisplayHelp);
 	ui->mainToolBar->addWidget(ui->pushButtonNavigateBack);
 	ui->mainToolBar->addWidget(ui->pushButtonNavigateForward);
 	ui->mainToolBar->addWidget(ui->pushButtonRESTART);
-	ui->mainToolBar->addWidget(ui->toolButton);
-	ui->toolButton->addAction(ui->actionVerifyTargetFlash);
-	ui->toolButton->addAction(ui->actionLoadProgramIntoTarget);
-	ui->toolButton->addAction(ui->actionDisconnectGdbServer);
-	ui->toolButton->addAction(ui->actionShowTargetOutput);
-	ui->toolButton->addAction(ui->actionAction_2);
+	ui->mainToolBar->addWidget(ui->pushButtonConnectToBlackmagic);
+
+	QWidget * toolbarSpacers[1];
+	for (auto & s : toolbarSpacers)
+	{
+		s = new QWidget();
+		s->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+	}
+	ui->mainToolBar->addWidget(ui->toolButtonActions);
+	ui->mainToolBar->addWidget(toolbarSpacers[0]);
+
+	ui->mainToolBar->addWidget(ui->labelSystemState);
+
+	/* For the moment, hide the short status widget. */
+	//ui->mainToolBar->addWidget(ui->pushButtonShortState);
+	ui->pushButtonShortState->setVisible(false);
+
+	ui->toolButtonActions->addAction(ui->actionVerifyTargetFlash);
+	ui->toolButtonActions->addAction(ui->actionLoadProgramIntoTarget);
+	ui->toolButtonActions->addAction(ui->actionDisconnectGdbServer);
+	ui->toolButtonActions->addAction(ui->actionShowTargetOutput);
+	ui->toolButtonActions->addAction(ui->actionactionScanForTargets);
 	connect(ui->mainToolBar, & QToolBar::visibilityChanged, [&] { if (!ui->mainToolBar->isVisible()) ui->mainToolBar->setVisible(true); });
 
 	/* If this flag is set, then provide a default user interface layout. */
 	bool isDefaultConfigRequested = !QFile::exists(SETTINGS_FILE_NAME);
 
+	/* Clearing the titles of the group boxes makes the user interface look more tidy. Don't just delete them in Qt Designer - it is helpful to have the titles when
+	 * tweaking the user interface there. */
+	ui->groupBoxTargetConnected->setTitle("");
+	ui->groupBoxTargetHalted->setTitle("");
+	ui->groupBoxTargetRunning->setTitle("");
+
 	settings = std::make_shared<QSettings>(SETTINGS_FILE_NAME, QSettings::IniFormat);
 	restoreState(settings->value(SETTINGS_MAINWINDOW_STATE, QByteArray()).toByteArray());
 	restoreGeometry(settings->value(SETTINGS_MAINWINDOW_GEOMETRY, QByteArray()).toByteArray());
 
-	connect(ui->pushButtonTrigger, & QPushButton::clicked, [&] { navigationStack.dump(); });
 	connect(ui->pushButtonNavigateForward, & QPushButton::clicked, [&] { if (navigationStack.canNavigateForward()) displaySourceCodeFile(navigationStack.following(), false); });
 	connect(ui->pushButtonNavigateBack, & QPushButton::clicked, [&] { if (navigationStack.canNavigateBack()) displaySourceCodeFile(navigationStack.previous(), false); });
+	connect(ui->pushButtonLocateWindow, & QPushButton::clicked, [&] { displayHelpMenu(); });
+
+	connect(ui->pushButtonScanForTargets, & QPushButton::clicked, [&] { scanForTargets(); });
 
 	connect(ui->pushButtonVerifyTargetMemory, & QPushButton::clicked, [&] { compareTargetMemory(); });
 	connect(ui->actionVerifyTargetFlash, & QAction::triggered, [&] { compareTargetMemory(); });
 	connect(ui->actionLoadProgramIntoTarget, & QAction::triggered, [&] { sendDataToGdbProcess("-target-download\n"); });
 	connect(ui->actionDisconnectGdbServer, & QAction::triggered, [&] { sendDataToGdbProcess("-target-disconnect\n"); });
+	connect(ui->actionactionScanForTargets, & QAction::triggered, [&] { scanForTargets(); });
 
-	/*! \todo	This is too verbose, should be improved. */
-	targetStateDependentWidgets.enabledActionsWhenTargetStopped << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
-	targetStateDependentWidgets.disabledActionsWhenTargetRunning << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
+	/*! \todo	This is too verbose, should be improved. This should be moved to a separate function. */
+	targetStateDependentWidgets.enabledActionsWhenTargetStopped << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer << ui->actionactionScanForTargets;
+	targetStateDependentWidgets.disabledActionsWhenTargetRunning << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer << ui->actionactionScanForTargets;
 	targetStateDependentWidgets.disabledActionsWhenTargetDetached << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget;
-	targetStateDependentWidgets.enabledActionsWhenTargetDetached << ui->actionDisconnectGdbServer;
-	targetStateDependentWidgets.disabledActionsWhenGdbServerDisconnected << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer;
+	targetStateDependentWidgets.enabledActionsWhenTargetDetached << ui->actionDisconnectGdbServer << ui->actionactionScanForTargets;
+	targetStateDependentWidgets.disabledActionsWhenGdbServerDisconnected << ui->actionVerifyTargetFlash << ui->actionLoadProgramIntoTarget << ui->actionDisconnectGdbServer << ui->actionactionScanForTargets;
+
+	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->dockWidgetContentsMemoryDump << ui->groupBoxTargetHalted << ui->groupBoxTargetConnected;
+	targetStateDependentWidgets.disabledWidgetsWhenTargetStopped << ui->groupBoxTargetRunning;
+	targetStateDependentWidgets.enabledWidgetsWhenTargetRunning << ui->groupBoxTargetRunning << ui->groupBoxTargetConnected;
+	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->dockWidgetContentsMemoryDump << ui->groupBoxTargetHalted;
+
+	targetStateDependentWidgets.disabledWidgetsWhenGdbServerDisconnected << ui->dockWidgetContentsMemoryDump << ui->groupBoxTargetConnected << ui->pushButtonScanForTargets;
+
+	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << targetStateDependentWidgets.enabledWidgetsWhenTargetRunning;
+	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << targetStateDependentWidgets.enabledWidgetsWhenTargetStopped;
+	/* The button for scanning for targets connected to the blackmagic probe is a bit special. */
+	targetStateDependentWidgets.enabledWidgetsWhenTargetDetached << ui->pushButtonScanForTargets;
+	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->pushButtonScanForTargets;
+	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->pushButtonScanForTargets;
 
 	connect(ui->pushButtonRequestGdbHalt, & QPushButton::clicked, [&]{ requestTargetHalt(); });
+	connect(ui->pushButtonStepInto, & QPushButton::clicked, [&]{ if (target_state == TARGET_STOPPED) sendDataToGdbProcess("-exec-step\n"); });
+	connect(ui->pushButtonStepOver, & QPushButton::clicked, [&]{ if (target_state == TARGET_STOPPED) sendDataToGdbProcess("-exec-next\n"); });
+	connect(ui->pushButtonDisconnectGdb, & QPushButton::clicked, [&]{ sendDataToGdbProcess("-target-disconnect\n"); });
+
 	connect(ui->pushButtonLoadSVDFile, & QPushButton::clicked, [&]{ loadSVDFile(); });
 
 	connect(ui->pushButtonRESTART, & QPushButton::clicked, [&]{
@@ -95,10 +144,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->lineEditSearchSVDTree, & QLineEdit::returnPressed, [&]
 	{
 		QString text = ui->lineEditSearchSVDTree->text();
-		/* Special case for the empty string - show all items in the tree. */
-		if (!text.length())
-		{
-		}
+		/* Special case for the empty string - show all items in the tree. No need to do anything special. */
 		std::vector<QTreeWidgetItem *> matchingItems, nonMatchingItems;
 		std::function<void(QTreeWidgetItem * item)> scan = [&](QTreeWidgetItem * item) -> void
 		{
@@ -110,12 +156,21 @@ MainWindow::MainWindow(QWidget *parent) :
 			for (int i = 0; i < item->childCount(); scan(item->child(i ++)))
 			     ;
 		};
+		std::function<void(QTreeWidgetItem * item)> makeSubtreeVisible = [&](QTreeWidgetItem * root) -> void
+		{
+			root->setHidden(false);
+			for (int i = 0; i < root->childCount(); makeSubtreeVisible(root->child(i ++)))
+			     ;
+		};
 		for (int i = 0; i < ui->treeWidgetSvd->topLevelItemCount(); scan(ui->treeWidgetSvd->topLevelItem(i ++)))
-		     ;
+			;
+		/* For matching items - make sure its parent items, upto the tree root, are visible.
+		 * Also, make sure that all items in subtrees with, roots amongst the matching items, are visible. */
 		for (auto & i : matchingItems)
 		{
-			QTreeWidgetItem * w = i;
-			do w->setHidden(false), w = w->parent(); while (w);
+			QTreeWidgetItem * w = i->parent();
+			while (w) w->setHidden(false), w = w->parent();
+			makeSubtreeVisible(i);
 		}
 	});
 
@@ -129,55 +184,87 @@ MainWindow::MainWindow(QWidget *parent) :
 		/* By default, enable target memory view auto update. */
 		ui->checkBoxMemoryDumpAutoUpdate->setChecked(false);
 	});
-	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->dockWidgetContentsMemoryDump;
-	targetStateDependentWidgets.disabledWidgetsWhenGdbServerDisconnected << ui->dockWidgetContentsMemoryDump;
-	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << ui->dockWidgetContentsMemoryDump;
-	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->dockWidgetContentsMemoryDump;
 
 	/*****************************************
-	 * Settings.
+	 * Configure the 'Settings' dialog.
 	 *****************************************/
 	loadSessions();
 	dialogEditSettings = new QDialog(this);
-	settingsUi.setupUi(dialogEditSettings);
+	uiSettings.setupUi(dialogEditSettings);
+	uiSettings.groupBoxAdvancedSettings->setVisible(false);
 	connect(ui->pushButtonSettings, & QPushButton::clicked, [&](){
 		populateSettingsDialog();
 		/* Execute the settings dialog asynchronously. */
 		dialogEditSettings->open();
+		if ((QGuiApplication::queryKeyboardModifiers() & (Qt::ControlModifier | Qt::ShiftModifier)) == (Qt::ControlModifier | Qt::ShiftModifier))
+			uiSettings.groupBoxAdvancedSettings->setVisible(true);
 	});
-	connect(settingsUi.pushButtonSelectGdbExecutableFile, & QPushButton::clicked, [&](){
+	connect(uiSettings.pushButtonSelectGdbExecutableFile, & QPushButton::clicked, [&](){
 		QString s = QFileDialog::getOpenFileName(0, "Select gdb executable");
 		if (!s.isEmpty())
-			settingsUi.lineEditGdbExecutable->setText(s);
+			uiSettings.lineEditGdbExecutable->setText(s);
 	});
-	connect(settingsUi.pushButtonSelectTargetSVDFile, & QPushButton::clicked, [&](){
-		QString s = QFileDialog::getOpenFileName(0, "Select target SVD file", QFileInfo(settingsUi.lineEditTargetSVDFileName->text()).absoluteFilePath());
+	connect(uiSettings.pushButtonSelectTargetSVDFile, & QPushButton::clicked, [&](){
+		QString s = QFileDialog::getOpenFileName(0, "Select target SVD file", QFileInfo(uiSettings.lineEditTargetSVDFileName->text()).absoluteFilePath());
 		if (!s.isEmpty())
-			settingsUi.lineEditTargetSVDFileName->setText(s);
+			uiSettings.lineEditTargetSVDFileName->setText(s);
 	});
-	connect(settingsUi.pushButtonSelectExternalEditor, & QPushButton::clicked, [&](){
-		QString s = QFileDialog::getOpenFileName(0, "Select external editor", QFileInfo(settingsUi.lineEditExternalEditorOptions->text()).absoluteFilePath());
+	connect(uiSettings.pushButtonSelectExternalEditor, & QPushButton::clicked, [&](){
+		QString s = QFileDialog::getOpenFileName(0, "Select external editor", QFileInfo(uiSettings.lineEditExternalEditorOptions->text()).absoluteFilePath());
 		if (!s.isEmpty())
-			settingsUi.lineEditExternalEditorProgram->setText(s);
+			uiSettings.lineEditExternalEditorProgram->setText(s);
 	});
-	connect(settingsUi.pushButtonSettingsOk, & QPushButton::clicked, [&](){
-		settings->setValue(SETTINGS_GDB_EXECUTABLE_FILENAME, settingsUi.lineEditGdbExecutable->text());
-		settings->setValue(SETTINGS_EXTERNAL_EDITOR_PROGRAM, settingsUi.lineEditExternalEditorProgram->text());
-		settings->setValue(SETTINGS_EXTERNAL_EDITOR_COMMAND_LINE_OPTIONS, settingsUi.lineEditExternalEditorOptions->text());
-		targetSVDFileName = settingsUi.lineEditTargetSVDFileName->text();
-		settings->setValue(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, settingsUi.checkBoxEnableNativeDebugging->isChecked());
-		settings->setValue(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, settingsUi.checkBoxHideLessUsedUiItems->isChecked());
+	connect(uiSettings.pushButtonSettingsOk, & QPushButton::clicked, [&](){
+		settings->setValue(SETTINGS_GDB_EXECUTABLE_FILENAME, uiSettings.lineEditGdbExecutable->text());
+		settings->setValue(SETTINGS_EXTERNAL_EDITOR_PROGRAM, uiSettings.lineEditExternalEditorProgram->text());
+		settings->setValue(SETTINGS_EXTERNAL_EDITOR_COMMAND_LINE_OPTIONS, uiSettings.lineEditExternalEditorOptions->text());
+		targetSVDFileName = uiSettings.lineEditTargetSVDFileName->text();
+		settings->setValue(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, uiSettings.checkBoxEnableNativeDebugging->isChecked());
+		settings->setValue(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, uiSettings.checkBoxHideLessUsedUiItems->isChecked());
 		dialogEditSettings->hide();
 	});
-	connect(settingsUi.pushButtonSettingsCancel, & QPushButton::clicked, [&]()
+	connect(uiSettings.pushButtonSettingsCancel, & QPushButton::clicked, [&]()
 		{
-			settingsUi.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
+			uiSettings.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
 			dialogEditSettings->hide();
 		});
-	connect(dialogEditSettings, & QDialog::rejected, [&] { settingsUi.pushButtonSettingsCancel->click(); });
+	connect(dialogEditSettings, & QDialog::rejected, [&] { uiSettings.pushButtonSettingsCancel->click(); });
 	/*****************************************
-	 * End Settings.
+	 * End 'Settings' dialog configuration.
 	 *****************************************/
+
+	/********************************************************
+	 * Configure the 'Choose file for debugging' dialog.
+	 ********************************************************/
+	dialogChooseFileForDebugging = new QDialog(this);
+	uiChooseFileForDebugging.setupUi(dialogChooseFileForDebugging);
+	for (const auto & s : sessions)
+	{
+		QFileInfo fi(s.executableFileName);
+		uiChooseFileForDebugging.treeWidgetRecentDebugExecutables->addTopLevelItem(new QTreeWidgetItem(QStringList() << fi.fileName() << fi.filePath()));
+	}
+	uiChooseFileForDebugging.lineEditDebugExecutable->setText(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, "").toString());
+
+	uiChooseFileForDebugging.treeWidgetRecentDebugExecutables->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+	uiChooseFileForDebugging.treeWidgetRecentDebugExecutables->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+
+	/*! \todo	Also connect the 'itemActivated()' signal here. */
+	connect(uiChooseFileForDebugging.treeWidgetRecentDebugExecutables, & QTreeWidget::itemClicked, [&](QTreeWidgetItem * item, int column) -> void
+		{
+			uiChooseFileForDebugging.lineEditDebugExecutable->setText(item->text(1));
+		});
+	connect(uiChooseFileForDebugging.pushButtonSelectFile, & QPushButton::clicked, [&]
+		{
+			QString fileName = QFileDialog::getOpenFileName(0, "Choose executable file for debugging");
+			if (fileName.size())
+				uiChooseFileForDebugging.lineEditDebugExecutable->setText(fileName);
+		});
+	connect(uiChooseFileForDebugging.pushButtonOk, & QPushButton::clicked, [&] { dialogChooseFileForDebugging->accept(); });
+	connect(uiChooseFileForDebugging.pushButtonCancel, & QPushButton::clicked, [&] { dialogChooseFileForDebugging->reject(); });
+
+	/********************************************************
+	 * End 'Choose file for debugging' dialog configuration.
+	 ********************************************************/
 
 	ui->splitterVerticalSourceView->restoreState(settings->value(SETTINGS_SPLITTER_VERTICAL_SOURCE_VIEW_STATE, QByteArray()).toByteArray());
 	ui->splitterHorizontalSourceView->restoreState(settings->value(SETTINGS_SPLITTER_HORIZONTAL_SOURCE_VIEW_STATE, QByteArray()).toByteArray());
@@ -208,14 +295,15 @@ MainWindow::MainWindow(QWidget *parent) :
 			ui->plainTextEditGdbLog->setMaximumBlockCount((newState == Qt::Checked) ? MAX_GDB_LINE_COUNT_IN_GDB_LIMITING_MODE : 0);
 		});
 
-	lessUsedUiItems << ui->pushButtonVerifyTargetMemory << ui->pushButtonLoadProgramToTarget << ui->pushButtonDisconnectGdbServer << ui->checkBoxShowTargetOutput;
-	connect(settingsUi.checkBoxHideLessUsedUiItems, & QCheckBox::stateChanged, [&](int newState)
+	lessUsedUiItems << ui->pushButtonVerifyTargetMemory << ui->pushButtonLoadProgramToTarget << ui->pushButtonDisconnectGdb << ui->checkBoxShowTargetOutput;
+	connect(uiSettings.checkBoxHideLessUsedUiItems, & QCheckBox::stateChanged, [&](int newState)
 		{
 			for (auto & w : lessUsedUiItems) w->setHidden(newState);
 		});
 	ui->checkBoxLimitGdbLog->setChecked(settings->value(SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE, true).toBool());
+	ui->checkBoxHideGdbMIData->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_GDB_MI_DATA_STATE, true).toBool());
 
-	settingsUi.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
+	uiSettings.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
 
 	gdbProcess = std::make_shared<QProcess>();
 	/*! \todo This doesn't need to live in a separate thread. */
@@ -243,19 +331,21 @@ MainWindow::MainWindow(QWidget *parent) :
 			{
 				QMessageBox::critical(0, "Gdb executable not set", "Gdb executable not specified. Please, specify a valid gdb executable.");
 				populateSettingsDialog();
-				settingsUi.lineEditGdbExecutable->setFocus();
+				uiSettings.lineEditGdbExecutable->setFocus();
 				/* Execute the settings dialog synchronously. */
 				dialogEditSettings->exec();
+				/* Do not check again if the gdb executable is available. */
+				gdbExecutableFileName = settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString();
 			}
-			/* Do not check again if the gdb executable is available. */
-			gdbExecutableFileName = settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString();
 			gdbProcess->setProgram(gdbExecutableFileName);
 			gdbProcess->start();
 		}
 	});
 
 	connect(gdbProcess.get(), & QProcess::started, [&] {
-		ui->pushButtonConnectGdbToGdbServer->setEnabled(true); ui->pushButtonStartGdb->setEnabled(false);
+		targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
+		ui->pushButtonStartGdb->setEnabled(false);
+		ui->pushButtonConnectToBlackmagic->setEnabled(true);
 	});
 	connect(gdbProcess.get(), SIGNAL(finished(int, QProcess::ExitStatus)), this, SLOT(gdbProcessFinished(int,QProcess::ExitStatus)));
 	connect(gdbProcess.get(), SIGNAL(errorOccurred(QProcess::ProcessError)), this, SLOT(gdbProcessError(QProcess::ProcessError)));
@@ -286,10 +376,6 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->treeWidgetStackVariables->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 	ui->treeWidgetStackVariables->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
 	ui->treeWidgetStackVariables->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
-
-	ui->treeWidgetTraceLog->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-	ui->treeWidgetTraceLog->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-	ui->treeWidgetTraceLog->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
 
 	ui->treeWidgetBookmarks->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 	ui->treeWidgetBookmarks->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
@@ -373,16 +459,10 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->treeWidgetDataTypes, & QTreeWidget::itemClicked, [=] (QTreeWidgetItem * item, int column)
 		{ showSourceCode(item); } );
 
-	connect(ui->treeWidgetBacktrace, & QTreeWidget::itemSelectionChanged, [=] ()
-		{	if (target_state != TARGET_STOPPED)
-				return;
-			QList<QTreeWidgetItem *> selectedItems = ui->treeWidgetBacktrace->selectedItems();
-			if (selectedItems.size())
-			{
-				sendDataToGdbProcess(QString("-stack-select-frame %1\n").arg(ui->treeWidgetBacktrace->indexOfTopLevelItem(selectedItems.at(0))));
-				sendDataToGdbProcess("-stack-info-frame\n");
-			}
-		} );
+	connect(ui->treeWidgetBacktrace, & QTreeWidget::itemActivated, [=] (QTreeWidgetItem * item, int column)
+		{ selectStackFrame(item); } );
+	connect(ui->treeWidgetBacktrace, & QTreeWidget::itemClicked, [=] (QTreeWidgetItem * item, int column)
+		{ selectStackFrame(item); } );
 
 	connect(ui->treeWidgetBreakpoints, & QTreeWidget::itemActivated, [=] (QTreeWidgetItem * item, int column)
 		{ if (column != TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER) showSourceCode(item); } );
@@ -497,61 +577,41 @@ MainWindow::MainWindow(QWidget *parent) :
 #endif
 			      ) +
 "QPlainTextEdit {\n"
-	+ DEFAULT_PLAINTEXT_EDIT_STYLESHEET +
+	+ DEFAULT_PLAINTEXTEDIT_STYLESHEET +
 "}\n"
 "QLineEdit{\n"
     "font: 10pt 'Hack';\n"
 "}\n"
 		      );
 
-	//gdbProcess->start("arm-none-eabi-gdb.exe", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("c:/src1/gdb-10.1-build/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("xxx", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("c:/src1/gdb-10.1-build-1/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
-	//gdbProcess->start("c:/src1/gdb-10.1-build-2/gdb/gdb.exe", QStringList() << "--interpreter=mi3");
 	ui->plainTextEditScratchpad->setPlainText(settings->value(SETTINGS_SCRATCHPAD_TEXT_CONTENTS, QString("Lorem ipsum dolor sit amet")).toString());
 
 	ui->plainTextEditSourceView->installEventFilter(this);
 	ui->plainTextEditDisassembly->installEventFilter(this);
 	ui->plainTextEditSourceView->viewport()->installEventFilter(this);
-	/*! \todo	Only execute the code below after gdb has been successfully started. */
+
+	/* Only execute the code below after gdb has been successfully started. */
 	connect(gdbProcess.get(), & QProcess::started, [&] {
-		QFileInfo f(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
-		if (f.exists())
+		sendDataToGdbProcess("-gdb-set tcp auto-retry off\n");
+		sendDataToGdbProcess("-gdb-set mem inaccessible-by-default off\n");
+		sendDataToGdbProcess("-gdb-set print elements unlimited\n");
+
+		int result;
+		QFileInfo fi;
+		do (result = dialogChooseFileForDebugging->exec()); while (result == QDialog::Accepted && !(fi = QFileInfo(uiChooseFileForDebugging.lineEditDebugExecutable->text())).exists());
+		if (result == QDialog::Accepted)
 		{
-			int choice = QMessageBox::question(0, "Reopen last executable for debugging",
-							   QString("Last opened executable file for debugging is:\n")
-							   + f.canonicalFilePath() + "\n\n"
-										     "Do you want to reopen it, or load a new file?",
-							   "Reopen last file", "Select new file", "Cancel");
-			if (choice == 0)
-				/* Reopen last file. */
-				goto reopen_last_file;
-			else if (choice == 1)
-				/* Select new file. */
-				goto select_new_file;
-			/* Otherwise, do not load anything. */
+			unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
+									   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_EXECUTABLE_SYMBOL_FILE_LOADED,
+									   fi.canonicalFilePath())
+								   );
+			sendDataToGdbProcess(QString("%1-file-exec-and-symbols \"%2\"\n").arg(t).arg(fi.canonicalFilePath()));
 		}
-		else
-		{
-select_new_file:
-			f = QFileInfo(settings->value(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, QString()).toString());
-			f = QFileInfo(QFileDialog::getOpenFileName(0, "Load executable for debugging", f.canonicalPath()));
-			if (!f.canonicalFilePath().isEmpty())
-			{
-reopen_last_file:
-				unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(
-										   GdbTokenContext::GdbResponseContext::GDB_RESPONSE_EXECUTABLE_SYMBOL_FILE_LOADED,
-										   f.canonicalFilePath())
-									   );
-				sendDataToGdbProcess("-gdb-set tcp auto-retry off\n");
-				sendDataToGdbProcess("-gdb-set mem inaccessible-by-default off\n");
-				sendDataToGdbProcess("-gdb-set print elements unlimited\n");
-				sendDataToGdbProcess(QString("%1-file-exec-and-symbols \"%2\"\n").arg(t).arg(f.canonicalFilePath()));
-			}
-		}
+
 	});
 	gdbProcess->setArguments(QStringList() << "--interpreter=mi3");
+	/* Make sure to first update the target state, and only then start the gdb process. */
+	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
 	ui->pushButtonStartGdb->click();
 
 	ui->treeWidgetBreakpoints->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -562,6 +622,9 @@ reopen_last_file:
 
 	ui->treeWidgetSvd->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(ui->treeWidgetSvd, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(svdContextMenuRequested(QPoint)));
+
+	ui->treeViewDataObjects->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(ui->treeViewDataObjects, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(varObjectContextMenuRequested(QPoint)));
 
 	/* Unified custom menu processing for source items. */
 	ui->treeWidgetObjectLocator->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -608,48 +671,25 @@ reopen_last_file:
         targetCorefile = std::make_shared<TargetCorefile>(targetFilesBaseDirectory + "flash.bin", 0x08000000,
 					    targetFilesBaseDirectory + "ram.bin", 0x20000000,
 					    targetFilesBaseDirectory + "registers.bin");
+	/* Use this to inspect coredumps instead of connecting to a real remote target. */
 	////gdbserver = new GdbServer(targetCorefile);
-
-	QStringList traceLog = settings->value(SETTINGS_TRACE_LOG, QStringList()).toStringList();
-	for (const auto & l : traceLog)
-	{
-		QStringList t = l.split('|');
-		QString x;
-		if (t.count() != 3)
-			continue;
-		int lineNumber;
-		bool ok;
-		lineNumber = t.at(1).toUInt(& ok);
-		if (!ok)
-			lineNumber = -1;
-		ui->treeWidgetTraceLog->addTopLevelItem(createNavigationWidgetItem(t, t.at(2), lineNumber));
-	}
-
-	connect(ui->checkBoxShowFullFileNamesInTraceLog, & QCheckBox::stateChanged, [&](int newState) { ui->treeWidgetTraceLog->setColumnHidden(2, newState == 0); });
-	ui->checkBoxShowFullFileNamesInTraceLog->setChecked(settings->value(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE, false).toBool());
-
-	connect(ui->treeWidgetTraceLog, & QTreeWidget::itemActivated, [=] (QTreeWidgetItem * item, int column)
-		{ showSourceCode(item); } );
-	connect(ui->treeWidgetTraceLog, & QTreeWidget::currentItemChanged, [=] (QTreeWidgetItem * current, QTreeWidgetItem * previous)
-		{ showSourceCode(current); } );
-	connect(ui->treeWidgetTraceLog, & QTreeWidget::itemClicked, [=] (QTreeWidgetItem * item, int column)
-		{ showSourceCode(item); } );
 
 	connect(& blackMagicProbeServer, & BlackMagicProbeServer::BlackMagicProbeConnected,
 		[&] {
-			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: lawngreen");
+			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: SpringGreen");
 			ui->pushButtonConnectToBlackmagic->setText(tr("Blackmagic connected"));
-			ui->groupBoxBlackMagicDisconnectedWidgets->setEnabled(false);
-			ui->groupBoxBlackMagicConnectedWidgets->setEnabled(true);
-			ui->pushButtonConnectGdbToGdbServer->click();
+			ui->pushButtonConnectToBlackmagic->setEnabled(false);
+			/*! \todo	do not hardcode the gdb server listening port */
+			sendDataToGdbProcess("-target-select extended-remote :1122\n");
+			isBlackmagicProbeConnected = true;
 			});
 	connect(& blackMagicProbeServer, & BlackMagicProbeServer::BlackMagicProbeDisconnected,
 		[&] {
-			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: yellow");
+			ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: Yellow");
 			ui->pushButtonConnectToBlackmagic->setText(tr("Connect to blackmagic"));
-			ui->groupBoxBlackMagicDisconnectedWidgets->setEnabled(true);
-			ui->groupBoxBlackMagicConnectedWidgets->setEnabled(false);
-			if (target_state != GDBSERVER_DISCONNECTED)
+			ui->pushButtonConnectToBlackmagic->setEnabled(true);
+			isBlackmagicProbeConnected = false;
+			if (target_state != GDBSERVER_DISCONNECTED && target_state != GDB_NOT_RUNNING)
 				sendDataToGdbProcess("-target-disconnect\n");
 			});
 	ui->pushButtonConnectToBlackmagic->setStyleSheet("background-color: yellow");
@@ -661,26 +701,21 @@ reopen_last_file:
 	/***************************************
 	 * Gdb and target state change handling.
 	 ***************************************/
-	 /*! \todo: Move this to a separate function */
-	targetStateDependentWidgets.enabledWidgetsWhenGdbServerDisconnected << ui->groupBoxTargetDisconnected;
-	targetStateDependentWidgets.disabledWidgetsWhenGdbServerDisconnected << ui->groupBoxTargetConnected;
 	connect(this, &MainWindow::gdbServerConnected, [&] {
 		/* A connection to the gdbserver has been established, but a connection to a target is not yet established. */
 		////QMessageBox::information(0, "Gdb connection established", "Gdb successfully connected to remote gdb server");
-		targetStateDependentWidgets.enterTargetState(target_state = TARGET_DETACHED);
+		targetStateDependentWidgets.enterTargetState(target_state = TARGET_DETACHED, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
 		ui->pushButtonScanForTargets->click();
 	});
 
 	connect(&blackMagicProbeServer, &BlackMagicProbeServer::GdbClientDisconnected, [&]
-		{ targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED);}
+		{ targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);}
 	);
 
-	targetStateDependentWidgets.enabledWidgetsWhenTargetStopped << ui->groupBoxTargetHalted << ui->groupBoxTargetConnected;
-	targetStateDependentWidgets.disabledWidgetsWhenTargetStopped << ui->groupBoxTargetRunning;
 	connect(this, &MainWindow::targetStopped, [&] {
 		if (target_state == GDBSERVER_DISCONNECTED || target_state == TARGET_DETACHED)
 			compareTargetMemory();
-		targetStateDependentWidgets.enterTargetState(target_state = TARGET_STOPPED);
+		targetStateDependentWidgets.enterTargetState(target_state = TARGET_STOPPED, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
 		/*! \todo Make the frame limits configurable. */
 		sendDataToGdbProcess("-stack-list-frames 0 100\n");
 		if (!targetRegisterIndices.size())
@@ -701,23 +736,17 @@ reopen_last_file:
 			ui->pushButtonShowCurrentDisassembly->click();
 	});
 
-	targetStateDependentWidgets.enabledWidgetsWhenTargetRunning << ui->groupBoxTargetRunning << ui->groupBoxTargetConnected;
-	targetStateDependentWidgets.disabledWidgetsWhenTargetRunning << ui->groupBoxTargetHalted;
 	connect(this, &MainWindow::targetRunning, [&] {
-		targetStateDependentWidgets.enterTargetState(target_state = TARGET_RUNNING);
+		targetStateDependentWidgets.enterTargetState(target_state = TARGET_RUNNING, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
 	});
 
-	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << targetStateDependentWidgets.enabledWidgetsWhenTargetRunning;
-	targetStateDependentWidgets.disabledWidgetsWhenTargetDetached << targetStateDependentWidgets.enabledWidgetsWhenTargetStopped;
 	connect(this, &MainWindow::targetDetached, [&]
 		/*! \todo	This is getting too complicated... It is problematic to distinguish between a gdbserver detach and a gdbserver disconnect event.
 		 *		The target state handling needs to be improved and simplified.
 		 *		For the moment, try to do some special case handling - if the target state is GDBSERVER_DISCONNECTED, then stay in the disconnected state. */
-		{ if (target_state != GDBSERVER_DISCONNECTED) targetStateDependentWidgets.enterTargetState(target_state = TARGET_DETACHED);}
+		{ if (target_state != GDBSERVER_DISCONNECTED) targetStateDependentWidgets.enterTargetState(target_state = TARGET_DETACHED, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);}
 	);
 
-
-	targetStateDependentWidgets.enterTargetState(target_state = GDBSERVER_DISCONNECTED);
 	/***************************************
 	 ***************************************
 	 ***************************************/
@@ -734,27 +763,29 @@ reopen_last_file:
 	widgetFlashHighlighterData.timer.setInterval(widgetFlashHighlighterData.flashIntervalMs);
 	connect(& widgetFlashHighlighterData.timer, SIGNAL(timeout()), this, SLOT(updateHighlightedWidget()));
 
-	connect(&controlKeyPressTimer, &QTimer::timeout, [&] (void) -> void {
-		controlKeyPressTimer.stop();
-		if (QApplication::queryKeyboardModifiers() & Qt::ControlModifier)
-			displayHelpMenu();
-	});
-
 	auto makeHighlightAction = [&, this] (const QString & actionText, const QString & shortcut, QDockWidget * w) -> void
 	{
 		QAction * act;
 		act = new QAction(actionText, this);
-		act->setShortcut(shortcut);
+		if (!shortcut.isEmpty())
+			act->setShortcut(shortcut);
 		connect(act, &QAction::triggered, [=] { flashHighlightDockWidget(w); });
 		highlightWidgetActions << act;
 	};
-	makeHighlightAction("Backtrace", "Ctrl+t", ui->dockWidgetBacktrace);
-	makeHighlightAction("Bookmarks", "Ctrl+b", ui->dockWidgetBookmarks);
-	makeHighlightAction("Breakpoints", "Ctrl+r", ui->dockWidgetBreakpoints);
-	makeHighlightAction("Data objects", "Ctrl+d", ui->dockWidgetDataObjects);
-	makeHighlightAction("Search results", "Ctrl+s", ui->dockWidgetSearchResults);
-	makeHighlightAction("Source files", "Ctrl+l", ui->dockWidgetSourceFiles);
-	makeHighlightAction("Subprograms", "Ctrl+u", ui->dockWidgetSubprograms);
+	makeHighlightAction(ui->dockWidgetBacktrace->windowTitle(), "Ctrl+t", ui->dockWidgetBacktrace);
+	makeHighlightAction(ui->dockWidgetBookmarks->windowTitle(), "Ctrl+b", ui->dockWidgetBookmarks);
+	makeHighlightAction(ui->dockWidgetBreakpoints->windowTitle(), "Ctrl+r", ui->dockWidgetBreakpoints);
+	makeHighlightAction(ui->dockWidgetDataObjects->windowTitle(), "Ctrl+d", ui->dockWidgetDataObjects);
+	makeHighlightAction(ui->dockWidgetSearchResults->windowTitle(), "Ctrl+s", ui->dockWidgetSearchResults);
+	makeHighlightAction(ui->dockWidgetSourceFiles->windowTitle(), "Ctrl+l", ui->dockWidgetSourceFiles);
+	makeHighlightAction(ui->dockWidgetSubprograms->windowTitle(), "Ctrl+u", ui->dockWidgetSubprograms);
+	makeHighlightAction(ui->dockWidgetScratchpad->windowTitle(), "", ui->dockWidgetScratchpad);
+	makeHighlightAction(ui->dockWidgetStaticDataObjects->windowTitle(), "", ui->dockWidgetStaticDataObjects);
+	makeHighlightAction(ui->dockWidgetObjectLocator->windowTitle(), "", ui->dockWidgetObjectLocator);
+	makeHighlightAction(ui->dockWidgetRegisters->windowTitle(), "", ui->dockWidgetRegisters);
+	makeHighlightAction(ui->dockWidgetDataTypes->windowTitle(), "", ui->dockWidgetDataTypes);
+	makeHighlightAction(ui->dockWidgetSvdView->windowTitle(), "", ui->dockWidgetSvdView);
+	makeHighlightAction(ui->dockWidgetMemoryDump->windowTitle(), "", ui->dockWidgetMemoryDump);
 	for (const auto & a : highlightWidgetActions)
 		addAction(a);
 
@@ -800,6 +831,8 @@ reopen_last_file:
 		ui->pushButtonHideDisassembly->click();
 		ui->pushButtonHideTargetOutputView->click();
 	}
+
+	ui->plainTextEditSourceView->setTabStopDistance(8 * ui->plainTextEditSourceView->fontMetrics().width(' '));
 }
 
 void MainWindow::loadSessions()
@@ -861,6 +894,12 @@ void MainWindow::saveSessions()
 	settings->setValue(SETTINGS_SAVED_SESSIONS, v);
 }
 
+void MainWindow::selectStackFrame(QTreeWidgetItem *item)
+{
+	sendDataToGdbProcess(QString("-stack-select-frame %1\n").arg(ui->treeWidgetBacktrace->indexOfTopLevelItem(item)));
+	sendDataToGdbProcess("-stack-info-frame\n");
+}
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
 	if (navigatorModeActivated)
@@ -879,7 +918,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	settings->setValue(SETTINGS_MAINWINDOW_STATE, saveState());
 	settings->setValue(SETTINGS_MAINWINDOW_GEOMETRY, saveGeometry());
 	settings->setValue(SETTINGS_BOOL_SHOW_FULL_FILE_NAME_STATE, ui->actionSourceFilesViewShowFullFileNames->isChecked());
-	settings->setValue(SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE, ui->checkBoxShowFullFileNamesInTraceLog->isChecked());
 	settings->setValue(SETTINGS_BOOL_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE, ui->actionSourceFilesShowOnlyFilesWithMachineCode->isChecked());
 	settings->setValue(SETTINGS_BOOL_SHOW_ONLY_EXISTING_SOURCE_FILES, ui->actionSourceFilesShowOnlyExistingFiles->isChecked());
 	settings->setValue(SETTINGS_SCRATCHPAD_TEXT_CONTENTS, ui->plainTextEditScratchpad->document()->toPlainText());
@@ -893,20 +931,12 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	settings->setValue(SETTINGS_IS_TARGET_OUTPUT_VIEW_VISIBLE, ui->groupBoxTargetOutput->isVisible());
 
 	settings->setValue(SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE, ui->checkBoxLimitGdbLog->isChecked());
+	settings->setValue(SETTINGS_CHECKBOX_HIDE_GDB_MI_DATA_STATE, ui->checkBoxHideGdbMIData->isChecked());
 
-	QStringList traceLog;
-	for (int i = 0; i < ui->treeWidgetTraceLog->topLevelItemCount(); i ++)
-	{
-		const QTreeWidgetItem * l = ui->treeWidgetTraceLog->topLevelItem(i);
-		traceLog << l->text(0) + '|' + l->text(1) + '|' + l->text(2);
-	}
-	settings->setValue(SETTINGS_TRACE_LOG, traceLog);
-
-		if (QGuiApplication::queryKeyboardModifiers() & (Qt::ControlModifier | Qt::ShiftModifier))
-			if (QMessageBox::question(0, "Delete configuration data?", "Really delete configuration data?", QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes)
-				if (QFile::remove(SETTINGS_FILE_NAME))
-					QMessageBox::information(0, "Configuration settings deleted", "The configuration settings have been deleted.\nThe frontend will next time start in the default configuration.");
-
+	if ((QGuiApplication::queryKeyboardModifiers() & (Qt::ControlModifier | Qt::ShiftModifier)) == (Qt::ControlModifier | Qt::ShiftModifier))
+		if (QMessageBox::question(0, "Delete configuration data?", "Really delete configuration data?", QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes)
+			if (QFile::remove(SETTINGS_FILE_NAME))
+				QMessageBox::information(0, "Configuration settings deleted", "The configuration settings have been deleted.\nThe frontend will next time start in the default configuration.");
 
 	QWidget::closeEvent(event);
 }
@@ -931,8 +961,6 @@ bool MainWindow::event(QEvent *event)
 				controlKeyPressTimer.stop();
 				displayHelpMenu();
 			}
-			else if (!controlKeyPressTimer.isActive())
-				controlKeyPressTimer.start(2500);
 		}
 	}
 	return QMainWindow::event(event);
@@ -1020,9 +1048,19 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 		QKeyEvent * e = static_cast<QKeyEvent *>(event);
 		switch (e->key())
 		{
+		case Qt::Key_Escape:
+			/* Emulate Qt Creator's behavior of decluttering the views by pressing the ESCape key. */
+			if (ui->checkBoxShowTargetOutput->isChecked())
+				ui->checkBoxShowTargetOutput->setChecked(false);
+			else if (ui->checkBoxShowGdbConsoles->isChecked())
+				ui->checkBoxShowGdbConsoles->setChecked(false);
+			else if (ui->checkBoxShowDisassembly->isChecked())
+				ui->checkBoxShowDisassembly->setChecked(false);
+			result = true;
+			break;
 		case Qt::Key_S:
 			if (target_state == TARGET_STOPPED)
-				sendDataToGdbProcess("s\n");
+				sendDataToGdbProcess("-exec-step\n");
 			result = true;
 			break;
 		case Qt::Key_Left:
@@ -1083,7 +1121,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 							sourceFilename.isEmpty() ? QApplication::applicationDirPath() : QFileInfo(sourceFilename).canonicalPath()))
 				{
 					QMessageBox::critical(0, "Error starting external editor", "Starting the external editor failed.\nPlease, review the external editor settings.");
-					settingsUi.lineEditExternalEditorProgram->setFocus();
+					uiSettings.lineEditExternalEditorProgram->setFocus();
 					ui->pushButtonSettings->click();
 				}
 			}
@@ -1092,6 +1130,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 		case Qt::Key_F3:
 		case Qt::Key_N:
 			result = true;
+			/*! \todo	Remove this, it is no longer needed. */
 			if (e->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier))
 			{
 				/*! \todo	Display a proper messagebox here, explaining the 'navigator' mode. */
@@ -1102,8 +1141,6 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 				ui->dockWidgetDataObjects->hide();
 				ui->dockWidgetStaticDataObjects->hide();
 				ui->dockWidgetScratchpad->hide();
-				ui->dockWidgetBlackmagicToolbox->hide();
-				ui->dockWidgetElfToolbox->hide();
 			}
 			else if (e->modifiers() == Qt::ShiftModifier)
 				moveCursorToPreviousMatch();
@@ -1195,6 +1232,8 @@ void MainWindow::gdbMiLineAvailable(QString line)
 {
 	if (!line.length())
 		return;
+	QRegularExpression rxGdbPrompt("\\(gdb\\)s*");
+	bool isGdbPromptRecord =  rxGdbPrompt.match(line).hasMatch();
 	/* Process token number prefix, if present. Negative numbers are not possible, because a minus
 	 * sign ('-') denotes the start of a machine interface command. */
 	unsigned tokenNumber = 0;
@@ -1218,58 +1257,41 @@ void MainWindow::gdbMiLineAvailable(QString line)
 		/* Exec-async output. */
 		case '^':
 		/* Result record. */
-			appendLineToGdbLog((tokenNumber ? QString("%1").arg(tokenNumber) : QString()) + line);
+			if (!ui->checkBoxHideGdbMIData->isChecked())
+				appendLineToGdbLog((tokenNumber ? QString("%1").arg(tokenNumber) : QString()) + line);
 			{
 				std::vector<GdbMiParser::MIResult> results;
 				GdbMiParser parser;
 				enum GdbMiParser::RESULT_CLASS_ENUM result = parser.parse(line.toStdString(), results);
-				if (handleFilesResponse(result, results, tokenNumber))
-					break;
-				if (handleLinesResponse(result, results, tokenNumber))
-					break;
-				if (handleNameResponse(result, results, tokenNumber))
-					break;
-				if (handleNumchildResponse(result, results, tokenNumber))
-					break;
-				if (handleFileExecAndSymbolsResponse(result, results, tokenNumber))
-					break;
-				if (handleSequencePoints(result, results, tokenNumber))
-					break;
-				if (handleTargetScanResponse(result, results, tokenNumber))
-					break;
-				if (handleSymbolsResponse(result, results, tokenNumber))
-					break;
-				if (handleBreakpointTableResponse(result, results, tokenNumber))
-					break;
-				if (handleStackResponse(result, results, tokenNumber))
-					break;
-				if (handleRegisterNamesResponse(result, results, tokenNumber))
-					break;
-				if (handleRegisterValuesResponse(result, results, tokenNumber))
-					break;
-				if (handleChangelistResponse(result, results, tokenNumber))
-					break;
-				if (handleVariablesResponse(result, results, tokenNumber))
-					break;
-				if (handleFrameResponse(result, results, tokenNumber))
-					break;
-				if (handleDisassemblyResponse(result, results, tokenNumber))
-					break;
-				if (handleValueResponse(result, results, tokenNumber))
-					break;
-				if (handleVerifyTargetMemoryContentsSeqPoint(result, results, tokenNumber))
-					break;
-				if (handleMemoryResponse(result, results, tokenNumber))
+				/* Try all command handlers, until some of them handles the response. */
+				if (
+				handleFilesResponse(result, results, tokenNumber) ||
+				handleLinesResponse(result, results, tokenNumber) ||
+				handleNameResponse(result, results, tokenNumber) ||
+				handleNumchildResponse(result, results, tokenNumber) ||
+				handleFileExecAndSymbolsResponse(result, results, tokenNumber) ||
+				handleSequencePoints(result, results, tokenNumber) ||
+				handleTargetScanResponse(result, results, tokenNumber) ||
+				handleSymbolsResponse(result, results, tokenNumber) ||
+				handleBreakpointTableResponse(result, results, tokenNumber) ||
+				handleStackResponse(result, results, tokenNumber) ||
+				handleRegisterNamesResponse(result, results, tokenNumber) ||
+				handleRegisterValuesResponse(result, results, tokenNumber) ||
+				handleChangelistResponse(result, results, tokenNumber) ||
+				handleVariablesResponse(result, results, tokenNumber) ||
+				handleFrameResponse(result, results, tokenNumber) ||
+				handleDisassemblyResponse(result, results, tokenNumber) ||
+				handleValueResponse(result, results, tokenNumber) ||
+				handleVerifyTargetMemoryContentsSeqPoint(result, results, tokenNumber) ||
+				handleMemoryResponse(result, results, tokenNumber) ||
+				false)
 					break;
 				switch (result)
 				{
 					case GdbMiParser::DONE:
 						break;
 					case GdbMiParser::ERROR:
-				{
-					/* \todo	Remove the 'gdbTokenContext' for the current token number, if not already removed above. */
-					QMessageBox::critical(0, "Gdb error", QString("Gdb error:\n%1").arg(gdbErrorString(result, results)));
-				}
+						handleGdbError(result, results, tokenNumber);
 					break;
 				case GdbMiParser::CONNECTED:
 					emit gdbServerConnected();
@@ -1299,13 +1321,17 @@ void MainWindow::gdbMiLineAvailable(QString line)
 			targetDataCapture.captureLine(line.right(line.length() - 1));
 			/* FALLTHROUGH */
 		default:
-			appendLineToGdbLog(line);
+			/* Special case - filter out duplicate consecutive'(gdb)' prompt responses, if needed, to make the gdb log more pretty. */
+			if (!isGdbPromptRecord || !ui->checkBoxHideGdbMIData->isChecked()
+					|| !rxGdbPrompt.match(ui->plainTextEditGdbLog->document()->lastBlock().text()).hasMatch())
+				appendLineToGdbLog(line);
 			break;
 		case '=':
-			appendLineToGdbLog(line);
+			if (!ui->checkBoxHideGdbMIData->isChecked())
+				appendLineToGdbLog(line);
 			/* Handle gdb 'notify-async-output' records. */
 			/*! \todo	If the number of cases here grows too much,
-				 *		extract this into a separate function. */
+			 *		extract this into a separate function. */
 			if (line.startsWith("=breakpoint-created") || line.startsWith("=breakpoint-modified")
 					|| line.startsWith("=breakpoint-deleted"))
 				sendDataToGdbProcess("-break-list\n");
@@ -1319,13 +1345,33 @@ void MainWindow::gdbMiLineAvailable(QString line)
 				else
 					debugProcessId = match.captured(2).toULong(0, 0);
 			}
+			/* Note - it is problematic to precisely distinguish between a gdb 'detach' and 'disconnect' responses, they are, in fact
+			 * almost identical:
+				>>> -target-detach
+
+				=thread-exited,id="1",group-id="i1"
+				=thread-group-exited,id="i1"
+				[Inferior 1 (Remote target) detached]
+				^done
+				(gdb)
+				...
+				>>> -target-disconnect
+
+				=thread-exited,id="1",group-id="i1"
+				=thread-group-exited,id="i1"
+				^done
+				(gdb)
+			 */
 			else if (line.startsWith("=thread-group-exited"))
 			{
 				emit targetDetached();
-				QMessageBox::information(0, "Target detached", "Gdb has detached from the target");
+				/* Do not print an information message on target detach. It is getting tedious, and the target status is already visualized anyway. */
+				//QMessageBox::information(0, "Target detached", "Gdb has detached from the target");
 			}
 			break;
 	}
+	/* Remove the 'gdbTokenContext' for the current token number, if not already removed above. */
+	gdbTokenContext.removeContext(tokenNumber);
 }
 
 QString MainWindow::normalizeGdbString(const QString &miString)
@@ -1354,19 +1400,21 @@ void MainWindow::appendLineToGdbLog(const QString &data)
 		return;
 	}
 	ui->plainTextEditGdbLog->appendPlainText(data);
+	QTextCursor c = ui->plainTextEditGdbLog->textCursor();
+	c.movePosition(QTextCursor::End);
+	ui->plainTextEditGdbLog->setTextCursor(c);
 }
 
 bool MainWindow::handleNameResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
 {
 	if (parseResult != GdbMiParser::DONE)
 		return false;
-	if (!gdbTokenContext.hasContextForToken(tokenNumber)
-		|| gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_NAME)
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context || context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_NAME)
 		return false;
-	struct GdbTokenContext::GdbResponseContext context = gdbTokenContext.readAndRemoveContext(tokenNumber);
 	struct GdbVarObjectTreeItem * node = new GdbVarObjectTreeItem;
 
-	node->name = context.s;
+	node->name = context->s;
 	int childCount = 0;
 	for (const auto & t : results)
 	{
@@ -1380,7 +1428,7 @@ bool MainWindow::handleNameResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseRes
 			childCount = QString::fromStdString(t.value->asConstant()->constant()).toInt(0, 0);
 	}
 	node->setReportedChildCount(childCount);
-	static_cast<GdbVarObjectTreeItemModel *>(context.p)->appendRootItem(node);
+	static_cast<GdbVarObjectTreeItemModel *>(context->p)->appendRootItem(node);
 	return true;
 }
 
@@ -1388,12 +1436,11 @@ bool MainWindow::handleNumchildResponse(GdbMiParser::RESULT_CLASS_ENUM parseResu
 {
 	if (parseResult != GdbMiParser::DONE)
 		return false;
-	if (!gdbTokenContext.hasContextForToken(tokenNumber)
-		|| gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_NUMCHILD)
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context || context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_NUMCHILD)
 		return false;
 
-	struct GdbTokenContext::GdbResponseContext context = gdbTokenContext.readAndRemoveContext(tokenNumber);
-	QModelIndex index = varObjectTreeItemModel.indexForMiVariableName(context.s);
+	QModelIndex index = varObjectTreeItemModel.indexForMiVariableName(context->s);
 	if (!index.isValid())
 	{
 		/* If this case is reached, this means that a gdb "-var-list-children" machine interface
@@ -1497,7 +1544,6 @@ bool MainWindow::handleFilesResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 	QStringList sourceCodeFilenames;
 	for (const auto & f : sourceFiles.operator *())
 		sourceCodeFilenames << f.fullFileName;
-	//qRegisterMetaType<QSharedPointer<QVector<StringFinder::SearchResult>>>("StringSearchResultType");
 
 	emit addFilesToSearchSet(sourceCodeFilenames);
 	qRegisterMetaType<QSharedPointer<QVector<StringFinder::SearchResult>>>();
@@ -1511,16 +1557,15 @@ bool MainWindow::handleLinesResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 {
 	if (parseResult != GdbMiParser::DONE)
 		return false;
-	if (!gdbTokenContext.hasContextForToken(tokenNumber)
-		|| gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_LINES)
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context || context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_LINES)
 		return false;
 	if (results.size() != 1 || results.at(0).variable != "lines" || !results.at(0).value->asList())
 		return false;
-	struct GdbTokenContext::GdbResponseContext context = gdbTokenContext.readAndRemoveContext(tokenNumber);
-	if (!sourceFiles->count(context.s))
+	if (!sourceFiles->count(context->s))
 		return false;
 
-	SourceFileData & sourceFile(sourceFiles.operator *().operator [](context.s));
+	SourceFileData & sourceFile(sourceFiles.operator *().operator [](context->s));
 	for (const auto & t : results.at(0).value->asList()->values)
 	{
 		if (!t->asTuple())
@@ -1545,14 +1590,13 @@ bool MainWindow::handleSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM parseResul
 {
 	if (parseResult != GdbMiParser::DONE)
 		return false;
-	if (!gdbTokenContext.hasContextForToken(tokenNumber))
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context)
 		return false;
-	const GdbTokenContext::GdbResponseContext & c = gdbTokenContext.contextForTokenNumber(tokenNumber);
-	if (c.gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_FUNCTION_SYMBOLS
-			&& c.gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_VARIABLE_SYMBOLS
-			&& c.gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TYPE_SYMBOLS)
+	if (context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_FUNCTION_SYMBOLS
+			&& context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_VARIABLE_SYMBOLS
+			&& context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TYPE_SYMBOLS)
 		return false;
-	GdbTokenContext::GdbResponseContext context = gdbTokenContext.readAndRemoveContext(tokenNumber);
 	const GdbMiParser::MITuple * t;
 	if (results.size() != 1 || results.at(0).variable != "symbols" || !(t = results.at(0).value->asTuple()))
 		return false;
@@ -1617,9 +1661,9 @@ bool MainWindow::handleSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM parseResul
 					s.isSourceLinesFetched = true;
 					sourceFiles->operator[](fullFileName) = s;
 				}
-				if (context.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_FUNCTION_SYMBOLS)
+				if (context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_FUNCTION_SYMBOLS)
 					sourceFiles->operator [](fullFileName).subprograms.insert(symbols.cbegin(), symbols.cend());
-				else if (context.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_VARIABLE_SYMBOLS)
+				else if (context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_VARIABLE_SYMBOLS)
 					sourceFiles->operator [](fullFileName).variables.insert(symbols.cbegin(), symbols.cend());
 				else
 					sourceFiles->operator [](fullFileName).dataTypes.insert(symbols.cbegin(), symbols.cend());
@@ -1638,25 +1682,26 @@ bool MainWindow::handleSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM parseResul
 
 bool MainWindow::handleFileExecAndSymbolsResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
 {
-	if (!gdbTokenContext.hasContextForToken(tokenNumber)
-		|| gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_EXECUTABLE_SYMBOL_FILE_LOADED)
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context || context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_RESPONSE_EXECUTABLE_SYMBOL_FILE_LOADED)
 		return false;
-	struct GdbTokenContext::GdbResponseContext context = gdbTokenContext.readAndRemoveContext(tokenNumber);
 	if (parseResult == GdbMiParser::ERROR)
 	{
-		QString errorMessage = QString("Failed to load executable file in gdb, could not load file:\n%1").arg(context.s);
+		QString errorMessage = QString("Failed to load executable file in gdb, could not load file:\n%1").arg(context->s);
 		if (results.size() && results.at(0).variable == "msg" && results.at(0).value->asConstant())
 			errorMessage += QString("\n\n%1").arg(QString::fromStdString(results.at(0).value->asConstant()->constant()));
+		errorMessage += "\n\n\nThe frontend will now restart, so that you may reliably select a valid executable file for debugging";
 		QMessageBox::critical(0, "Error loading executable file in gdb",
 				      errorMessage);
-		return true;
+		ui->pushButtonRESTART->click();
+		/* Should never */ return true;
 	}
 
-	settings->setValue(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, context.s);
+	settings->setValue(SETTINGS_LAST_LOADED_EXECUTABLE_FILE, context->s);
 	elfReader = std::make_shared<elfio>();
-	if (!elfReader->load(context.s.toStdString()))
+	if (!elfReader->load(context->s.toStdString()))
 		elfReader.reset();
-	restoreSession(context.s);
+	restoreSession(context->s);
 	sendDataToGdbProcess("-file-list-exec-source-files\n");
 	return true;
 }
@@ -1802,14 +1847,6 @@ bool MainWindow::handleStackResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 			 frame.fullFileName,
 			 frame.lineNumber));
 
-	if (ui->checkBoxEnableTraceLogging->isChecked() && backtrace.size())
-	{
-		StackFrameData frame = backtrace.at(0);
-		ui->treeWidgetTraceLog->addTopLevelItem(createNavigationWidgetItem(
-				QStringList() << frame.fileName << QString("%1").arg(frame.lineNumber) << frame.fullFileName,
-				frame.fullFileName,
-				frame.lineNumber));
-	}
 	return true;
 }
 
@@ -2060,9 +2097,8 @@ bool MainWindow::handleValueResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult,
 {
 	if (parseResult != GdbMiParser::DONE || results.size() != 1 || results.at(0).variable != "value" || !results.at(0).value->asConstant())
 		return false;
-	if (gdbTokenContext.hasContextForToken(tokenNumber))
-	if (gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode
-		&& gdbTokenContext.readAndRemoveContext(tokenNumber).gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_UPDATE_LAST_KNOWN_PROGRAM_COUNTER)
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (context && context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_UPDATE_LAST_KNOWN_PROGRAM_COUNTER)
 	{
 		bool ok;
 		uint64_t pc;
@@ -2077,30 +2113,28 @@ bool MainWindow::handleSequencePoints(GdbMiParser::RESULT_CLASS_ENUM parseResult
 {
 	if (parseResult != GdbMiParser::DONE)
 		return false;
-	bool response_handled = false;
-	if (!gdbTokenContext.hasContextForToken(tokenNumber))
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context)
 		return false;
-	switch (gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode)
+	switch (context->gdbResponseCode)
 	{
 	case GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_SOURCE_CODE_ADDRESSES_RETRIEVED:
 		updateSourceListView();
 		updateSymbolViews();
+		return true;
+	default:
 		break;
 	}
-	if (response_handled)
-		gdbTokenContext.readAndRemoveContext(tokenNumber);
-	return response_handled;
+	return false;
 }
 
 bool MainWindow::handleVerifyTargetMemoryContentsSeqPoint(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
 {
 	if (parseResult != GdbMiParser::DONE)
 		return false;
-	if (!gdbTokenContext.hasContextForToken(tokenNumber))
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (!context || context->gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_CHECK_MEMORY_CONTENTS)
 		return false;
-	if (gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode != GdbTokenContext::GdbResponseContext::GDB_SEQUENCE_POINT_CHECK_MEMORY_CONTENTS)
-		return false;
-	gdbTokenContext.readAndRemoveContext(tokenNumber);
 	bool match = true;
 	int i = 0;
 	for (const auto & f : targetMemorySectionsTempFileNames)
@@ -2148,11 +2182,10 @@ bool MainWindow::handleVerifyTargetMemoryContentsSeqPoint(GdbMiParser::RESULT_CL
 
 bool MainWindow::handleTargetScanResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
 {
-	if (gdbTokenContext.hasContextForToken(tokenNumber)
-		&& gdbTokenContext.contextForTokenNumber(tokenNumber).gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TARGET_SCAN_COMPLETE)
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (context && context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TARGET_SCAN_COMPLETE)
 	{
 		targetDataCapture.stopCapture();
-		gdbTokenContext.readAndRemoveContext(tokenNumber);
 		if (parseResult == GdbMiParser::ERROR)
 		{
 			QMessageBox::critical(0, "Target scan failed", QString("Target scan command failed, error:\n%1").arg(gdbErrorString(parseResult, results)));
@@ -2161,18 +2194,19 @@ bool MainWindow::handleTargetScanResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 		/* Try to parse any stream output from the target. */
 		const QStringList & output(targetDataCapture.capturedLines());
 		QStringList detectedTargets;
-		QRegularExpression rx("^\"\\s*(\\d+)\\s+");
-		for (const auto & l : output)
+                QRegularExpression rx("^\\s*(\\d+)\\s+(.+)");
+                for (auto l : output)
 		{
-			qDebug() << "processing line:" << l;
-			if (l.contains("scan failed"))
+                        /* Clean up the string a bit. */
+                        l.replace('"', "").replace("\\n","");
+                        if (l.contains("scan failed"))
 			{
 				QMessageBox::critical(0, "Target scan failed", QString("Target scan command failed, error:\n%1").arg(l));
 				return true;
 			}
 			QRegularExpressionMatch match = rx.match(l);
 			if (match.hasMatch())
-				detectedTargets << l;
+                                detectedTargets << l;
 		}
 		assert(detectedTargets.length() != 0);
 		bool ok;
@@ -2185,7 +2219,7 @@ bool MainWindow::handleTargetScanResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 							     detectedTargets, 0, false, &ok);
 		if (!ok)
 		{
-			QMessageBox::information(0, "No target selected", "No target selected, abborting target connection.");
+			QMessageBox::information(0, "No target selected", "No target selected, aborting target connection.");
 			return true;
 		}
 		QRegularExpressionMatch match = rx.match(targetNumber);
@@ -2197,15 +2231,12 @@ bool MainWindow::handleTargetScanResponse(GdbMiParser::RESULT_CLASS_ENUM parseRe
 
 bool MainWindow::handleMemoryResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
 {
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
 	if (parseResult == GdbMiParser::ERROR)
 	{
 		/* If there is an error reading the target memory, disable the auto update of the memory view. */
-		if (gdbTokenContext.hasContextForToken(tokenNumber) && gdbTokenContext.contextForTokenNumber(tokenNumber)
-				.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_DATA_READ_MEMORY)
-		{
-			gdbTokenContext.readAndRemoveContext(tokenNumber);
+		if (context && context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_DATA_READ_MEMORY)
 			ui->checkBoxMemoryDumpAutoUpdate->setChecked(false);
-		}
 		return false;
 	}
 	const GdbMiParser::MIList * l;
@@ -2234,15 +2265,45 @@ bool MainWindow::handleMemoryResponse(GdbMiParser::RESULT_CLASS_ENUM parseResult
 					f.spinbox->setValue((d >> f.bitoffset) & ((1 << f.bitwidth) - 1));
 	}
 	/* Check if the memory dump view should be updated. */
-	if (gdbTokenContext.hasContextForToken(tokenNumber) && gdbTokenContext.contextForTokenNumber(tokenNumber)
-			.gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_DATA_READ_MEMORY)
+	if (context && context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_DATA_READ_MEMORY)
 	{
-		gdbTokenContext.readAndRemoveContext(tokenNumber);
 		ui->plainTextEditMemoryDump->clear();
 		ui->plainTextEditMemoryDump->appendPlainText(data.toHex());
 	}
 
 	return true;
+}
+
+void MainWindow::handleGdbError(GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> &results, unsigned tokenNumber)
+{
+	if (parseResult != GdbMiParser::ERROR)
+		return;
+	const struct GdbTokenContext::GdbResponseContext * context = gdbTokenContext.contextForTokenNumber(tokenNumber);
+	if (context)
+	{
+		if (context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_FUNCTION_SYMBOLS
+				|| context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_VARIABLE_SYMBOLS
+				|| context->gdbResponseCode == GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TYPE_SYMBOLS)
+		{
+			static bool symbolAccessMiErrrorPrinted = false;
+			/* It is likely that the gdb executable available is not a recent one, as the machine interface commands for querying function, variable, and type symbols
+			 * have been introduced in gdb version 10. */
+			if (!symbolAccessMiErrrorPrinted)
+			{
+				symbolAccessMiErrrorPrinted = true;
+				QMessageBox::critical(0, "Gdb version used is possibly out of date",
+						      "A gdb symbol query machine interface command has failed.\n\n"
+						      "Such gdb machine interface commands have only been introduced in recent gdb versions\n"
+						      "(gdb versions 10.x and above).\n\n"
+						      "Please, make sure you are running a recent gdb version.\n"
+						      "Otherwise, the behaviour of the frontend will be suboptimal.\n"
+						      "(This message shall not be printed again during this debug session."
+						      );
+			}
+			return;
+		}
+	}
+	QMessageBox::critical(0, "Gdb error", QString("Gdb error:\n%1").arg(gdbErrorString(parseResult, results)));
 }
 
 void MainWindow::gdbProcessError(QProcess::ProcessError error)
@@ -2269,8 +2330,10 @@ void MainWindow::gdbProcessError(QProcess::ProcessError error)
 			QMessageBox::critical(0, "Gdb process unknown error", "Unknown gdb error");
 			break;
 	}
-	ui->pushButtonConnectGdbToGdbServer->setEnabled(false);
+	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
 	ui->pushButtonStartGdb->setEnabled(true);
+	varObjectTreeItemModel.removeAllTopLevelItems();
+	ui->pushButtonConnectToBlackmagic->setEnabled(false);
 }
 
 void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
@@ -2278,30 +2341,42 @@ void MainWindow::gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
 	qDebug() << gdbProcess->readAllStandardError();
 	qDebug() << gdbProcess->readAllStandardOutput();
 	qDebug() << "gdb process finished";
+	targetStateDependentWidgets.enterTargetState(target_state = GDB_NOT_RUNNING, isBlackmagicProbeConnected, ui->labelSystemState, ui->pushButtonShortState);
 	ui->pushButtonStartGdb->setEnabled(true);
+	varObjectTreeItemModel.removeAllTopLevelItems();
+	ui->pushButtonConnectToBlackmagic->setEnabled(false);
 	if (exitStatus == QProcess::CrashExit)
 	{
 		if (QMessageBox::critical(0, "The gdb process crashed", "Gdb crashed\n\nDo you want to restart the gdb process?", "Restart gdb", "Abort")
 				== 0)
-			gdbProcess->start();
+			ui->pushButtonStartGdb->click();
 	}
 	else if (exitCode != 0)
 	{
 		if (QMessageBox::critical(0, "The gdb process exited with error", QString("Gdb exited with error code: %1\n\nDo you want to restart the gdb process?").arg(exitCode), "Restart gdb", "Abort")
 				== 0)
-			gdbProcess->start();
+			ui->pushButtonStartGdb->click();
 	}
 	else
 	{
 		if (QMessageBox::information(0, "The gdb process exited normally", "Gdb exited normally.\n\nDo you want to restart the gdb process?", "Restart gdb", "Abort")
 				== 0)
-			gdbProcess->start();
+			ui->pushButtonStartGdb->click();
 	}
 }
 
-void MainWindow::sendDataToGdbProcess(const QString & data)
+void MainWindow::sendDataToGdbProcess(const QString & data, bool isFrontendIssuedCommand)
 {
-	appendLineToGdbLog(">>> " + data);
+	if (isFrontendIssuedCommand && !ui->checkBoxHideGdbMIData->isChecked())
+		appendLineToGdbLog(">>> " + data);
+	else if (!isFrontendIssuedCommand)
+	{
+		QTextCursor c = ui->plainTextEditGdbLog->textCursor();
+		c.movePosition(QTextCursor::End);
+		c.insertText(data);
+		c.movePosition(QTextCursor::End);
+		ui->plainTextEditGdbLog->setTextCursor(c);
+	}
 	/*! \todo	WARNING. This needs to be investigated, but attempting to send data to the gdb process, when
 	 *		it is dead, of course - does not work, and this error is reported by Qt;
 	 *
@@ -2524,6 +2599,37 @@ void MainWindow::bookmarksContextMenuRequested(QPoint p)
 	}
 }
 
+void MainWindow::varObjectContextMenuRequested(QPoint p)
+{
+	QModelIndex index = ui->treeViewDataObjects->indexAt(p);
+	if (!index.isValid())
+		return;
+	const GdbVarObjectTreeItem * varObject = varObjectTreeItemModel.varoObjectTreeItemForIndex(index);
+	if (varObject && /* Only allow deleting top-level varObjects. This looks like a sane behaviour. */ !index.parent().isValid())
+	{
+		qDebug() << varObject->miName;
+		QMenu menu(this);
+		QHash<void *, int> menuSelections;
+		menuSelections.operator [](menu.addAction("Delete")) = 1;
+		menu.addAction("Cancel");
+		/* Because of the header of the tree view, it looks more natural to set the
+		 * menu position on the screen at point translated from the tree view viewport,
+		 * not from the tree view itself. */
+		QAction * selection = menu.exec(ui->treeViewDataObjects->viewport()->mapToGlobal(p));
+
+		switch (menuSelections.operator []((void *) selection))
+		{
+		case 1:
+			/* Delete varObject. */
+			varObjectTreeItemModel.removeTopLevelItem(index);
+			sendDataToGdbProcess(QString("-var-delete %1\n").arg(varObject->miName));
+			break;
+		default:
+			break;
+		}
+	}
+}
+
 void MainWindow::breakpointViewItemChanged(QTreeWidgetItem *item, int column)
 {
 	if (column != TREE_WIDGET_BREAKPOINT_ENABLE_STATUS_COLUMN_NUMBER)
@@ -2723,7 +2829,7 @@ void MainWindow::sendCommandsToGdb(QLineEdit * lineEdit)
 QStringList l = lineEdit->text().split('\n');
 	lineEdit->clear();
 	for (const auto & s : l)
-		sendDataToGdbProcess(s + '\n');
+		sendDataToGdbProcess(s + '\n', false);
 
 }
 
@@ -2951,7 +3057,10 @@ void MainWindow::displayHelpMenu()
 	menu.addAction("(but you may select items here with the mouse)");
 	for (const auto & a : highlightWidgetActions)
 	{
-		QAction * act = menu.addAction(a->text() + "\t(" + a->shortcut().toString() + ")");
+		QString actionText = a->text();
+		if (!a->shortcut().toString().isEmpty())
+			actionText += "\t(" + a->shortcut().toString() + ")";
+		QAction * act = menu.addAction(actionText);
 		connect(act, SIGNAL(triggered(bool)), a, SLOT(trigger()));
 	}
 	QAction * selection = menu.exec((p));
@@ -3145,6 +3254,7 @@ bool result = false;
 	/* Special case for internal files (e.g., the internal help file) - do not attempt to apply syntax highlighting. */
 	if (sourceCodeLocation.fullFileName.startsWith(":/"))
 	{
+		ui->plainTextEditSourceView->setStyleSheet(HELPVIEW_PLAINTEXTEDIT_STYLESHEET);
 		QFile f(sourceCodeLocation.fullFileName);
 		//ui->plainTextEditSourceView->setStyleSheet("");
 		f.open(QFile::ReadOnly);
@@ -3171,6 +3281,7 @@ bool result = false;
 	else
 	{
 		QString errorMessage;
+		ui->plainTextEditSourceView->setStyleSheet(DEFAULT_PLAINTEXTEDIT_STYLESHEET);
 		auto sourceData = sourceFilesCache.getSourceFileCacheData(sourceCodeLocation.fullFileName, errorMessage);
 		if (!sourceData)
 		{
@@ -3247,8 +3358,10 @@ void MainWindow::createSvdRegisterView(QTreeWidgetItem *item, int column)
 	SvdFileParser::SvdRegisterOrClusterNode * svdRegister = static_cast<SvdFileParser::SvdRegisterOrClusterNode *>(item->data(0, SVD_REGISTER_POINTER).value<void *>());
 
 	QDialog * dialog = new QDialog(0, Qt::WindowTitleHint | Qt::WindowMinimizeButtonHint);
+	unsigned address = item->data(0, SVD_REGISTER_ADDRESS).toUInt();
+	dialog->setWindowTitle(QString("%1 @ 0x%2").arg(svdRegister->name).arg(address, 8, 16, QChar('0')));
 	QGroupBox * fieldsGroupBox = new QGroupBox();
-	SvdRegisterViewData view(dialog, item->data(0, SVD_REGISTER_ADDRESS).toUInt());
+	SvdRegisterViewData view(dialog, address);
 	view.fieldsGroupBox = fieldsGroupBox;
 	dialog->setAttribute(Qt::WA_DeleteOnClose, true);
 	QVBoxLayout * fieldsLayout = new QVBoxLayout();
@@ -3384,10 +3497,6 @@ void MainWindow::on_pushButtonDeleteAllBookmarks_clicked()
 	disassemblyCache.highlightLines(ui->plainTextEditDisassembly, breakpoints, lastKnownProgramCounter);
 }
 
-void MainWindow::on_pushButtonDisconnectGdbServer_clicked()
-{
-	sendDataToGdbProcess("-target-disconnect\n");
-}
 
 void MainWindow::on_lineEditFindText_returnPressed()
 {
@@ -3419,11 +3528,6 @@ void MainWindow::requestTargetHalt(void)
 		}
 #endif
 	}
-}
-
-void MainWindow::on_pushButtonDumpVarObjects_clicked()
-{
-	varObjectTreeItemModel.dumpTree();
 }
 
 void MainWindow::on_pushButtonLoadProgramToTarget_clicked()
@@ -3461,11 +3565,7 @@ void MainWindow::on_comboBoxSelectLayout_activated(int index)
 		break;
 	case 3:
 		/* Switch to debug layout. */
-		addDockWidget(Qt::TopDockWidgetArea, ui->dockWidgetBlackmagicToolbox, Qt::Horizontal);
-		ui->dockWidgetBlackmagicToolbox->setFloating(false);
-		ui->dockWidgetBlackmagicToolbox->show();
-
-		splitDockWidget(ui->dockWidgetBlackmagicToolbox, ui->dockWidgetObjectLocator, Qt::Horizontal);
+		addDockWidget(Qt::TopDockWidgetArea, ui->dockWidgetObjectLocator, Qt::Horizontal);
 		ui->dockWidgetObjectLocator->setFloating(false);
 		ui->dockWidgetObjectLocator->show();
 
@@ -3494,6 +3594,10 @@ void MainWindow::on_comboBoxSelectLayout_activated(int index)
 		ui->dockWidgetSearchResults->show();
 
 		break;
+	case 4:
+		for (const auto & d : dockWidgets)
+			d->show();
+		break;
 	}
 	ui->comboBoxSelectLayout->setCurrentIndex(0);
 }
@@ -3503,7 +3607,7 @@ void MainWindow::loadSVDFile(void)
 	if (!QFileInfo(targetSVDFileName).exists())
 	{
 		QMessageBox::critical(0, "Target SVD file not found", "No valid SVD file specified.\nYou can specify the target SVD file in the settings.");
-		settingsUi.lineEditTargetSVDFileName->setFocus();
+		uiSettings.lineEditTargetSVDFileName->setFocus();
 		ui->pushButtonSettings->click();
 		return;
 	}
@@ -3602,17 +3706,11 @@ void MainWindow::on_pushButtonSendScratchpadToGdb_clicked()
 	sendDataToGdbProcess(ui->plainTextEditScratchpad->toPlainText());
 }
 
-void MainWindow::on_pushButtonScanForTargets_clicked()
+void MainWindow::scanForTargets(void)
 {
 	unsigned t = gdbTokenContext.insertContext(GdbTokenContext::GdbResponseContext(GdbTokenContext::GdbResponseContext::GDB_RESPONSE_TARGET_SCAN_COMPLETE));
 	targetDataCapture.startCapture();
 	sendDataToGdbProcess(QString("%1monitor swdp_scan\n").arg(t));
-}
-
-void MainWindow::on_pushButtonConnectGdbToGdbServer_clicked()
-{
-	/*! \todo	do not hardcode the gdb server listening port */
-	sendDataToGdbProcess("-target-select extended-remote :1122\n");
 }
 
 void MainWindow::compareTargetMemory()
@@ -3629,6 +3727,8 @@ void MainWindow::compareTargetMemory()
 	int i = 0;
 	for (const auto & segment : elfReader->segments)
 	{
+		if (!segment->get_file_size())
+			continue;
 		targetMemorySectionsTempFileNames << QString("section-%1-%2.bin").arg(i).arg(x);
 		/* There is no machine interface command for dumping target memory to files, so use the regular gdb commands. */
 		gdbRequest += QString("dump binary memory %1 0x%2 0x%3\n")

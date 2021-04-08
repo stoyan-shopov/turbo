@@ -108,7 +108,7 @@ public:
 			QString s = QString::fromStdString(address + '\t' + opcodes + '\t' + mnemonics);
 			if (funcName.length() && offset.length())
 				s += QString::fromStdString("\t; " + funcName + "+" + offset);
-			QString backgroundColor = "Silver";
+			QString backgroundColor = "PowderBlue";
 			bool ok;
 			uint64_t t = QString::fromStdString(address).toULongLong(& ok, 0);
 			htmlDocument += QString("<p style=\"background-color:%1;\"><pre>%2</pre></p>")
@@ -139,7 +139,7 @@ public:
 					{
 						QString errorMessage;
 						auto sourceData = sourceFilesCache.getSourceFileCacheData(fullFileName, errorMessage);
-						QString backgroundColor = "Olive";
+						QString backgroundColor = "Azure";
 
 						sourceLines.operator [](fullFileName).operator [](lineNumber).insert(currentLine);
 						if (sourceData && lineNumber - 1 < sourceData->sourceCodeTextlines.length())

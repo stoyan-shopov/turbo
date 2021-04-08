@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1666</width>
-    <height>719</height>
+    <width>1773</width>
+    <height>675</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -44,6 +44,11 @@
             <string>Debug layout</string>
            </property>
           </item>
+          <item>
+           <property name="text">
+            <string>Show all views</string>
+           </property>
+          </item>
          </widget>
         </item>
         <item>
@@ -63,7 +68,7 @@
         <item>
          <widget class="QPushButton" name="pushButtonDisplayHelp">
           <property name="styleSheet">
-           <string notr="true">background-color: rgb(255, 170, 0);</string>
+           <string notr="true">background-color: Ivory</string>
           </property>
           <property name="text">
            <string>Help</string>
@@ -83,12 +88,26 @@
        </layout>
       </item>
       <item>
-       <widget class="QToolButton" name="toolButton">
+       <widget class="QToolButton" name="toolButtonActions">
         <property name="text">
          <string>ACTION</string>
         </property>
         <property name="popupMode">
          <enum>QToolButton::InstantPopup</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="labelSystemState">
+        <property name="text">
+         <string>System state</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButtonShortState">
+        <property name="text">
+         <string/>
         </property>
        </widget>
       </item>
@@ -105,7 +124,10 @@
       <item>
        <widget class="QGroupBox" name="groupBoxTargetConnected">
         <property name="title">
-         <string>GroupBox - target connected</string>
+         <string>Target Connected</string>
+        </property>
+        <property name="flat">
+         <bool>false</bool>
         </property>
         <layout class="QHBoxLayout" name="horizontalLayout_17">
          <property name="spacing">
@@ -126,7 +148,7 @@
          <item>
           <widget class="QGroupBox" name="groupBoxTargetRunning">
            <property name="title">
-            <string>Target running</string>
+            <string>Target Running</string>
            </property>
            <layout class="QHBoxLayout" name="horizontalLayout_18">
             <property name="spacing">
@@ -157,7 +179,7 @@
          <item>
           <widget class="QGroupBox" name="groupBoxTargetHalted">
            <property name="title">
-            <string>Target halted</string>
+            <string>Target Halted</string>
            </property>
            <layout class="QHBoxLayout" name="horizontalLayout_20">
             <property name="spacing">
@@ -185,8 +207,7 @@
             <item>
              <widget class="QPushButton" name="pushButtonLoadProgramToTarget">
               <property name="text">
-               <string>Load program
-to target</string>
+               <string>Load program to target</string>
               </property>
              </widget>
             </item>
@@ -204,14 +225,50 @@ to target</string>
               </property>
              </widget>
             </item>
+            <item>
+             <widget class="QPushButton" name="pushButtonStepOver">
+              <property name="text">
+               <string>Step over</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButtonStepInto">
+              <property name="text">
+               <string>Step into</string>
+              </property>
+             </widget>
+            </item>
            </layout>
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButtonDisconnectGdbServer">
+          <widget class="QPushButton" name="pushButtonDisconnectGdb">
            <property name="text">
-            <string>Disconnect
-gdb server</string>
+            <string>Disconnect gdb</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButtonConnectToBlackmagic">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="text">
+            <string>Connect to blackmagic</string>
            </property>
           </widget>
          </item>
@@ -219,43 +276,26 @@ gdb server</string>
        </widget>
       </item>
       <item>
-       <widget class="QGroupBox" name="groupBoxTargetDisconnected">
-        <property name="title">
-         <string>Target disconnected</string>
+       <widget class="QPushButton" name="pushButtonScanForTargets">
+        <property name="text">
+         <string>Scan and attach</string>
         </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_19">
-         <property name="spacing">
-          <number>0</number>
-         </property>
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>0</number>
-         </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
-         <property name="bottomMargin">
-          <number>0</number>
-         </property>
-         <item>
-          <widget class="QPushButton" name="pushButtonConnectGdbToGdbServer">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="text">
-            <string>Connect gdb</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
        </widget>
       </item>
       <item>
        <widget class="QPushButton" name="pushButtonStartGdb">
         <property name="text">
          <string>Start gdb</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButtonLocateWindow">
+        <property name="styleSheet">
+         <string notr="true">background-color: LightSteelBlue</string>
+        </property>
+        <property name="text">
+         <string>Locate window</string>
         </property>
        </widget>
       </item>
@@ -346,22 +386,18 @@ gdb server</string>
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout_4">
            <item>
-            <layout class="QVBoxLayout" name="verticalLayout_28">
-             <item>
-              <widget class="QCheckBox" name="checkBoxShowDisassembly">
-               <property name="text">
-                <string>Show disassembly</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QCheckBox" name="checkBoxShowTargetOutput">
-               <property name="text">
-                <string>Show target output</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
+            <widget class="QCheckBox" name="checkBoxShowTargetOutput">
+             <property name="text">
+              <string>Gdb stderr</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="checkBoxShowDisassembly">
+             <property name="text">
+              <string>Disassembly</string>
+             </property>
+            </widget>
            </item>
            <item>
             <widget class="QCheckBox" name="checkBoxShowGdbConsoles">
@@ -406,13 +442,6 @@ for text:</string>
             <widget class="QPushButton" name="pushButtonNavigateForward">
              <property name="text">
               <string>Go forward</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="pushButtonTrigger">
-             <property name="text">
-              <string>Trigger</string>
              </property>
             </widget>
            </item>
@@ -488,6 +517,12 @@ for text:</string>
              <property name="lineWrapMode">
               <enum>QPlainTextEdit::NoWrap</enum>
              </property>
+             <property name="plainText">
+              <string>Lorem ipsum, dolor sit amet</string>
+             </property>
+             <property name="textInteractionFlags">
+              <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+             </property>
             </widget>
            </item>
           </layout>
@@ -540,8 +575,21 @@ for text:</string>
            </item>
            <item>
             <widget class="QCheckBox" name="checkBoxLimitGdbLog">
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Check this checkbox to limit the number of shown gdb lines in the gdb console, and to truncate long lines in the gdb output.&lt;/p&gt;&lt;p&gt;This can have a noticable impact on performance. Generally, you should normally check this checkbox, and uncheck it when debugging the gdb communication.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
              <property name="text">
               <string>Limit gdb log</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="checkBoxHideGdbMIData">
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Check this checkbox to hide the gdb machine interface (MI) data in the communication between the frontend and gdb.&lt;/p&gt;&lt;p&gt;This significantly improves the readability and convenience when communicating directly with gdb. Generally, you should normally check this checkbox, and uncheck it when debugging the gdb communication.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="text">
+              <string>Hide gdb MI data</string>
              </property>
             </widget>
            </item>
@@ -604,7 +652,7 @@ for text:</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1666</width>
+     <width>1773</width>
      <height>21</height>
     </rect>
    </property>
@@ -629,28 +677,28 @@ for text:</string>
     <number>2</number>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents">
-    <layout class="QVBoxLayout" name="verticalLayout">
+    <layout class="QVBoxLayout" name="verticalLayout_13">
      <property name="spacing">
-      <number>3</number>
+      <number>0</number>
      </property>
      <property name="leftMargin">
-      <number>3</number>
+      <number>0</number>
      </property>
      <property name="topMargin">
-      <number>3</number>
+      <number>0</number>
      </property>
      <property name="rightMargin">
-      <number>3</number>
+      <number>0</number>
      </property>
      <property name="bottomMargin">
-      <number>3</number>
+      <number>0</number>
      </property>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_2">
        <item>
         <widget class="QLabel" name="label_2">
          <property name="text">
-          <string>Access varObject:</string>
+          <string>Data object:</string>
          </property>
         </widget>
        </item>
@@ -660,34 +708,40 @@ for text:</string>
       </layout>
      </item>
      <item>
-      <widget class="QPushButton" name="pushButtonDumpVarObjects">
-       <property name="text">
-        <string>dump</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QSplitter" name="splitter">
        <property name="orientation">
         <enum>Qt::Vertical</enum>
        </property>
        <widget class="QTreeView" name="treeViewDataObjects"/>
-       <widget class="QTreeWidget" name="treeWidgetStackVariables">
-        <column>
-         <property name="text">
-          <string notr="true">Name</string>
-         </property>
-        </column>
-        <column>
-         <property name="text">
-          <string>Value</string>
-         </property>
-        </column>
-        <column>
-         <property name="text">
-          <string>Hex value</string>
-         </property>
-        </column>
+       <widget class="QWidget" name="layoutWidget">
+        <layout class="QVBoxLayout" name="verticalLayout">
+         <item>
+          <widget class="QLabel" name="label_8">
+           <property name="text">
+            <string>Local variables</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QTreeWidget" name="treeWidgetStackVariables">
+           <column>
+            <property name="text">
+             <string notr="true">Name</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>Value</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>Hex value</string>
+            </property>
+           </column>
+          </widget>
+         </item>
+        </layout>
        </widget>
       </widget>
      </item>
@@ -1091,86 +1145,6 @@ for text:</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="dockWidgetBlackmagicToolbox">
-   <property name="windowTitle">
-    <string>Blackmagic toolbox</string>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>8</number>
-   </attribute>
-   <widget class="QWidget" name="dockWidgetContents_9">
-    <layout class="QVBoxLayout" name="verticalLayout_13">
-     <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_21">
-       <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_11">
-         <item>
-          <widget class="QGroupBox" name="groupBoxBlackMagicConnectedWidgets">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="title">
-            <string>GroupBox</string>
-           </property>
-           <layout class="QHBoxLayout" name="horizontalLayout_15">
-            <item>
-             <widget class="QLabel" name="label_11">
-              <property name="text">
-               <string>TextLabel</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="pushButtonScanForTargets">
-              <property name="text">
-               <string>Scan</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item>
-        <widget class="QGroupBox" name="groupBoxBlackMagicDisconnectedWidgets">
-         <property name="title">
-          <string>GroupBox</string>
-         </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_16">
-          <item>
-           <widget class="QPushButton" name="pushButtonConnectToBlackmagic">
-            <property name="text">
-             <string>Connect to blackmagic</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <widget class="QPlainTextEdit" name="plainTextEditBlackmagicLog"/>
-     </item>
-    </layout>
-   </widget>
-  </widget>
-  <widget class="QDockWidget" name="dockWidgetElfToolbox">
-   <property name="windowTitle">
-    <string>ELF toolbox</string>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>4</number>
-   </attribute>
-   <widget class="QWidget" name="dockWidgetContents_10">
-    <layout class="QVBoxLayout" name="verticalLayout_14">
-     <item>
-      <widget class="QPlainTextEdit" name="plainTextEditELFToolbox"/>
-     </item>
-    </layout>
-   </widget>
-  </widget>
   <widget class="QDockWidget" name="dockWidgetObjectLocator">
    <property name="windowTitle">
     <string>Object locator</string>
@@ -1212,7 +1186,7 @@ for text:</string>
      <item>
       <widget class="QTreeWidget" name="treeWidgetObjectLocator">
        <property name="styleSheet">
-        <string notr="true">background-color: PaleTurquoise</string>
+        <string notr="true">background-color: Azure</string>
        </property>
        <property name="indentation">
         <number>0</number>
@@ -1350,66 +1324,7 @@ for text:</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="dockWidgetTraceLog">
-   <property name="windowTitle">
-    <string>Trace log</string>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>8</number>
-   </attribute>
-   <widget class="QWidget" name="dockWidgetContents_15">
-    <layout class="QVBoxLayout" name="verticalLayout_20">
-     <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_22">
-       <item>
-        <widget class="QPushButton" name="pushButton">
-         <property name="text">
-          <string>Clear</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="checkBoxEnableTraceLogging">
-         <property name="text">
-          <string>gather trace log</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="checkBoxShowFullFileNamesInTraceLog">
-         <property name="text">
-          <string>show full file name</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <widget class="QTreeWidget" name="treeWidgetTraceLog">
-       <column>
-        <property name="text">
-         <string>File</string>
-        </property>
-       </column>
-       <column>
-        <property name="text">
-         <string>Line</string>
-        </property>
-       </column>
-       <column>
-        <property name="text">
-         <string>Full file name</string>
-        </property>
-       </column>
-      </widget>
-     </item>
-    </layout>
-   </widget>
-  </widget>
-  <widget class="QDockWidget" name="dockWidget">
+  <widget class="QDockWidget" name="dockWidgetSvdView">
    <property name="windowTitle">
     <string>SVD view</string>
    </property>
@@ -1423,7 +1338,7 @@ for text:</string>
        <item>
         <widget class="QLabel" name="label_6">
          <property name="text">
-          <string>Lorem ipsum</string>
+          <string>Search:</string>
          </property>
         </widget>
        </item>
@@ -1525,11 +1440,6 @@ for text:</string>
     <string>Verify flash</string>
    </property>
   </action>
-  <action name="actionAction_2">
-   <property name="text">
-    <string>Action 2</string>
-   </property>
-  </action>
   <action name="actionSourceFilesViewShowFullFileNames">
    <property name="checkable">
     <bool>true</bool>
@@ -1572,6 +1482,14 @@ for text:</string>
     <string>Show target output (defunkt)</string>
    </property>
   </action>
+  <action name="actionactionScanForTargets">
+   <property name="text">
+    <string>Scan for targets</string>
+   </property>
+   <property name="toolTip">
+    <string>Scan and attach to target</string>
+   </property>
+  </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources/>
@@ -1583,28 +1501,12 @@ for text:</string>
    <slot>clear()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>345</x>
-     <y>429</y>
+     <x>307</x>
+     <y>421</y>
     </hint>
     <hint type="destinationlabel">
-     <x>1062</x>
-     <y>501</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>pushButton</sender>
-   <signal>clicked()</signal>
-   <receiver>treeWidgetTraceLog</receiver>
-   <slot>clear()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>977</x>
-     <y>567</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>1201</x>
-     <y>680</y>
+     <x>1130</x>
+     <y>493</y>
     </hint>
    </hints>
   </connection>
@@ -1615,12 +1517,12 @@ for text:</string>
    <slot>clear()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>346</x>
-     <y>295</y>
+     <x>366</x>
+     <y>287</y>
     </hint>
     <hint type="destinationlabel">
-     <x>347</x>
-     <y>384</y>
+     <x>367</x>
+     <y>376</y>
     </hint>
    </hints>
   </connection>

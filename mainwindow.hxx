@@ -74,6 +74,7 @@
 
 #include "breakpoint-cache.hxx"
 #include "source-file-data.hxx"
+#include "ui_select-debug-executable-file-dialog.h"
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
 /* It seems that prior to Qt version 5.14, Qt does not provide a specialization
@@ -356,8 +357,9 @@ public:
 	bool isChildrenFetchingInProgress = false;
 	bool isInScope = true;
 	int getReportedChildCount(void) const { return isInScope ? reportedChildCount : 0; }
-	int setReportedChildCount(int reportedChildCount) { this->reportedChildCount = reportedChildCount; }
+	void setReportedChildCount(int reportedChildCount) { this->reportedChildCount = reportedChildCount; }
 	void deleteChildren(void) { qDeleteAll(children); children.clear(); }
+	void deleteChildAtRow(int row) { if (row < children.size()) children.removeAt(row); }
 
 	~GdbVarObjectTreeItem() { deleteChildren(); }
 
@@ -616,7 +618,7 @@ public:
 			GdbVarObjectTreeItem * t = static_cast<GdbVarObjectTreeItem *>(root.internalPointer());
 			if (t->miName == miName)
 				return root;
-			int i;
+			int i = 0;
 			QModelIndex x;
 			while ((x = index(i ++, 0, root)).isValid())
 				if ((x = scan(x)).isValid())
@@ -624,12 +626,41 @@ public:
 			return x;
 		};
 
-		int i;
+		int i = 0;
 		QModelIndex x, invalid = QModelIndex();
 		while ((x = index(i ++, 0, invalid)).isValid())
 			if ((x = scan(x)).isValid())
 				break;
 		return x;
+	}
+
+	void removeTopLevelItem(const QModelIndex & index)
+	{
+		if (!index.parent().isValid())
+		{
+			beginRemoveRows(QModelIndex(), index.row(), index.row());
+			root.deleteChildAtRow(index.row());
+			endRemoveRows();
+		}
+	}
+
+	void removeAllTopLevelItems(void)
+	{
+		int i = root.childCount();
+		if (i)
+		{
+			beginRemoveRows(QModelIndex(), 0, 0);
+			do root.deleteChildAtRow(0); while (--i);
+			endRemoveRows();
+		}
+	}
+
+	static const GdbVarObjectTreeItem * varoObjectTreeItemForIndex(const QModelIndex & index)
+	{
+		if (!index.isValid())
+			return 0;
+		else
+			return static_cast<GdbVarObjectTreeItem *>(index.internalPointer());
 	}
 signals:
 	void readGdbVarObjectChildren(const QString varObjectName);
@@ -665,6 +696,7 @@ private:
 
 	const QString SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS			= "checkbox-hide-less-used-ui-items";
 	const QString SETTINGS_CHECKBOX_GDB_OUTPUT_LIMITING_MODE_STATE		= "checkbox-gdb-output-limiting-mode-state";
+	const QString SETTINGS_CHECKBOX_HIDE_GDB_MI_DATA_STATE			= "checkbox-gdb-hide-gdb-mi-data-state";
 	const QString SETTINGS_BOOL_SHOW_FULL_FILE_NAME_STATE			= "setting-show-full-file-name-state";
 	const QString SETTINGS_BOOL_SHOW_ONLY_SOURCES_WITH_MACHINE_CODE_STATE	= "setting-show-only-sources-with-machine-code-state";
 	const QString SETTINGS_BOOL_SHOW_ONLY_EXISTING_SOURCE_FILES		= "setting-show-only-existing-source-files";
@@ -672,9 +704,7 @@ private:
 
 	const QString SETTINGS_SCRATCHPAD_TEXT_CONTENTS				= "scratchpad-text-contents";
 
-	const QString SETTINGS_TRACE_LOG					= "trace-log";
-	const QString SETTINGS_CHECKBOX_SHOW_FULL_FILE_NAME_IN_TRACE_LOG_STATE	= "checkbox-show-full-file-name-in-trace-log-state";
-
+	/*! #todo	This is redundant, it should equal the last loaded executable in the most recent session record. */
 	const QString SETTINGS_LAST_LOADED_EXECUTABLE_FILE			= "last-loaded-executable-file";
 
 	const QString SETTINGS_GDB_EXECUTABLE_FILENAME				= "gdb-executable-filename";
@@ -683,9 +713,11 @@ private:
 
 	/* This is the index in the layout combo box to set when a default user interface configuration is requested. */
 	const int defaultLayoutIndex = 2;
-	const QString DEFAULT_PLAINTEXT_EDIT_STYLESHEET =  "font: 10pt 'Hack';";
+	const QString DEFAULT_PLAINTEXTEDIT_STYLESHEET =  "font: 10pt 'Hack';";
+	const QString HELPVIEW_PLAINTEXTEDIT_STYLESHEET =  "font: 10pt 'Hack'; background-color: MintCream;";
 
 	std::shared_ptr<QSettings> settings;
+	/*! #todo	This is redundant, it should equal the last used SVD file in the most recent session record. */
 	QString targetSVDFileName;
 
 	/* This list holds the items that will be shown or hidden when requesting to show or hide the not-so-often used user interface items, in order to make the user interface less cluttered. */
@@ -730,16 +762,20 @@ private:
 	void restoreSession(const QString & executableFileName);
 	void saveSessions(void);
 
-	Ui::DialogSettings settingsUi;
-	QDialog * dialogEditSettings;
+	void selectStackFrame(QTreeWidgetItem *item);
+
+	Ui::DialogSettings			uiSettings;
+	QDialog					* dialogEditSettings = 0;
+	Ui::DialogChooseFileForDebugging	uiChooseFileForDebugging;
+	QDialog					* dialogChooseFileForDebugging = 0;
 	void populateSettingsDialog(void)
 	{
-		settingsUi.lineEditGdbExecutable->setText(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString());
-		settingsUi.lineEditExternalEditorProgram->setText(settings->value(SETTINGS_EXTERNAL_EDITOR_PROGRAM, "").toString());
-		settingsUi.lineEditExternalEditorOptions->setText(settings->value(SETTINGS_EXTERNAL_EDITOR_COMMAND_LINE_OPTIONS, "").toString());
-		settingsUi.lineEditTargetSVDFileName->setText(targetSVDFileName);
-		settingsUi.checkBoxEnableNativeDebugging->setChecked(settings->value(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, false).toBool());
-		settingsUi.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
+		uiSettings.lineEditGdbExecutable->setText(settings->value(SETTINGS_GDB_EXECUTABLE_FILENAME, "").toString());
+		uiSettings.lineEditExternalEditorProgram->setText(settings->value(SETTINGS_EXTERNAL_EDITOR_PROGRAM, "").toString());
+		uiSettings.lineEditExternalEditorOptions->setText(settings->value(SETTINGS_EXTERNAL_EDITOR_COMMAND_LINE_OPTIONS, "").toString());
+		uiSettings.lineEditTargetSVDFileName->setText(targetSVDFileName);
+		uiSettings.checkBoxEnableNativeDebugging->setChecked(settings->value(SETTINGS_CHECKBOX_ENABLE_NATIVE_DEBUGGING_STATE, false).toBool());
+		uiSettings.checkBoxHideLessUsedUiItems->setChecked(settings->value(SETTINGS_CHECKBOX_HIDE_LESS_USED_UI_ITEMS, false).toBool());
 	}
 
 public:
@@ -752,13 +788,15 @@ private slots:
 	void displayHelp(void);
 	void gdbProcessError(QProcess::ProcessError error);
 	void gdbProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
-	void sendDataToGdbProcess(const QString &data);
+	void sendDataToGdbProcess(const QString &data, bool isFrontendIssuedCommand = true);
+
 	void readGdbVarObjectChildren(const QString varObjectName);
 	/* Returns true, if the source code file was successfully displayed, false otherwise. */
 	bool showSourceCode(const QTreeWidgetItem * item);
 	void breakpointsContextMenuRequested(QPoint p);
 	void svdContextMenuRequested(QPoint p);
 	void bookmarksContextMenuRequested(QPoint p);
+	void varObjectContextMenuRequested(QPoint p);
 	void breakpointViewItemChanged(QTreeWidgetItem * item, int column);
 	void stringSearchReady(const QString pattern, QSharedPointer<QVector<StringFinder::SearchResult>> results, bool resultsTruncated);
 	void createSvdRegisterView(QTreeWidgetItem *item, int column);
@@ -777,13 +815,9 @@ private slots:
 
 	void on_pushButtonDeleteAllBookmarks_clicked();
 
-	void on_pushButtonDisconnectGdbServer_clicked();
-
 	void on_lineEditFindText_returnPressed();
 
 	void requestTargetHalt(void);
-
-	void on_pushButtonDumpVarObjects_clicked();
 
 	void on_pushButtonLoadProgramToTarget_clicked();
 
@@ -895,28 +929,21 @@ private:
 			GdbResponseContext(enum GDB_RESPONSE_ENUM gdbResponseCode, const QString & s, void * p) : gdbResponseCode(gdbResponseCode), s(s), p(p) {}
 		};
 
-		struct GdbResponseContext readAndRemoveContext(unsigned tokenNumber)
+		void removeContext(unsigned tokenNumber)
 		{
 			auto t = gdbTokenContextMap.find(tokenNumber);
-			if (t == gdbTokenContextMap.end())
+			if (t != gdbTokenContextMap.end())
 			{
-				QMessageBox::critical(0, "Internal frontend error", "Internal error - could not locate gdb context. Please, report this");
-				return GdbResponseContext(GdbResponseContext::GDB_RESPONSE_INVALID);
+				gdbTokenPool[tokenNumber >> 3] &=~ (1 << (tokenNumber & 7));
+				gdbTokenContextMap.erase(t);
 			}
-			struct GdbResponseContext c = t->second;
-			gdbTokenContextMap.erase(t);
-			gdbTokenPool[tokenNumber >> 3] &=~ (1 << (tokenNumber & 7));
-			return c;
 		}
-		const struct GdbResponseContext & contextForTokenNumber(unsigned tokenNumber) const
+		const struct GdbResponseContext * contextForTokenNumber(unsigned tokenNumber) const
 		{
 			auto t = gdbTokenContextMap.find(tokenNumber);
 			if (t == gdbTokenContextMap.end())
-			{
-				QMessageBox::critical(0, "Internal frontend error", "Internal error - could not locate gdb context. Please, report this.\nThe frontend will now exit.");
-				exit(-1);
-			}
-			return t->second;
+				return 0;
+			return & t->second;
 		}
 		unsigned insertContext(const GdbResponseContext & context)
 		{
@@ -927,7 +954,8 @@ private:
 		bool hasContextForToken(unsigned tokenNumber)
 		{
 			/* Token number 0 is regarded as invalid, and must never be used. */
-			if (!tokenNumber) return false;
+			if (!tokenNumber)
+				return false;
 			return gdbTokenContextMap.count(tokenNumber) != 0;
 		}
 	private:
@@ -1007,12 +1035,14 @@ private:
 
 	enum TARGET_STATE
 	{
-		GDBSERVER_DISCONNECTED = 0,
+		GDB_NOT_RUNNING = 0,
+		GDBSERVER_DISCONNECTED,
 		TARGET_RUNNING,
 		TARGET_STOPPED,
 		TARGET_DETACHED,
 	}
-	target_state = GDBSERVER_DISCONNECTED;
+	target_state = GDB_NOT_RUNNING;
+	bool isBlackmagicProbeConnected = false;
 
 	/* This structure captures target output data, e.g., the target responses
 	 * for 'monitor swdp_scan' and 'monitor jtag_scan' commands. */
@@ -1049,7 +1079,10 @@ private:
 		QList<QAction *> enabledActionsWhenTargetDetached;
 		QList<QAction *> disabledActionsWhenTargetDetached;
 
-		void enterTargetState(enum TARGET_STATE target_state)
+		/*! \todo	The `isBlackmagicProbeConnected` parameter here is only needed to distinguish between a 'target detached'
+		 *		and a 'target disconnected' state, which is hard to do by only using information reports from gdb.
+		 *		This really needs to be handled in a better way. */
+		void enterTargetState(enum TARGET_STATE target_state, bool isBlackmagicProbeConnected, QLabel * systemStateLabel, QWidget * shortStatusLabel = 0)
 		{
 			//qDebug() << "Entering target state: " << target_state;
 			switch (target_state)
@@ -1067,6 +1100,8 @@ private:
 				for (const auto & a : enabledActionsWhenTargetDetached)
 					a->setEnabled(true);
 				break;
+			case GDB_NOT_RUNNING:
+				/* Treat the GDB_NOT_RUNNING state the same as the GDBSERVER_DISCONNECTED state. */
 			case GDBSERVER_DISCONNECTED:
 				for (const auto & w : disabledWidgetsWhenGdbServerDisconnected)
 					w->setEnabled(false);
@@ -1098,6 +1133,34 @@ private:
 					a->setEnabled(true);
 				break;
 			}
+			/* Update the status label. */
+			QString stateMessage = "<<< INVALID >>>", backgroundColor = "Red";
+			switch (target_state)
+			{
+				case GDB_NOT_RUNNING:
+					stateMessage = "GDB NOT RUNNING";
+					break;
+				case TARGET_DETACHED:
+					if (isBlackmagicProbeConnected)
+						stateMessage = "Target detached";
+					else
+				case GDBSERVER_DISCONNECTED:
+						stateMessage = "Target disconnected";
+					backgroundColor = "Yellow";
+					break;
+				case TARGET_RUNNING:
+					stateMessage = "Target running";
+					backgroundColor = "SpringGreen";
+					break;
+				case TARGET_STOPPED:
+					stateMessage = "Target halted";
+					backgroundColor = "SpringGreen";
+					break;
+			}
+			systemStateLabel->setText(stateMessage);
+			systemStateLabel->setStyleSheet(QString("background-color: %1;").arg(backgroundColor));
+			if (shortStatusLabel)
+				shortStatusLabel->setStyleSheet(QString("background-color: %1;").arg(backgroundColor));
 		}
 	}
 	targetStateDependentWidgets;
@@ -1129,6 +1192,8 @@ private:
 	void searchCurrentSourceText(const QString &pattern);
 	void moveCursorToNextMatch(void);
 	void moveCursorToPreviousMatch(void);
+
+	void scanForTargets(void);
 
 	void sendCommandsToGdb(QLineEdit * lineEdit);
 
@@ -1201,10 +1266,6 @@ private:
 private slots:
 	void updateHighlightedWidget(void);
 	void on_pushButtonSendScratchpadToGdb_clicked();
-
-	void on_pushButtonScanForTargets_clicked();
-
-	void on_pushButtonConnectGdbToGdbServer_clicked();
 
 	void compareTargetMemory();
 
@@ -1304,6 +1365,9 @@ private:
 	bool handleTargetScanResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 	/* Handle the response to the "-data-read-memory-bytes" machine interface gdb command. */
 	bool handleMemoryResponse(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
+
+	/* Generic error handler. */
+	void handleGdbError(enum GdbMiParser::RESULT_CLASS_ENUM parseResult, const std::vector<GdbMiParser::MIResult> & results, unsigned tokenNumber);
 
 protected:
 	void closeEvent(QCloseEvent *event) override;
