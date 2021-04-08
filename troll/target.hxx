@@ -97,7 +97,7 @@ public:
 				if (is_ram)
 					ram_areas.push_back((struct ram_area) { .start = start, .length = length, });
 				else
-					flash_areas.push_back((struct flash_area) { .start = start, .length = length, .blocksize = blocksize, });
+					flash_areas.push_back((struct flash_area) { .start = start, .length = length, .blocksize = (unsigned int) blocksize, });
 			}
 			for (i = 0; i < x.size(); i ++)
 			{
