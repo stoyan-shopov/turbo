@@ -157,6 +157,11 @@ void findConnectedProbes(std::vector<BmpProbeData> &probeData)
 
 }
 
+#elif defined Q_OS_MACOS
+void findConnectedProbes(std::vector<BmpProbeData> &probeData)
+{
+	probeData.clear();
+}
 #else
 #error Unsupported environment.
 #endif /* Q_OS_LINUX */
