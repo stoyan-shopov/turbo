@@ -12,7 +12,7 @@ Why another *gdb* frontend? There are already so many good *gdb* frontends, so w
 
 This frontend attempts to be a minimalistic, very thin wrapper around the *gdb* debugger, with a focus on remote debugging. Native debugging has its own challenges and peculiarities, and is currently out of scope for this frontend. Also, attempts are made to seamlessly interface with the powerful [blackmagic probe](https://github.com/blacksphere/blackmagic "Blackmagic probe home page"). At the moment, the frontend only supports connecting to the **blackmagic**  probe hardware directly. However, another, potentially much more powerful possibility exists - connecting to the **blackmagic** *hosted* variant, which supports more hardware probes, and has enhancements not present in the *blackmagic* probe firmware. Such support is intended to be added in the future.
 
-For reasons that will be made clear later, this frontend works best when debugging programs written in the **C** programming language. Of course, debugging programs written in any language supported by *gdb* is available, but the best debugging experience is with programs written in the **C** programming language.
+This frontend works best when debugging programs written in the **C** programming language. Of course, debugging programs written in any language supported by *gdb* is available, but the best debugging experience is with programs written in the **C** programming language.
 
 ### Building the software
 All of the prerequisite libraries (currently, this is only the [ELFIO library](https://github.com/serge1/ELFIO "ELFIO home page")) are provided in the project's github repository. The software is released under an MIT license. The Qt framework is being used for driving the graphical user interface. The Qt framework is freely available for download for non-commercial use. If you are downloading the Qt framework package for the first time, you may find it unusually hard to locate the list of offline installer packages, so here is a [direct link to the Qt offline installers](https://www.qt.io/offline-installers "Offline Qt Downloads"). Installing the Qt package, however, requires performing a free registration on the Qt site.
@@ -70,7 +70,7 @@ Because the frontend is being run for the first time, it needs some configuratio
 
 The pale grey text is a hint about what you need to specify in this dialog. It is absolutely essential to specify a valid **gdb** executable, the frontend will not work without one. If you intend to invoke an external editor from the frontend, for editing files, you can configure your prefered editor here as well.
 
-##### NOTE: the **Turbo** frontend is NOT an IDE. It can NOT be used for editing files. For that, you need an external editor.
+##### NOTE: the **Turbo** frontend is NOT an IDE. It can NOT be used for editing files. For that purpose, you need an external editor.
 
 Once the **gdb** program has been configured and successfully started, you will need to specify an executable file to debug:
 
@@ -129,7 +129,7 @@ This menu can be used for quickly locating a view window - by selecting the view
  - `Help` button - display brief help. This needs to be improved
  - `Go back` button - navigate to the previous source code location (if any) in the navigation stack, when browsing the program source code. The keyboard shortcut is `<ALT> + <LEFT ARROW>`
  - `Go forward` button - navigate to the next source code location (if any) in the navigation stack, when browsing the program source code. The keyboard shortcut is `<ALT> + <RIGHT ARROW>`
- - `RESTART` button - restart the frontend. Restarting the frontend is described in a section of its own.
+ - `RESTART` button - restart the frontend. **Currently, this is the only way to request loading of a new executable file for debugging.**
  - `Connect to blackmagic` button. Activating this button will attempt to automatically detect, and connect to an available **blackmagic** probe. In case only one **blackmagic** probe is found, an attempt to connect to it is made. In case more than one blackmagic probe is found (common, when debugging the **blackmagic** probe with another instance of itself), a dialog to select the probe is shown:
 
 ![Select blackmagic probe dialog][select-blackmagic-probe]
@@ -190,7 +190,19 @@ The Qt framework used in the frontend provides powerful facilities for construct
 
 A view can be closed, if not needed at a particular moment. A view can be recalled, most efficiently, by tapping the `<CTRL>` key twice, or by triggering either one of the `Show window`, or `Locate window` buttons. Triggering the `Locate window` button does the same as tapping the `<CTRL>` key twice.
 
-    DOCUMENT NOT FINISHED
+### Final remarks
+
+This small **gdb** frontend attempts to make debugging of small embedded targets remotely more efficient. In particular, there are some enhancements for working with the **blackmagic** probe.
+
+This program is not perfect, it attempts to be useful, not perfect.
+Debugging can often be a kind of craft, a process of observation, experimenting, and making and verifying assumptions.
+
+The debug experience mostly depends on the quality of the debug information provided by the compiler. In the case of the **gcc** and **clang** compilers, this is the **DWARF** debug information. The **DWARF** standard was conceived with **C**-like languages in mind. This explains why the **C** language has one of the best debugging supports available.
+
+Unfortunately, I doubt that I will be able to allocate much time on this project in the future. I will try to address any issues, but I can make no promises. In any case, please do report any issues on the github page of this project - even if I would not be able to address them, maybe someone else could, if he or she decides to take over this project. It would be best to at least be aware of the known issues.
+
+Thank you, and take care!
+    
 
 [gdb-not-set-message]: https://raw.githubusercontent.com/stoyan-shopov/turbo/devel/documentation/images/gdb-executable-not-set.png "Gdb not set message"
 [empty-configuration-dialog]: https://raw.githubusercontent.com/stoyan-shopov/turbo/devel/documentation/images/settings-dialog-not-filled.png "Empty configuration dialog"
@@ -206,3 +218,4 @@ A view can be closed, if not needed at a particular moment. A view can be recall
 [complete-view]: https://raw.githubusercontent.com/stoyan-shopov/turbo/devel/documentation/images/screenshot-large.png
 [complete-view-whole-screen]: https://raw.githubusercontent.com/stoyan-shopov/turbo/devel/documentation/images/screenshot-large-whole-screen.png
 [minimal-view]: https://raw.githubusercontent.com/stoyan-shopov/turbo/devel/documentation/images/minimal-view.png
+
